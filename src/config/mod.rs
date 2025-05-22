@@ -20,6 +20,10 @@ use crate::api::{self, ApiClient};
     bin_name = "linkura-cli",
 )]
 pub struct Args {
+    #[clap(short('k'), long)]
+    pub skip: bool,
+    #[clap(short('i'), long = "id", value_name = "ID")]
+    pub id: Option<String>,
     // #[command(subcommand)]
     // pub command: Commands,
 }
@@ -60,8 +64,6 @@ pub struct ConfigManager {
     home_dir_config_path: PathBuf,
 
     runtime_config_path: Option<PathBuf>,
-
-    home: Option<PathBuf>,
 }
 
 impl ConfigManager {
@@ -86,7 +88,6 @@ impl ConfigManager {
             current_dir_config_path,
             home_dir_config_path,
             runtime_config_path: None,
-            home,
         }
     }
 
@@ -178,35 +179,38 @@ impl Global {
         } else {
             match config_res.unwrap() {
                 Some(mut config) => {
-                    let mut sp = Spinner::new(
-                        spinners::Dots,
-                        "Checking for linkura version...",
-                        Color::Green,
-                    );
-                    // check if latest res_version and client_version
-                    let (res_version, client_version) = api_client.get_app_version().unwrap();
-                    if let Some(res_version) = res_version {
-                        if res_version != config.credential.res_version {
-                            sp.update_text(format!(
-                                "New res version found, update from {} to {}",
-                                config.credential.res_version, res_version
-                            ));
+                    if !args.skip {
+                        let mut sp = Spinner::new(
+                            spinners::Dots,
+                            "Checking for linkura version...",
+                            Color::Green,
+                        );
+                        // check if latest res_version and client_version
+                        let (res_version, client_version) = api_client.get_app_version().unwrap();
+                        if let Some(res_version) = res_version {
+                            if res_version != config.credential.res_version {
+                                sp.update_text(format!(
+                                    "New res version found, update from {} to {}",
+                                    config.credential.res_version, res_version
+                                ));
 
-                            config.credential.res_version = res_version;
+                                config.credential.res_version = res_version;
+                            }
                         }
+
+                        if let Some(client_version) = client_version {
+                            if client_version != config.credential.client_version {
+                                sp.update_text(format!(
+                                    "New client version found, update from {} to {}",
+                                    config.credential.client_version, client_version
+                                ));
+                                config.credential.client_version = client_version;
+                            }
+                        }
+
+                        sp.success("Version check complete!");
                     }
 
-                    if let Some(client_version) = client_version {
-                        if client_version != config.credential.client_version {
-                            sp.update_text(format!(
-                                "New client version found, update from {} to {}",
-                                config.credential.client_version, client_version
-                            ));
-                            config.credential.client_version = client_version;
-                        }
-                    }
-
-                    sp.success("Version check complete!");
                     config
                 }
                 None => Self::initialize_config(&config_manager, &api_client),
@@ -254,6 +258,31 @@ pub fn init() -> Result<Global> {
         global.config.credential.session_token.clone().unwrap()
     };
     global.api_client.set_session_token(&session_token);
+    // 测试登录态
+    sp.update_text("测试是否登录成功...");
+    match global.api_client.get_with_meets_plan_list() {
+        Ok(_) => {}
+        Err(_) => {
+            sp.update_text("测试获取信息失败，尝试重新登录");
+            global.api_client.del_session_token();
+            // delete session token
+            let session_token = global
+                .api_client
+                .device_id_login(
+                    &global.config.credential.player_id,
+                    &global.config.credential.device_specific_id,
+                )
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "初始化登录失败: {:?}，请尝试删除配置文件重新配置，或者使用命令行参数...",
+                        e
+                    )
+                })?;
+            global.config.credential.session_token = Some(session_token.clone());
+            global.api_client.set_session_token(&session_token);
+        }
+    }
+
     global
         .config_manager
         .save_config(&global.config)

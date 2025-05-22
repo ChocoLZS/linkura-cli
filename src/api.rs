@@ -153,29 +153,6 @@ impl ApiClient {
     ///
     /// Returns (x-res-version, `app version from website`)
     pub fn get_app_version(&self) -> Result<(Option<String>, Option<String>)> {
-        // empty id login check
-        let url = format!("{API_BASE}/user/login");
-        let res = self
-            .client
-            .post(url)
-            .headers(self.runtime_header.clone())
-            .header("x-idempotency-key", gen_random_idempotency_key())
-            .json(&json!({
-                "player_id": "",
-                "device_specific_id": "",
-                "version": 1
-            }))
-            .send()?;
-        let mut res_version: Option<String> = None;
-        if res.status() != reqwest::StatusCode::OK {
-            tracing::error!("Linkura api request failed: {:?}", res);
-        } else {
-            res_version = res.headers().get("x-res-version").map(|v| {
-                let version = v.to_str().unwrap_or_default();
-                version.split('@').next().unwrap_or_default().to_string()
-            });
-        }
-
         let mut app_version: Option<String> = None;
         let website = reqwest::blocking::Client::new()
             .get(LINKURA_APP_STORE_URL)
@@ -190,6 +167,30 @@ impl ApiClient {
             app_version = captures
                 .and_then(|cap| cap.get(1))
                 .map(|m| m.as_str().to_string());
+        }
+        // empty id login check
+        let url = format!("{API_BASE}/user/login");
+        let res = self
+            .client
+            .post(url)
+            .headers(self.runtime_header.clone())
+            .header("x-idempotency-key", gen_random_idempotency_key())
+            .header("x-client-version", app_version.clone().unwrap_or_default())
+            .json(&json!({
+                "player_id": "",
+                "device_specific_id": "",
+                "version": 1
+            }))
+            .send()?;
+        
+        let mut res_version: Option<String> = None;
+        if res.status() != reqwest::StatusCode::OK {
+            tracing::error!("Linkura api request failed: {:?}", res);
+        } else {
+            res_version = res.headers().get("x-res-version").map(|v| {
+                let version = v.to_str().unwrap_or_default();
+                version.split('@').next().unwrap_or_default().to_string()
+            });
         }
 
         Ok((res_version, app_version))
@@ -212,6 +213,75 @@ impl ApiClient {
             .get("plan_list")
             .ok_or_else(|| anyhow::anyhow!("Get meets plan list failed: {:?}", json))?;
         Ok(plan_list.clone())
+    }
+
+    pub fn get_archive_list(&self) -> Result<serde_json::Value> {
+        let url = format!("{API_BASE}/archive/get_archive_list");
+        let res = self
+            .client
+            .post(url)
+            .headers(self.runtime_header.clone())
+            .header("x-idempotency-key", gen_random_idempotency_key())
+            .json(&json!({
+                              "order": "desc",
+                              "characters": [],
+                              "limit": 4,
+                              "sort": "live_start_time"
+            }))
+            .send()?;
+        if res.status() != reqwest::StatusCode::OK {
+            return Err(anyhow::anyhow!("Get archive list failed: {:?}", res));
+        }
+        let json: serde_json::Value = res.json()?;
+        let archive_list = json
+            .get("archive_list")
+            .ok_or_else(|| anyhow::anyhow!("Get archive list failed: {:?}", json))?;
+        Ok(archive_list.clone())
+    }
+
+    pub fn get_with_meets_info(&self, id: &str) -> Result<serde_json::Value> {
+        let url = format!("{API_BASE}/withlive/enter");
+        let res = self
+            .client
+            .post(url)
+            .headers(self.runtime_header.clone())
+            .header("x-idempotency-key", gen_random_idempotency_key())
+            .json(&json!({
+                "live_id": id,
+            }))
+            .send()?;
+        if res.status() != reqwest::StatusCode::OK {
+            return Err(anyhow::anyhow!("Get meets info failed: {:?}", res));
+        }
+        let wm_info: serde_json::Value = res.json()?;
+        Ok(json!({
+            "description": wm_info.get("description").unwrap().as_str().unwrap(),
+            "thumbnail": wm_info.get("cover_image_url").unwrap().as_str().unwrap(),
+            "characters": wm_info.get("characters").unwrap().as_array().unwrap(),
+        }))
+    }
+
+    pub fn get_fes_live_info(&self, id: &str) -> Result<serde_json::Value> {
+        let url = format!("{API_BASE}/feslive/enter");
+        let res = self
+            .client
+            .post(url)
+            .headers(self.runtime_header.clone())
+            .header("x-idempotency-key", gen_random_idempotency_key())
+            .json(&json!({
+                "live_id": id,
+            }))
+            .send()?;
+        if res.status() != reqwest::StatusCode::OK {
+            return Err(anyhow::anyhow!("Get fes live info failed: {:?}", res));
+        }
+        let fes_info: serde_json::Value = res.json()?;
+        Ok(json!({
+            "room": fes_info.get("room").unwrap().as_object().unwrap(),
+            "name": fes_info.get("name").unwrap().as_str().unwrap(),
+            "description": fes_info.get("description").unwrap().as_str().unwrap(),
+            "characters": fes_info.get("characters").unwrap().as_array().unwrap(),
+        }))
     }
 }
 
@@ -241,5 +311,9 @@ impl ApiClient {
             header::AUTHORIZATION,
             format!("Bearer {}", token).parse().unwrap(),
         );
+    }
+
+    pub fn del_session_token(&mut self) {
+        self.runtime_header.remove(header::AUTHORIZATION);
     }
 }
