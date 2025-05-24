@@ -17,7 +17,19 @@ rand = "0.9.1"
 regex = "1.11.1"
 spinoff = "0.8.0"
 chrono = "0.4.41"
+p256 = { version = "0.13.2", features = ["ecdh"] }
 
 # No need for concurrent for now
-# tokio = { version = "1.44.2", features = ["full"] }
+tokio = { version = "1.44.2", features = ["full"] }
+rand_core = { version = "0.6.4", features = ["getrandom"] }
+hex = "0.4.3"
+ctrlc = "3.4.7"
 # once_cell = "1.21.3"
+
+[lib]
+name = "linkura_client"
+path = "src/lib/mod.rs"
+
+[[bin]]
+name = "mrs-client"
+path = "src/bin/mrs-client.rs"

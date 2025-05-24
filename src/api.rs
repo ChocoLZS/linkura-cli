@@ -182,7 +182,7 @@ impl ApiClient {
                 "version": 1
             }))
             .send()?;
-        
+
         let mut res_version: Option<String> = None;
         if res.status() != reqwest::StatusCode::OK {
             tracing::error!("Linkura api request failed: {:?}", res);
@@ -255,9 +255,12 @@ impl ApiClient {
         }
         let wm_info: serde_json::Value = res.json()?;
         Ok(json!({
+            "room": wm_info.get("room").unwrap().as_object().unwrap(),
+            "name": wm_info.get("name").unwrap().as_str().unwrap(),
             "description": wm_info.get("description").unwrap().as_str().unwrap(),
             "thumbnail": wm_info.get("cover_image_url").unwrap().as_str().unwrap(),
             "characters": wm_info.get("characters").unwrap().as_array().unwrap(),
+            "hls_url": wm_info.get("hls").unwrap().as_object().unwrap().get("url").unwrap().as_str().unwrap(),
         }))
     }
 

@@ -1,15 +1,13 @@
 use chrono::{DateTime, Utc};
 use config::init;
-use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+
+use linkura_client::log;
 
 mod api;
 mod config;
 
 fn main() {
-    tracing_subscriber::registry()
-        .with(fmt::layer())
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
-        .init();
+    log::init();
 
     // do prepare
     let global = init().expect("Failed to initialize config");
@@ -17,13 +15,13 @@ fn main() {
 
     let api_client = &global.api_client;
     let wm_res: serde_json::Value = api_client.get_with_meets_plan_list().unwrap();
-    println!("wm_res: {:?}", wm_res);
+    tracing::info!("wm_res: {:?}", wm_res);
     let archive_res: serde_json::Value = api_client.get_archive_list().unwrap();
-    println!("archive_res: {:?}", archive_res);
+    tracing::info!("archive_res: {:?}", archive_res);
 
     if let Some(id) = &args.id {
         let res = api_client.get_with_meets_info(&id).unwrap();
-        println!("wm info: {:?}", res);
+        tracing::info!("wm info: {:?}", res);
     } else {
         let mut res: Option<&serde_json::Value> = None;
         let now = Utc::now();
@@ -36,25 +34,23 @@ fn main() {
                 break;
             }
         }
-        let mut id = res
-            .unwrap()
-            .get("link")
-            .unwrap()
-            .as_str()
-            .unwrap();
+        let mut id = res.unwrap().get("link").unwrap().as_str().unwrap();
         // id may start with "withLive" or "fesLive"
-        
+
         let name: &str = res.unwrap().get("name").unwrap().as_str().unwrap();
         if id.starts_with("withLive") {
             id = id.strip_prefix("withLive").unwrap();
             let res: Result<serde_json::Value, anyhow::Error> = api_client.get_with_meets_info(id);
             match res {
                 Ok(res) => {
-                    println!(
-                        "latest wm info: \n title: {}\n description: {:?}\n thumbnail: {:?}\n characters: {:?}",
+                    tracing::info!(
+                        "[{}] latest wm info: \n title: {}\n description: {:?}\n room: {:?}\n thumbnail: {:?}\n hls_url: {:?}\n characters: {:?}",
+                        now.format("%Y-%m-%d %H:%M:%S"),
                         name,
                         res.get("description").unwrap().as_str().unwrap(),
+                        res.get("room").unwrap().as_object().unwrap(),
                         res.get("thumbnail").unwrap().as_str().unwrap(),
+                        res.get("hls_url").unwrap().as_str().unwrap(),
                         res.get("characters").unwrap().as_array().unwrap()
                     );
                 }
@@ -67,7 +63,8 @@ fn main() {
             let res: Result<serde_json::Value, anyhow::Error> = api_client.get_fes_live_info(id);
             match res {
                 Ok(res) => {
-                    println!("fes live info: \n title: {}\n description: {:?}\n room: {:?}\n characters: {:?}",
+                    tracing::info!(
+                        "fes live info: \n title: {}\n description: {:?}\n room: {:?}\n characters: {:?}",
                         name,
                         res.get("description").unwrap().as_str().unwrap(),
                         res.get("room").unwrap().as_object().unwrap(),
@@ -98,10 +95,19 @@ fn main() {
         .unwrap()
         .as_str()
         .unwrap();
+    let video_url = latest_archive_res
+        .get("video_url")
+        .unwrap()
+        .as_str()
+        .unwrap();
 
-    println!(
-        "latest archive: \n title: {:?}\n description: {:?}\n thumbnail: {:?}\n link: {:?}",
-        title, description, thumbnail, link
+    tracing::info!(
+        "latest archive: \n title: {:?}\n description: {:?}\n thumbnail: {:?}\n link: {:?}\n video_url: {:?}",
+        title,
+        description,
+        thumbnail,
+        link,
+        video_url
     );
 
     return;
