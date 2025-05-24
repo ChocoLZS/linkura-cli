@@ -8,8 +8,8 @@ use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
 };
+use std::thread::sleep;
 use std::time::Duration;
-use tokio::time::sleep;
 
 mod packet {
     use anyhow::{Context, Result};
@@ -66,7 +66,11 @@ mod packet {
                 MrsPacketType::KeyExchangeRequest => "KeyExchangeRequest",
                 MrsPacketType::JoinRoom => "JoinRoom",
                 MrsPacketType::KeepAliveResponse => "KeepAliveResponse",
-                _ => "Unknown Packet Type",
+                MrsPacketType::KeyExchangeResponse => "KeyExchangeResponse",
+                MrsPacketType::KeepAliveRequest => "KeepAliveRequest",
+                MrsPacketType::ConnectionClose => "ConnectionClose",
+                MrsPacketType::ConnectionCloseHardLimitOver => "ConnectionCloseHardLimitOver",
+                MrsPacketType::End => "End",
             }
         }
     }
@@ -136,11 +140,13 @@ mod packet {
             })
         }
 
+        #[allow(dead_code)]
         pub fn len(&self) -> usize {
             12 + self.payload.len()
         }
 
         /// 获取包的十六进制字符串表示（用于调试）
+        #[allow(dead_code)]
         pub fn to_hex_string(&self) -> String {
             hex::encode(self.to_bytes())
         }
@@ -261,6 +267,25 @@ const RECEIVE_DATA_INTERVAL: Duration = Duration::from_millis(10);
 const MAX_RECONNECT_ATTEMPTS: u32 = 5;
 const RECONNECT_DELAY: Duration = Duration::from_secs(5);
 
+#[derive(Debug, Clone)]
+pub struct MrsClientConfig {
+    pub receive_interval: Duration,
+    pub max_reconnect_attempts: u32,
+    pub reconnect_delay: Duration,
+    pub data_directory: String,
+}
+
+impl Default for MrsClientConfig {
+    fn default() -> Self {
+        Self {
+            receive_interval: RECEIVE_DATA_INTERVAL,
+            max_reconnect_attempts: MAX_RECONNECT_ATTEMPTS,
+            reconnect_delay: RECONNECT_DELAY,
+            data_directory: "data".to_string(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct MrsConnectionInfo {
     pub host: String,
@@ -276,18 +301,31 @@ pub struct MrsClient {
     running_signal: Arc<AtomicBool>,
     packet_generator: packet::PacketGenerator,
     connection_info: MrsConnectionInfo,
+    config: MrsClientConfig,
+    receive_buffer: Vec<u8>, // 接收缓冲区，用于处理TCP分片
 }
 
 impl MrsClient {
     pub fn new(
         running_signal: Arc<AtomicBool>,
         connection_info: MrsConnectionInfo,
+        config: Option<MrsClientConfig>,
+    ) -> Result<Self> {
+        Self::with_config(running_signal, connection_info, config.unwrap_or_default())
+    }
+
+    pub fn with_config(
+        running_signal: Arc<AtomicBool>,
+        connection_info: MrsConnectionInfo,
+        config: MrsClientConfig,
     ) -> Result<Self> {
         let p_k = EphemeralSecret::random(&mut OsRng);
         let pub_key = p_k.public_key();
         let pub_key_string = hex::encode(pub_key.to_sec1_bytes());
 
-        std::fs::create_dir_all("data").context("Failed to create data directory")?;
+        std::fs::create_dir_all(&config.data_directory)
+            .with_context(|| format!("Failed to create data directory: {}", config.data_directory))?;
+        
         Ok(Self {
             stream: None,
             pub_key_string,
@@ -295,6 +333,8 @@ impl MrsClient {
             running_signal,
             packet_generator: packet::PacketGenerator::new(),
             connection_info,
+            config,
+            receive_buffer: Vec::new()
         })
     }
 
@@ -372,32 +412,24 @@ impl MrsClient {
     /// 7. 客户端发送心跳包（KeepAliveResponse）
     ///
     fn handle_packet(&mut self, packet: packet::MrsPacket) -> Result<bool> {
+        tracing::debug!("Handling packet: {}", 
+            packet.packet_type.as_str());
+        
         match packet.packet_type {
             packet::MrsPacketType::VersionCheck => {
-                if let Err(e) = self.send_handshake() {
-                    tracing::error!("Failed to send handshake response: {}", e);
-                }
+                self.send_handshake().context("Failed to send handshake response")?;
             }
             packet::MrsPacketType::KeyExchangeResponse => {
-                if let Err(e) = self.send_join_room() {
-                    tracing::error!("Failed to send join room request: {}", e);
-                }
+                self.send_join_room().context("Failed to send join room request")?;
             }
             packet::MrsPacketType::KeepAliveRequest => {
-                if let Err(e) = self.send_keepalive() {
-                    tracing::error!("Failed to send keepalive response: {}", e);
-                }
+                self.send_keepalive().context("Failed to send keepalive response")?;
             }
             packet::MrsPacketType::End | packet::MrsPacketType::ConnectionClose => {
+                tracing::info!("Received connection close signal from server");
                 return Ok(false);
             }
-            _ => {
-                // 暂时不处理其他类型的包
-                tracing::warn!(
-                    "Received packet type: {}, but not handling it",
-                    packet.packet_type.as_str()
-                );
-            }
+            _ => {}
         }
         Ok(true)
     }
@@ -412,41 +444,17 @@ impl MrsClient {
                 return Ok(false);
             }
             Ok(bytes_read) => {
-                let data = &buffer[0..bytes_read];
+                let new_data = &buffer[0..bytes_read];
                 tracing::trace!(
                     "Received {} bytes from server: {}",
                     bytes_read,
-                    hex::encode(data)
+                    hex::encode(new_data)
                 );
-                match packet::MrsPacket::from_bytes(data) {
-                    Ok(packet) => {
-                        tracing::debug!(
-                            "Received packet: type={:?}, seq={}, payload_len={}",
-                            packet.packet_type,
-                            packet.sequence_number,
-                            packet.payload.len()
-                        );
-                        let Ok(_) = self.handle_packet(packet) else {
-                            return Ok(false);
-                        };
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to parse packet: {}, saving raw data", e);
-                    }
-                }
 
-                // 保存接收到的原始数据
-                let file_path = format!("data/data_{}.bin", self.data_index);
-                let mut file = File::create(&file_path)
-                    .with_context(|| format!("Failed to create file {}", file_path))?;
-                file.write_all(data)
-                    .with_context(|| format!("Failed to write data to {}", file_path))?;
-                tracing::debug!(
-                    "Data saved to {} ({} bytes)",
-                    file_path,
-                    bytes_read
-                );
-                self.data_index += 1;
+                self.receive_buffer.extend_from_slice(new_data);
+                
+                self.process_receive_buffer()?;
+
                 Ok(true)
             }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -455,6 +463,59 @@ impl MrsClient {
             }
             Err(e) => Err(anyhow::anyhow!("Error reading from socket: {}", e)),
         }
+    }
+
+    fn process_receive_buffer(&mut self) -> Result<()> {
+        // 目前保证收到的包的结构都是完整的
+        while self.receive_buffer.len() >= 4 {
+            let packet_length = u32::from_le_bytes([
+                self.receive_buffer[0],
+                self.receive_buffer[1], 
+                self.receive_buffer[2],
+                self.receive_buffer[3]
+            ]) as usize + 4;
+
+            if self.receive_buffer.len() >= packet_length {
+                let packet_data = self.receive_buffer[0..packet_length].to_vec();
+                
+                self.receive_buffer.drain(0..packet_length);
+                
+                match packet::MrsPacket::from_bytes(&packet_data) {
+                    Ok(packet) => {
+                        tracing::debug!(
+                            "Received packet: type={}, seq={}, payload_len={}",
+                            packet.packet_type.as_str(),
+                            packet.sequence_number,
+                            packet.payload.len()
+                        );
+                        
+                        if !self.handle_packet(packet)? {
+                            return Err(anyhow::anyhow!("Packet handling requested connection close"));
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to parse packet: {}", e);
+                    }
+                }
+
+                self.save_raw_data(&packet_data, packet_data.len())?;
+            } else {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    /// 保存原始数据用于调试
+    fn save_raw_data(&mut self, data: &[u8], size: usize) -> Result<()> {
+        let file_path = format!("{}/data_{}.bin", self.config.data_directory, self.data_index);
+        let mut file = File::create(&file_path)
+            .with_context(|| format!("Failed to create file {}", file_path))?;
+        file.write_all(data)
+            .with_context(|| format!("Failed to write data to {}", file_path))?;
+        tracing::debug!("Raw data saved to {} ({} bytes)", file_path, size);
+        self.data_index += 1;
+        Ok(())
     }
 
     fn send_keepalive(&mut self) -> Result<()> {
@@ -473,7 +534,7 @@ impl MrsClient {
         Ok(())
     }
 
-    pub async fn run(&mut self) -> Result<()> {
+    pub fn run(&mut self) -> Result<()> {
         let mut reconnect_attempts = 0u32;
 
         loop {
@@ -484,7 +545,7 @@ impl MrsClient {
 
             // 如果没有连接，尝试重连
             if self.stream.is_none() {
-                if reconnect_attempts >= MAX_RECONNECT_ATTEMPTS {
+                if reconnect_attempts >= self.config.max_reconnect_attempts {
                     return Err(anyhow::anyhow!("Max reconnection attempts reached"));
                 }
 
@@ -492,9 +553,9 @@ impl MrsClient {
                     tracing::info!(
                         "Reconnection attempt {} of {}",
                         reconnect_attempts + 1,
-                        MAX_RECONNECT_ATTEMPTS
+                        self.config.max_reconnect_attempts
                     );
-                    sleep(RECONNECT_DELAY).await;
+                    sleep(self.config.reconnect_delay);
                 }
 
                 match self.connect() {
@@ -509,7 +570,6 @@ impl MrsClient {
                 }
             }
 
-            // 处理不同状态的逻辑
             let result = match self.receive_data() {
                     Ok(true) => Ok(()),
                     Ok(false) => {
@@ -526,8 +586,7 @@ impl MrsClient {
                 continue;
             }
 
-            // 根据l4抓包数据获取的大概间隔
-            sleep(RECEIVE_DATA_INTERVAL).await;
+            sleep(self.config.receive_interval);
         }
 
         Ok(())
@@ -545,7 +604,43 @@ mod tests {
         "2300000001000000000000ff0200000003006d72730400000208006d72735f726f6f6d00000002"; // first packet
     const KEEPALIVE_RESPONSE: &str = "08000000040000000000a2ff"; // 4th packet
 
+
     #[test]
+    fn test_packet_type_conversion() {
+        assert_eq!(packet::MrsPacketType::from_u16(0xff00), Some(packet::MrsPacketType::VersionCheck));
+        assert_eq!(packet::MrsPacketType::from_u16(0xff01), Some(packet::MrsPacketType::KeyExchangeRequest));
+        assert_eq!(packet::MrsPacketType::from_u16(0x0005), Some(packet::MrsPacketType::JoinRoom));
+        assert_eq!(packet::MrsPacketType::from_u16(0xffa2), Some(packet::MrsPacketType::KeepAliveResponse));
+        assert_eq!(packet::MrsPacketType::from_u16(0x9999), None); // 未知类型
+    }
+
+    #[test]
+    fn test_client_config() {
+        let config = MrsClientConfig::default();
+        assert_eq!(config.receive_interval, Duration::from_millis(10));
+        assert_eq!(config.max_reconnect_attempts, 5);
+        assert_eq!(config.reconnect_delay, Duration::from_secs(5));
+        assert_eq!(config.data_directory, "data");
+
+        let custom_config = MrsClientConfig {
+            receive_interval: Duration::from_millis(20),
+            max_reconnect_attempts: 3,
+            reconnect_delay: Duration::from_secs(10),
+            data_directory: "custom_data".to_string(),
+        };
+
+        let running_signal = Arc::new(AtomicBool::new(true));
+        let connection_info = MrsConnectionInfo {
+            host: "localhost".to_string(),
+            port: 8080,
+            room_id: ROOM_ID,
+            player_id: PLAYER_ID,
+        };
+
+        let _client = MrsClient::with_config(running_signal, connection_info, custom_config).unwrap();
+    }
+
+    #[allow(dead_code)]
     fn test_all_packets() {
         let mut room_bytes = Vec::new();
         room_bytes.extend_from_slice(&ROOM_ID.to_le_bytes());

@@ -12,8 +12,7 @@ const PORT: u16 = 21011;
 const ROOM_ID: u32 = 1639274124;
 const PLAYER_ID: u16 = 11998;
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     log::init();
     // 设置优雅退出信号处理
     let running = Arc::new(AtomicBool::new(true));
@@ -34,6 +33,7 @@ async fn main() -> Result<()> {
             room_id: ROOM_ID,
             player_id: PLAYER_ID,
         },
+        None
     )
     .context("Failed to create MrsClient instance")?;
 
@@ -41,7 +41,7 @@ async fn main() -> Result<()> {
     tracing::info!("Press Ctrl+C to gracefully shutdown");
 
     // 运行客户端
-    match client.run().await {
+    match client.run() {
         Ok(_) => {
             tracing::info!("Client shut down gracefully");
         }
