@@ -303,6 +303,10 @@ pub struct MrsClient {
     connection_info: MrsConnectionInfo,
     config: MrsClientConfig,
     receive_buffer: Vec<u8>, // 接收缓冲区，用于处理TCP分片
+    saved_buffer: Vec<u8>, // 保存原始数据
+    state: packet::MrsPacketType,
+    timeout: Duration,
+    last_received: std::time::Instant,
 }
 
 impl MrsClient {
@@ -334,11 +338,22 @@ impl MrsClient {
             packet_generator: packet::PacketGenerator::new(),
             connection_info,
             config,
-            receive_buffer: Vec::new()
+            receive_buffer: Vec::new(),
+            saved_buffer: Vec::new(),
+            state: packet::MrsPacketType::VersionCheck,
+            timeout: Duration::from_secs(10), // 默认超时时间为10秒
+            last_received: std::time::Instant::now(),
         })
     }
 
-    pub fn connect(&mut self) -> Result<()> {
+    fn init_state(&mut self) {
+        self.state = packet::MrsPacketType::VersionCheck;
+        self.receive_buffer.clear();
+        self.saved_buffer.clear();
+        self.last_received = std::time::Instant::now();
+    }
+
+    fn connect(&mut self) -> Result<()> {
         tracing::info!(
             "Connecting to server at {}:{}...",
             self.connection_info.host, self.connection_info.port
@@ -358,6 +373,13 @@ impl MrsClient {
     }
 
     pub fn disconnect(&mut self) {
+        if !self.receive_buffer.is_empty() || !self.saved_buffer.is_empty() {
+            tracing::warn!("MrsClient disconnected with remaining data in receive && saved buffer, saving to file");
+            let data_to_save = std::mem::take(&mut self.receive_buffer);
+            if let Err(e) = self.save_raw_data(&data_to_save, data_to_save.len(), true) {
+                tracing::error!("Failed to save remaining data: {}", e);
+            }
+        }
         if let Some(stream) = self.stream.take() {
             let _ = stream.shutdown(std::net::Shutdown::Both);
             tracing::info!("Disconnected from server");
@@ -417,10 +439,20 @@ impl MrsClient {
         
         match packet.packet_type {
             packet::MrsPacketType::VersionCheck => {
+                if self.state != packet::MrsPacketType::VersionCheck {
+                    tracing::warn!("Received unexpected VersionCheck packet in state: {}", self.state.as_str());
+                    return Ok(false);
+                }
                 self.send_handshake().context("Failed to send handshake response")?;
+                self.state = packet::MrsPacketType::KeyExchangeRequest;
             }
             packet::MrsPacketType::KeyExchangeResponse => {
+                if self.state != packet::MrsPacketType::KeyExchangeRequest {
+                    tracing::warn!("Received unexpected KeyExchangeResponse packet in state: {}", self.state.as_str());
+                    return Ok(false);
+                }
                 self.send_join_room().context("Failed to send join room request")?;
+                self.state = packet::MrsPacketType::JoinRoom;
             }
             packet::MrsPacketType::KeepAliveRequest => {
                 self.send_keepalive().context("Failed to send keepalive response")?;
@@ -454,11 +486,15 @@ impl MrsClient {
                 self.receive_buffer.extend_from_slice(new_data);
                 
                 self.process_receive_buffer()?;
-
+                self.last_received = std::time::Instant::now();
                 Ok(true)
             }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 // 非阻塞模式下没有数据可读，正常情况
+                if self.last_received.elapsed() > self.timeout {
+                    tracing::warn!("No data received after {:?}, disconnecting", self.timeout);
+                    return Ok(false);
+                }
                 Ok(true)
             }
             Err(e) => Err(anyhow::anyhow!("Error reading from socket: {}", e)),
@@ -497,8 +533,7 @@ impl MrsClient {
                         tracing::warn!("Failed to parse packet: {}", e);
                     }
                 }
-
-                self.save_raw_data(&packet_data, packet_data.len())?;
+                self.save_raw_data(&packet_data, packet_data.len(), false)?;
             } else {
                 break;
             }
@@ -506,15 +541,20 @@ impl MrsClient {
         Ok(())
     }
 
-    /// 保存原始数据用于调试
-    fn save_raw_data(&mut self, data: &[u8], size: usize) -> Result<()> {
-        let file_path = format!("{}/data_{}.bin", self.config.data_directory, self.data_index);
-        let mut file = File::create(&file_path)
-            .with_context(|| format!("Failed to create file {}", file_path))?;
-        file.write_all(data)
-            .with_context(|| format!("Failed to write data to {}", file_path))?;
-        tracing::debug!("Raw data saved to {} ({} bytes)", file_path, size);
-        self.data_index += 1;
+    /// 保存原始数据
+    fn save_raw_data(&mut self, data: &[u8], size: usize, force: bool) -> Result<()> {
+        self.saved_buffer.extend_from_slice(data);
+        if self.saved_buffer.len() >= 1024 * 1024 || force {
+            tracing::info!("Save buffer exceeded 1MB, saving data to file");
+            let file_path = format!("{}/data_{}.bin", self.config.data_directory, self.data_index);
+            let mut file = File::create(&file_path)
+                .with_context(|| format!("Failed to create file {}", file_path))?;
+            file.write_all(&self.saved_buffer)
+                .with_context(|| format!("Failed to write data to {}", file_path))?;
+            tracing::debug!("Raw data saved to {} ({} bytes)", file_path, size);
+            self.data_index += 1;
+            self.saved_buffer.clear();
+        }
         Ok(())
     }
 
@@ -537,6 +577,7 @@ impl MrsClient {
     pub fn run(&mut self) -> Result<()> {
         let mut reconnect_attempts = 0u32;
 
+        self.init_state();
         loop {
             if !self.running_signal.load(Ordering::Relaxed) {
                 tracing::info!("Received shutdown signal, exiting...");
@@ -548,23 +589,21 @@ impl MrsClient {
                 if reconnect_attempts >= self.config.max_reconnect_attempts {
                     return Err(anyhow::anyhow!("Max reconnection attempts reached"));
                 }
-
-                if reconnect_attempts > 0 {
-                    tracing::info!(
-                        "Reconnection attempt {} of {}",
-                        reconnect_attempts + 1,
-                        self.config.max_reconnect_attempts
-                    );
-                    sleep(self.config.reconnect_delay);
-                }
+                tracing::info!(
+                    "Reconnection attempt {} of {}",
+                    reconnect_attempts + 1,
+                    self.config.max_reconnect_attempts
+                );
+                reconnect_attempts += 1;
+                sleep(self.config.reconnect_delay);
 
                 match self.connect() {
                     Ok(_) => {
-                        reconnect_attempts = 0;
+                        // reconnect_attempts = 0;
+                        self.init_state();
                     }
                     Err(e) => {
                         tracing::error!("Failed to connect: {}", e);
-                        reconnect_attempts += 1;
                         continue;
                     }
                 }
@@ -590,6 +629,12 @@ impl MrsClient {
         }
 
         Ok(())
+    }
+}
+
+impl Drop for MrsClient {
+    fn drop(&mut self) {
+        self.disconnect();
     }
 }
 
