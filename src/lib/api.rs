@@ -319,7 +319,7 @@ impl ApiClient {
     }
 
     pub fn update_with_credential(&mut self, credential: &Credential) {
-        
+        self.update_version(&credential.res_version, &credential.client_version);
         self.runtime_header.insert(
             "x-device-specific-id",
             credential.device_specific_id.parse().unwrap(),
