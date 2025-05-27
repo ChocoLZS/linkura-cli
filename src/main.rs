@@ -3,7 +3,6 @@ use config::init;
 
 use linkura_client::log;
 
-mod api;
 mod config;
 
 fn main() {

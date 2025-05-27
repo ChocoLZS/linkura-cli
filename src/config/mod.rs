@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::api::{self, ApiClient};
+use linkura_client::api::{self, ApiClient, Credential};
 
 /** ARG PARSER **/
 #[derive(Parser, Debug)]
@@ -37,20 +37,6 @@ pub enum Commands {
 }
 
 /** ARG PARSER END**/
-
-#[derive(Debug, Default, Deserialize, Serialize)]
-pub struct Credential {
-    /// x-res-version
-    pub res_version: String,
-    /// x-client-version
-    pub client_version: String,
-    /// device_specific_id
-    pub device_specific_id: String,
-    /// user account id
-    pub player_id: String,
-    /// session token
-    pub session_token: Option<String>,
-}
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Config {
@@ -175,7 +161,7 @@ impl Global {
 
         let config = if config_res.is_err() {
             tracing::error!("Failed to load config: {:?}", config_res.err());
-            Self::initialize_config(&config_manager, &api_client)
+            Self::initialize_config(&config_manager, &mut api_client)
         } else {
             match config_res.unwrap() {
                 Some(mut config) => {
@@ -213,7 +199,7 @@ impl Global {
 
                     config
                 }
-                None => Self::initialize_config(&config_manager, &api_client),
+                None => Self::initialize_config(&config_manager, &mut api_client),
             }
         };
 
@@ -226,13 +212,13 @@ impl Global {
         }
     }
 
-    fn initialize_config(config_manager: &ConfigManager, api_client: &ApiClient) -> Config {
+    fn initialize_config(config_manager: &ConfigManager, api_client: &mut ApiClient) -> Config {
         tracing::warn!(
             "No config found, creating a new one to path: {}",
             config_manager.get_config_path().display()
         );
         // first time to init interactive
-        let credential = interactive::get_credential_with_simple_prompt(&api_client)
+        let credential = interactive::get_credential_with_simple_prompt(api_client)
             .expect("Failed to get credential");
         Config { credential }
     }

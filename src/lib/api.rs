@@ -3,8 +3,21 @@ use rand::Rng;
 use rand::distr::Alphanumeric;
 use reqwest::header;
 use serde_json::json;
+use serde::{Deserialize, Serialize};
 
-use crate::config::Credential;
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct Credential {
+    /// x-res-version
+    pub res_version: String,
+    /// x-client-version
+    pub client_version: String,
+    /// device_specific_id
+    pub device_specific_id: String,
+    /// user account id
+    pub player_id: String,
+    /// session token
+    pub session_token: Option<String>,
+}
 
 const API_BASE: &str = "https://api.link-like-lovelive.app/v1";
 const LINKURA_APP_STORE_URL: &str = "https://apps.apple.com/jp/app/link-like-%E3%83%A9%E3%83%96%E3%83%A9%E3%82%A4%E3%83%96-%E8%93%AE%E3%83%8E%E7%A9%BA%E3%82%B9%E3%82%AF%E3%83%BC%E3%83%AB%E3%82%A2%E3%82%A4%E3%83%89%E3%83%AB%E3%82%AF%E3%83%A9%E3%83%96/id1665027261";
@@ -105,7 +118,7 @@ impl ApiClient {
         let json: serde_json::Value = res.json()?;
         let device_specific_id: &str = json["device_specific_id"].as_str().unwrap_or_default();
         if device_specific_id.is_empty() {
-            return Err(anyhow::anyhow!("Login failed"));
+            return Err(anyhow::anyhow!("Login failed, device_specific_id is empty"));
         }
         Ok(device_specific_id.to_string())
     }
@@ -290,22 +303,26 @@ impl ApiClient {
 
 // setter
 impl ApiClient {
-    pub fn update_with_credential(&mut self, credential: &Credential) {
+    pub fn update_version(&mut self, res_version: &str, client_version: &str) {
         self.runtime_header
-            .insert("x-res-version", credential.res_version.parse().unwrap());
+            .insert("x-res-version", res_version.parse().unwrap());
         self.runtime_header.insert(
             "x-client-version",
-            credential.client_version.parse().unwrap(),
-        );
-        self.runtime_header.insert(
-            "x-device-specific-id",
-            credential.device_specific_id.parse().unwrap(),
+            client_version.parse().unwrap(),
         );
         self.runtime_header.insert(
             header::USER_AGENT,
-            format!("{UA_PREFIX}/{0}", credential.client_version)
+            format!("{UA_PREFIX}/{0}", client_version)
                 .parse()
                 .unwrap(),
+        );
+    }
+
+    pub fn update_with_credential(&mut self, credential: &Credential) {
+        
+        self.runtime_header.insert(
+            "x-device-specific-id",
+            credential.device_specific_id.parse().unwrap(),
         );
     }
 
