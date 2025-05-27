@@ -8,6 +8,7 @@ use std::{
 };
 
 use linkura_client::api::{self, ApiClient, Credential};
+use rust_i18n::t;
 
 /** ARG PARSER **/
 #[derive(Parser, Debug)]
@@ -15,7 +16,7 @@ use linkura_client::api::{self, ApiClient, Credential};
     name = "linkura-cli",
     version = "0.1.0",
     author = "ChocoLZS, chocoielzs@gmail.com",
-    about = "Interactive Api Client for Linkura",
+    about = t!("linkura-cli.about").to_string(),
     long_about = None,
     bin_name = "linkura-cli",
 )]

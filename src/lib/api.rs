@@ -2,8 +2,8 @@ use anyhow::Result;
 use rand::Rng;
 use rand::distr::Alphanumeric;
 use reqwest::header;
-use serde_json::json;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Credential {
@@ -306,15 +306,11 @@ impl ApiClient {
     pub fn update_version(&mut self, res_version: &str, client_version: &str) {
         self.runtime_header
             .insert("x-res-version", res_version.parse().unwrap());
-        self.runtime_header.insert(
-            "x-client-version",
-            client_version.parse().unwrap(),
-        );
+        self.runtime_header
+            .insert("x-client-version", client_version.parse().unwrap());
         self.runtime_header.insert(
             header::USER_AGENT,
-            format!("{UA_PREFIX}/{0}", client_version)
-                .parse()
-                .unwrap(),
+            format!("{UA_PREFIX}/{0}", client_version).parse().unwrap(),
         );
     }
 

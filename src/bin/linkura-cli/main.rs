@@ -3,6 +3,8 @@ use config::init;
 
 use linkura_client::log;
 
+rust_i18n::i18n!("locales", fallback = "en");
+
 mod config;
 
 fn main() {

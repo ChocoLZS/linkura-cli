@@ -1,0 +1,6 @@
+_version: 2
+linkura-cli:
+  about:
+    en: "Interactive cli api client for Linkura"
+    zh-CN: "林库拉的交互式 API 客户端"
+    jp: "リンクラのインタラクティブな API クライアント"
