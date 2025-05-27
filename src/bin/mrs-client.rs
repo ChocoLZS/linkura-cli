@@ -1,13 +1,12 @@
 use anyhow::{Context, Result};
+use clap::Parser;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
 };
-use clap::Parser;
 
-
-use linkura_client::mrs::{MrsClient, MrsConnectionInfo};
 use linkura_client::log;
+use linkura_client::mrs::client::{MrsClient, MrsConnectionInfo};
 
 /** ARG PARSER **/
 #[derive(Parser, Debug)]
@@ -22,7 +21,12 @@ use linkura_client::log;
 pub struct Args {
     #[clap(short('a'), long = "address", value_name = "ADDRESS")]
     pub addr: String,
-    #[clap(short('p'), long = "port", value_name = "PORT", default_value_t = 21011)]
+    #[clap(
+        short('p'),
+        long = "port",
+        value_name = "PORT",
+        default_value_t = 21011
+    )]
     pub port: u16,
     #[clap(short('r'), long = "room-id", value_name = "ROOM_ID")]
     pub room_id: u32,
@@ -50,7 +54,7 @@ fn main() -> Result<()> {
             room_id: args.room_id,
             player_id: args.player_id,
         },
-        None
+        None,
     )
     .context("Failed to create MrsClient instance")?;
 
