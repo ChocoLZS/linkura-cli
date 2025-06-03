@@ -361,7 +361,7 @@ impl Client {
             let mut last_keepalive = std::time::Instant::now();
             
             tracing::info!("Keepalive thread started");
-            
+            // loop获取tcp流
             loop {
                 if !running_signal.load(Ordering::Relaxed) || !keepalive_enabled.load(Ordering::Relaxed) {
                     tracing::info!("Keepalive thread received shutdown signal, exiting...");
@@ -370,7 +370,7 @@ impl Client {
                 
                 if let Ok(mut stream) = rx.try_recv() {
                     tracing::debug!("Keepalive thread received new stream");
-                    
+                    // keepalive loop
                     loop {
                         if !running_signal.load(Ordering::Relaxed) || !keepalive_enabled.load(Ordering::Relaxed) {
                             tracing::info!("Keepalive thread received shutdown signal during keepalive loop");

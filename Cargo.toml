@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 default-run = "linkura-cli"
 
+[package.metadata.i18n]
+available-locales = ["en", "zh", "ja"]
+
 [dependencies]
 clap = { version = "4.5.37", features = ["derive"] }
 inquire = "0.7.5"
@@ -35,3 +38,8 @@ path = "src/lib/mod.rs"
 [[bin]]
 name = "mrs-client"
 path = "src/bin/mrs-client.rs"
+
+[[bin]]
+name = "als-client"
+path = "src/bin/als-client.rs"
+
