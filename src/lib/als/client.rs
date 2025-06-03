@@ -5,8 +5,9 @@ use std::net::TcpStream;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
+    mpsc::{self, Sender},
 };
-use std::thread::sleep;
+use std::thread::{self, JoinHandle, sleep};
 use std::time::Duration;
 
 use super::packet;
@@ -14,6 +15,7 @@ use super::packet;
 const RECEIVE_DATA_INTERVAL: Duration = Duration::from_millis(10);
 const MAX_RECONNECT_ATTEMPTS: u32 = 5;
 const RECONNECT_DELAY: Duration = Duration::from_secs(5);
+const KEEP_ALIVE_INTERVAL: Duration = Duration::from_millis(1350);
 
 #[derive(Debug, PartialEq)]
 enum ClientState {
@@ -108,6 +110,10 @@ pub struct Client {
     connection_info: ConnectionInfo,
     config: ClientConfig,
     runtime_state: ClientRuntimeState,
+    // Keepalive 线程管理
+    keepalive_enabled: Arc<AtomicBool>,
+    keepalive_handle: Option<JoinHandle<()>>,
+    keepalive_tx: Option<Sender<TcpStream>>,
 }
 
 impl Client {
@@ -117,8 +123,8 @@ impl Client {
         config: Option<ClientConfig>,
     ) -> Result<Self> {
         Self::with_config(running_signal, connection_info, config.unwrap_or_default())
-    }
-
+    }    
+    
     pub fn with_config(
         running_signal: Arc<AtomicBool>,
         connection_info: ConnectionInfo,
@@ -130,6 +136,9 @@ impl Client {
             connection_info,
             config,
             runtime_state: ClientRuntimeState::new(),
+            keepalive_enabled: Arc::new(AtomicBool::new(false)),
+            keepalive_handle: None,
+            keepalive_tx: None,
         })
     }
 
@@ -151,9 +160,10 @@ impl Client {
         self.stream = Some(stream);
         tracing::info!("Connected to server successfully");
         Ok(())
-    }
-
+    }    
+    
     pub fn disconnect(&mut self) {
+        self.stop_keepalive_thread();
         if !self.runtime_state.receive_buffer.is_empty()
             || !self.runtime_state.saved_buffer.is_empty()
         {
@@ -229,11 +239,18 @@ impl Client {
             if self.runtime_state.receive_buffer.len() >= packet_length {
                 let packet_data = self.runtime_state.receive_buffer[0..packet_length].to_vec();
 
-                self.runtime_state.receive_buffer.drain(0..packet_length);
+                self.runtime_state.receive_buffer.drain(0..packet_length);                
                 if self.runtime_state.state == ClientState::Join {
                     packet::AlsPacket::JoinRequest { live_id: self.connection_info.live_id.clone() }
                         .send(self.stream.as_mut().context("No active connection")?)?;
                     self.runtime_state.state = ClientState::ReceivingData;
+
+                    if let Err(e) = self.start_keepalive_thread() {
+                        tracing::error!("Failed to start keepalive thread: {}", e);
+                    }
+                    if let Err(e) = self.send_stream_to_keepalive() {
+                        tracing::error!("Failed to send stream to keepalive thread: {}", e);
+                    }
                 }
 
                 self.save_raw_data(&packet_data, packet_data.len(), false)?;
@@ -263,22 +280,6 @@ impl Client {
             self.runtime_state.increase_data_index();
             self.runtime_state.saved_buffer.clear();
         }
-        Ok(())
-    }
-
-    fn send_keepalive(&mut self) -> Result<()> {
-        let stream = self.stream.as_mut().context("No active connection")?;
-
-        // 使用新的packet系统发送keepalive消息
-        // let keepalive_packet = self
-        //     .packet_generator
-        //     .generate::<packet::KeepAliveResponse>(())?;
-        // let keepalive_bytes = keepalive_packet.to_bytes();
-        // keepalive_packet.log_send();
-        // stream
-        //     .write_all(&keepalive_bytes)
-        //     .context("Failed to send keepalive packet")?;
-        // keepalive_packet.log_sent();
         Ok(())
     }
 
@@ -342,6 +343,102 @@ impl Client {
             sleep(self.config.receive_interval);
         }
 
+        Ok(())
+    }
+
+    fn start_keepalive_thread(&mut self) -> Result<()> {
+        if self.keepalive_handle.is_some() {
+            self.stop_keepalive_thread();
+        }
+
+        let (tx, rx) = mpsc::channel::<TcpStream>();
+        let running_signal = self.running_signal.clone();
+        let keepalive_enabled = self.keepalive_enabled.clone();
+
+        keepalive_enabled.store(true, Ordering::Relaxed);
+        
+        let handle = thread::spawn(move || {
+            let mut last_keepalive = std::time::Instant::now();
+            
+            tracing::info!("Keepalive thread started");
+            
+            loop {
+                if !running_signal.load(Ordering::Relaxed) || !keepalive_enabled.load(Ordering::Relaxed) {
+                    tracing::info!("Keepalive thread received shutdown signal, exiting...");
+                    break;
+                }
+                
+                if let Ok(mut stream) = rx.try_recv() {
+                    tracing::debug!("Keepalive thread received new stream");
+                    
+                    loop {
+                        if !running_signal.load(Ordering::Relaxed) || !keepalive_enabled.load(Ordering::Relaxed) {
+                            tracing::info!("Keepalive thread received shutdown signal during keepalive loop");
+                            break;
+                        }
+                        
+                        if last_keepalive.elapsed() >= KEEP_ALIVE_INTERVAL {
+                            let keepalive_packet = packet::AlsPacket::KeepAliveRequest {};
+                            match keepalive_packet.send(&mut stream) {
+                                Ok(_) => {
+                                    tracing::trace!("Keepalive packet sent successfully");
+                                    last_keepalive = std::time::Instant::now();
+                                }
+                                Err(e) => {
+                                    tracing::error!("Failed to send keepalive packet: {}", e);
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        sleep(Duration::from_millis(100));
+                    }
+                }
+
+                sleep(Duration::from_millis(100));
+            }
+            
+            tracing::info!("Keepalive thread exited");
+        });
+
+        self.keepalive_handle = Some(handle);
+        self.keepalive_tx = Some(tx);
+        
+        tracing::info!("Keepalive thread started successfully");
+        Ok(())
+    }
+
+    fn stop_keepalive_thread(&mut self) {
+        self.keepalive_enabled.store(false, Ordering::Relaxed);
+        
+        if let Some(handle) = self.keepalive_handle.take() {
+            if let Err(e) = handle.join() {
+                tracing::error!("Error joining keepalive thread: {:?}", e);
+            }
+        }
+        
+        self.keepalive_tx = None;
+        
+        tracing::debug!("Keepalive thread stopped");
+    }
+
+    fn send_stream_to_keepalive(&mut self) -> Result<()> {
+        if let (Some(tx), Some(stream)) = (&self.keepalive_tx, &self.stream) {
+            match stream.try_clone() {
+                Ok(cloned_stream) => {
+                    if let Err(e) = tx.send(cloned_stream) {
+                        tracing::error!("Failed to send stream to keepalive thread: {}", e);
+                        return Err(anyhow::anyhow!("Failed to send stream to keepalive thread: {}", e));
+                    } else {
+                        tracing::debug!("Stream sent to keepalive thread");
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to clone stream for keepalive thread: {}", e);
+                    return Err(anyhow::anyhow!("Failed to clone stream for keepalive thread: {}", e));
+                }
+            }
+        }
         Ok(())
     }
 }

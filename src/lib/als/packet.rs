@@ -4,6 +4,7 @@ use std::io::{Write};
 // protobuf format, but we do not use protobuf in this project.
 // instead we use a custom format
 static MAGIC_DELIMITER: [u8; 3] = [0x00, 0x82, 0x01];
+static KEEP_ALIVE_MAGIC: [u8; 3] = [0x00, 0x48, 0x01];
 pub enum AlsPacket {
     AuthenticateRequest {
         /// Token
@@ -11,7 +12,8 @@ pub enum AlsPacket {
     },
     JoinRequest {
         live_id: String,
-    }
+    },
+    KeepAliveRequest {}
 }
 
 impl AlsPacket {
@@ -54,7 +56,10 @@ impl AlsPacket {
                 bytes.extend_from_slice(&[0x0a]);
                 bytes.extend_from_slice(&varint);
                 bytes.extend_from_slice(live_id.as_bytes());
-            }
+            },
+            AlsPacket::KeepAliveRequest {} => {
+                bytes.extend_from_slice(&KEEP_ALIVE_MAGIC);
+            },
         }
         let length = ((bytes.len() - 2) as u16).to_be_bytes();
         bytes[0] = length[0];
