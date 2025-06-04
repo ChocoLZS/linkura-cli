@@ -16,7 +16,7 @@ use rust_i18n::t;
     name = "linkura-cli",
     version = "0.1.0",
     author = "ChocoLZS, chocoielzs@gmail.com",
-    about = t!("linkura-cli.about").to_string(),
+    about = t!("linkura.cli.about").to_string(),
     long_about = None,
     bin_name = "linkura-cli",
 )]
@@ -25,16 +25,50 @@ pub struct Args {
     pub skip: bool,
     #[clap(short('i'), long = "id", value_name = "ID")]
     pub id: Option<String>,
-    // #[command(subcommand)]
-    // pub command: Commands,
+    #[clap(short('c'), long = "config", value_name = "CONFIG_PATH")]
+    pub config_path: Option<String>,
+    #[command(subcommand)]
+    pub command: Option<Commands>,
 }
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// Get the video id from the url
-    Player,
-    /// Get the video url from the id
-    Event,
+    /// Get mrs data
+    MRS {
+        #[clap(short('a'), long = "address", value_name = "ADDRESS")]
+        addr: String,
+        #[clap(
+            short('p'),
+            long = "port",
+            value_name = "PORT",
+            default_value_t = 21011
+        )]
+        port: u16,
+        #[clap(short('r'), long = "room-id", value_name = "ROOM_ID")]
+        room_id: u32,
+        #[clap(short('i'), long = "player-id", value_name = "PLAYER_ID")]
+        player_id: u16,
+        #[clap(short('w'), long = "watch", value_name = "WATCH")]
+        watch: bool,
+    },
+    /// Get als data
+    ALS {
+        #[clap(short('a'), long = "address", value_name = "ADDRESS")]
+        addr: Option<String>,
+        #[clap(short('p'), long = "port", value_name = "PORT")]
+        port: Option<u16>,
+        #[clap(short('l'), long = "room-id", value_name = "ROOM_ID")]
+        room_id: Option<String>,
+        #[clap(short('t'), long = "token", value_name = "TOKEN")]
+        token: Option<String>,
+        #[clap(
+            short('w'),
+            long = "watch",
+            value_name = "WATCH_MODE",
+            default_value_t = false
+        )]
+        watch: bool,
+    },
 }
 
 /** ARG PARSER END**/
@@ -247,7 +281,7 @@ pub fn init() -> Result<Global> {
     global.api_client.set_session_token(&session_token);
     // 测试登录态
     sp.update_text("测试是否登录成功...");
-    match global.api_client.get_with_meets_plan_list() {
+    match global.api_client.get_plan_list() {
         Ok(_) => {}
         Err(_) => {
             sp.update_text("测试获取信息失败，尝试重新登录");

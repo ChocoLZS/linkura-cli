@@ -30,6 +30,7 @@ hex = "0.4.3"
 ctrlc = "3.4.7"
 indicatif = "0.17.11"
 rust-i18n = "3.1.5"
+base64 = "0.22.1"
 
 [lib]
 name = "linkura_client"

@@ -54,7 +54,7 @@ impl Default for ClientConfig {
 pub struct ConnectionInfo {
     pub host: String,
     pub port: u16,
-    pub live_id: String,
+    pub room_id: String,
     pub token: String,
 }
 
@@ -123,8 +123,8 @@ impl Client {
         config: Option<ClientConfig>,
     ) -> Result<Self> {
         Self::with_config(running_signal, connection_info, config.unwrap_or_default())
-    }    
-    
+    }
+
     pub fn with_config(
         running_signal: Arc<AtomicBool>,
         connection_info: ConnectionInfo,
@@ -160,8 +160,8 @@ impl Client {
         self.stream = Some(stream);
         tracing::info!("Connected to server successfully");
         Ok(())
-    }    
-    
+    }
+
     pub fn disconnect(&mut self) {
         self.stop_keepalive_thread();
         if !self.runtime_state.receive_buffer.is_empty()
@@ -185,7 +185,10 @@ impl Client {
         let stream = self.stream.as_mut().context("No active connection")?;
         // 客户端主动发起连接
         if self.runtime_state.state == ClientState::Auth {
-            packet::AlsPacket::AuthenticateRequest { token: self.connection_info.token.clone() }.send(stream)?;
+            packet::AlsPacket::AuthenticateRequest {
+                token: self.connection_info.token.clone(),
+            }
+            .send(stream)?;
             self.runtime_state.state = ClientState::Join;
             return Ok(true);
         }
@@ -239,10 +242,12 @@ impl Client {
             if self.runtime_state.receive_buffer.len() >= packet_length {
                 let packet_data = self.runtime_state.receive_buffer[0..packet_length].to_vec();
 
-                self.runtime_state.receive_buffer.drain(0..packet_length);                
+                self.runtime_state.receive_buffer.drain(0..packet_length);
                 if self.runtime_state.state == ClientState::Join {
-                    packet::AlsPacket::JoinRequest { live_id: self.connection_info.live_id.clone() }
-                        .send(self.stream.as_mut().context("No active connection")?)?;
+                    packet::AlsPacket::JoinRequest {
+                        room_id: self.connection_info.room_id.clone(),
+                    }
+                    .send(self.stream.as_mut().context("No active connection")?)?;
                     self.runtime_state.state = ClientState::ReceivingData;
 
                     if let Err(e) = self.start_keepalive_thread() {
@@ -356,27 +361,33 @@ impl Client {
         let keepalive_enabled = self.keepalive_enabled.clone();
 
         keepalive_enabled.store(true, Ordering::Relaxed);
-        
+
         let handle = thread::spawn(move || {
             let mut last_keepalive = std::time::Instant::now();
-            
+
             tracing::info!("Keepalive thread started");
             // loop获取tcp流
             loop {
-                if !running_signal.load(Ordering::Relaxed) || !keepalive_enabled.load(Ordering::Relaxed) {
+                if !running_signal.load(Ordering::Relaxed)
+                    || !keepalive_enabled.load(Ordering::Relaxed)
+                {
                     tracing::info!("Keepalive thread received shutdown signal, exiting...");
                     break;
                 }
-                
+
                 if let Ok(mut stream) = rx.try_recv() {
                     tracing::debug!("Keepalive thread received new stream");
                     // keepalive loop
                     loop {
-                        if !running_signal.load(Ordering::Relaxed) || !keepalive_enabled.load(Ordering::Relaxed) {
-                            tracing::info!("Keepalive thread received shutdown signal during keepalive loop");
+                        if !running_signal.load(Ordering::Relaxed)
+                            || !keepalive_enabled.load(Ordering::Relaxed)
+                        {
+                            tracing::info!(
+                                "Keepalive thread received shutdown signal during keepalive loop"
+                            );
                             break;
                         }
-                        
+
                         if last_keepalive.elapsed() >= KEEP_ALIVE_INTERVAL {
                             let keepalive_packet = packet::AlsPacket::KeepAliveRequest {};
                             match keepalive_packet.send(&mut stream) {
@@ -390,35 +401,35 @@ impl Client {
                                 }
                             }
                         }
-                        
+
                         sleep(Duration::from_millis(100));
                     }
                 }
 
                 sleep(Duration::from_millis(100));
             }
-            
+
             tracing::info!("Keepalive thread exited");
         });
 
         self.keepalive_handle = Some(handle);
         self.keepalive_tx = Some(tx);
-        
+
         tracing::info!("Keepalive thread started successfully");
         Ok(())
     }
 
     fn stop_keepalive_thread(&mut self) {
         self.keepalive_enabled.store(false, Ordering::Relaxed);
-        
+
         if let Some(handle) = self.keepalive_handle.take() {
             if let Err(e) = handle.join() {
                 tracing::error!("Error joining keepalive thread: {:?}", e);
             }
         }
-        
+
         self.keepalive_tx = None;
-        
+
         tracing::debug!("Keepalive thread stopped");
     }
 
@@ -428,14 +439,20 @@ impl Client {
                 Ok(cloned_stream) => {
                     if let Err(e) = tx.send(cloned_stream) {
                         tracing::error!("Failed to send stream to keepalive thread: {}", e);
-                        return Err(anyhow::anyhow!("Failed to send stream to keepalive thread: {}", e));
+                        return Err(anyhow::anyhow!(
+                            "Failed to send stream to keepalive thread: {}",
+                            e
+                        ));
                     } else {
                         tracing::debug!("Stream sent to keepalive thread");
                     }
                 }
                 Err(e) => {
                     tracing::error!("Failed to clone stream for keepalive thread: {}", e);
-                    return Err(anyhow::anyhow!("Failed to clone stream for keepalive thread: {}", e));
+                    return Err(anyhow::anyhow!(
+                        "Failed to clone stream for keepalive thread: {}",
+                        e
+                    ));
                 }
             }
         }
@@ -475,11 +492,10 @@ mod tests {
         let connection_info = ConnectionInfo {
             host: "localhost".to_string(),
             port: 8080,
-            live_id: LIVE_ID.to_string(),
+            room_id: LIVE_ID.to_string(),
             token: TOKEN.to_string(),
         };
 
-        let _client =
-            Client::with_config(running_signal, connection_info, custom_config).unwrap();
+        let _client = Client::with_config(running_signal, connection_info, custom_config).unwrap();
     }
 }

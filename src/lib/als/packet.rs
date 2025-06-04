@@ -1,6 +1,6 @@
-use std::net::TcpStream;
 use anyhow::Result;
-use std::io::{Write};
+use std::io::Write;
+use std::net::TcpStream;
 // protobuf format, but we do not use protobuf in this project.
 // instead we use a custom format
 static MAGIC_DELIMITER: [u8; 3] = [0x00, 0x82, 0x01];
@@ -11,9 +11,9 @@ pub enum AlsPacket {
         token: String,
     },
     JoinRequest {
-        live_id: String,
+        room_id: String,
     },
-    KeepAliveRequest {}
+    KeepAliveRequest {},
 }
 
 impl AlsPacket {
@@ -21,7 +21,7 @@ impl AlsPacket {
         let mut bytes = Vec::new();
         let mut len = length;
         while len > 0 {
-            let part =  (len & 0x7f) as u8;
+            let part = (len & 0x7f) as u8;
             len >>= 7;
             if len == 0 {
                 bytes.push(part);
@@ -49,17 +49,17 @@ impl AlsPacket {
                 bytes.extend_from_slice(token.as_bytes());
                 // big endian header length
             }
-            AlsPacket::JoinRequest { live_id } => {
-                let varint = Self::get_varint(live_id.len() as u16);
+            AlsPacket::JoinRequest { room_id } => {
+                let varint = Self::get_varint(room_id.len() as u16);
                 // magic
                 bytes.extend_from_slice(&[0x31, 0x9a, 0x01, 0x2e]);
                 bytes.extend_from_slice(&[0x0a]);
                 bytes.extend_from_slice(&varint);
-                bytes.extend_from_slice(live_id.as_bytes());
-            },
+                bytes.extend_from_slice(room_id.as_bytes());
+            }
             AlsPacket::KeepAliveRequest {} => {
                 bytes.extend_from_slice(&KEEP_ALIVE_MAGIC);
-            },
+            }
         }
         let length = ((bytes.len() - 2) as u16).to_be_bytes();
         bytes[0] = length[0];
@@ -77,7 +77,6 @@ impl AlsPacket {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -94,9 +93,9 @@ mod tests {
         };
         let bytes = auth_packet.to_bytes();
         assert_eq!(bytes, hex::decode("0274008201ef048201eb040ae80465794a68624763694f694a49557a55784d694973496e523563434936496b705856434a392e65794a7a5a584a3261574e6c583252766257467062694936496d68306448427a4f693876595842704c6d7870626d737462476c725a53317362335a6c62476c325a533568634841694c434a73615735725832787061325666615751694f694a425155464251554642515545694c434a796232397458326c6b496a6f695a47566d595856736443316d59574e695a4745314d533169596a6c6b4c5451794e6a6374596a5268596930315a57597a597a67334f474a685a574d694c434a796232786c496a6f695958566b61575675593255694c434a77623251694f6e7369636d39735a534936496d46315a476c6c626d4e6c4969776963324e6f5a57316c496a6f6964474e77496977695957526b636d567a63794936496a45774c6a45784e4334314d5451754d546b784969776963473979644349364f5467784d483073496d6c7a63794936496d68306448427a4f693876595842704c6d7870626d737462476c725a53317362335a6c62476c325a533568634841694c434a7a645749694f694a425155464251554642515545694c434a68645751694f6c7369515546425155464251554642496c3073496d5634634349364d5463304f4455784f4455334e537769626d4a6d496a6f784e7a51344e5445344e5459774c434a70595851694f6a45334e4467314d5467314e6a42392e656464695a6a7a45485f49383877396c6d4f564272325a344257536849763679654d3954505a764b49747335726d5046777642624a454b66666b6f6258676c4f75554270383073764c6f7566797a4f4d5f59536d4467").unwrap());
-        
+
         let join_packet = AlsPacket::JoinRequest {
-            live_id: "default-facbda51-bb9d-4267-b4ab-5ef3c878baec".to_string(),
+            room_id: "default-facbda51-bb9d-4267-b4ab-5ef3c878baec".to_string(),
         };
         let bytes = join_packet.to_bytes();
         assert_eq!(bytes, hex::decode("0035008201319a012e0a2c64656661756c742d66616362646135312d626239642d343236372d623461622d356566336338373862616563").unwrap());
