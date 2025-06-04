@@ -1,35 +1,24 @@
 use crate::config::Global;
-use chrono::{DateTime, Local, Utc};
+use chrono::{Local, Utc};
+use linkura_client::api::{extract_jwt_payload, get_hls_url_from_archive};
 
 pub fn run(ctx: &Global) {
     let args = &ctx.args;
 
     let api_client = &ctx.api_client;
     let wm_res: serde_json::Value = api_client.get_plan_list().unwrap();
-    tracing::info!("wm_res: {:?}", wm_res);
-    let archive_res: serde_json::Value = api_client.get_archive_list().unwrap();
-    tracing::info!("archive_res: {:?}", archive_res);
 
     if let Some(id) = &args.id {
         let res = api_client.get_with_meets_info(&id).unwrap();
         tracing::info!("wm info: {:?}", res);
     } else {
-        let mut res: Option<&serde_json::Value> = None;
-        let now = Utc::now();
-        for item in wm_res.as_array().unwrap().into_iter() {
-            let end_time = item.get("end_time").unwrap().as_str().unwrap();
-            let end_time = DateTime::parse_from_rfc3339(end_time).unwrap();
-            if now <= end_time {
-                res = Some(item)
-            } else {
-                break;
-            }
-        }
+        let res = wm_res.as_array().unwrap().first();
         if let Some(res) = res {
             print_latest_trailer_archive(ctx, res);
         }
     }
 
+    let archive_res: serde_json::Value = api_client.get_archive_list().unwrap();
     let latest_archive_res = archive_res.as_array().unwrap()[0].clone();
     print_latest_archive_info(ctx, &latest_archive_res);
 }
@@ -73,6 +62,8 @@ fn print_latest_trailer_archive(ctx: &Global, wm: &serde_json::Value) {
         );
         return;
     }
+    let maybe_started = Utc::now() >= chrono::DateTime::parse_from_rfc3339(start_time).unwrap() - chrono::Duration::minutes(10);
+
     if live_type == 2 {
         let res: Result<serde_json::Value, anyhow::Error> = api_client.get_with_meets_info(id);
         match res {
@@ -93,6 +84,24 @@ fn print_latest_trailer_archive(ctx: &Global, wm: &serde_json::Value) {
                     name,
                     id
                 );
+            }
+        }
+        if maybe_started {
+            let token = api_client.get_with_meets_connect_token(id);
+            match token {
+                Ok(token) => {
+                    let _ = extract_jwt_payload(token.as_str()).and_then(|payload| {
+                        tracing::info!("Room info: \n address: {}\n port: {}\n room_id: {}",
+                            payload["pod"]["address"].as_str().unwrap().to_string(),
+                            payload["pod"]["port"].as_u64().unwrap(),
+                            payload["room_id"].as_str().unwrap().to_string()
+                        );
+                        Ok(payload)
+                    });
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to get with meets connect token: {}", e);
+                }
             }
         }
     }
@@ -125,13 +134,17 @@ fn print_latest_archive_info(_ctx: &Global, archive: &serde_json::Value) {
         .unwrap();
     let link = archive.get("external_link").unwrap().as_str().unwrap();
     let video_url = archive.get("video_url").unwrap().as_str().unwrap();
-
+    let mut real_url = String::new();
+    if !link.is_empty() {
+        real_url = get_hls_url_from_archive(link).unwrap_or_else(|_| String::new());
+    }
     tracing::info!(
-        "Latest archive: \n title: {:?}\n description: {:?}\n thumbnail: {:?}\n link: {:?}\n video_url: {:?}",
+        "Latest archive: \n title: {:?}\n description: {:?}\n thumbnail: {:?}\n link: {:?}\n url: {:?}\n video_url: {:?}",
         title,
         description,
         thumbnail,
         link,
+        real_url,
         video_url
     );
 }

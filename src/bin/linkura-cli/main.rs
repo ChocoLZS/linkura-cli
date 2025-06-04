@@ -36,7 +36,10 @@ fn main() {
                     token: token.clone(),
                 },
                 *watch,
-            );
+            ).map_err(|e| {
+                tracing::error!("Error running ALS command: {}", e);
+                std::process::exit(1);
+            });
         }
         None => {
             command::default::run(&global);

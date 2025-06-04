@@ -25,11 +25,11 @@ pub struct Args {
         short('p'),
         long = "port",
         value_name = "PORT",
-        default_value_t = 21011
+        default_value_t = 9201
     )]
     pub port: u16,
-    #[clap(short('l'), long = "live-id", value_name = "LIVE_ID")]
-    pub live_id: String,
+    #[clap(short('r'), long = "room-id", value_name = "ROOM_ID")]
+    pub room_id: String,
     #[clap(short('t'), long = "token", value_name = "TOKEN")]
     pub token: String,
 }
@@ -51,7 +51,7 @@ fn main() -> Result<()> {
         ConnectionInfo {
             host: args.addr,
             port: args.port,
-            live_id: args.live_id,
+            room_id: args.room_id,
             token: args.token,
         },
         None,

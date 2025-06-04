@@ -329,6 +329,41 @@ impl ApiClient {
             "characters": fes_info.get("characters").unwrap().as_array().unwrap(),
         }))
     }
+
+}
+
+pub fn get_hls_url_from_archive(url: &str) -> Result<String> {
+    let res = reqwest::blocking::Client::new().get(url).headers(
+        [(
+            header::USER_AGENT,
+            "UnityPlayer/2021.3.36f1 (UnityWebRequest/1.0, libcurl/8.5.0-DEV)".parse().unwrap(),
+        ),
+        (
+            header::ACCEPT,
+            "*/*".parse().unwrap(),
+        ),(
+            header::HOST,
+            "assets.link-like-lovelive.app".parse().unwrap(),
+        ),(
+            header::ACCEPT_ENCODING,
+            "deflate, gzip".parse().unwrap(),
+        ),(
+            "X-Unity-Version".parse().unwrap(),
+            "2021.3.36f1".parse().unwrap(),
+        )]
+        .iter()
+        .cloned()
+        .collect(),
+    ).send()?;
+    if res.status() != reqwest::StatusCode::OK {
+        return Err(anyhow::anyhow!("Get archive failed: {:?}", res));
+    }
+    let json: serde_json::Value = res.json()?;
+    let hls_url = format!("{}/{}", 
+        json["path"].as_str().unwrap(), 
+        json["playlist_file"].as_str().unwrap()
+    );
+    Ok(hls_url.to_string())
 }
 
 // setter
@@ -362,6 +397,8 @@ impl ApiClient {
     pub fn del_session_token(&mut self) {
         self.runtime_header.remove(header::AUTHORIZATION);
     }
+
+
 }
 
 pub fn extract_jwt_payload(jwt: &str) -> Result<serde_json::Value> {
@@ -370,7 +407,9 @@ pub fn extract_jwt_payload(jwt: &str) -> Result<serde_json::Value> {
         return Err(anyhow::anyhow!("Invalid JWT format"));
     }
     let payload = parts[1];
-    let decoded_payload = general_purpose::URL_SAFE.decode(payload)?;
+    let decoded_payload = general_purpose::URL_SAFE_NO_PAD.decode(payload).or_else(|_| {
+        general_purpose::URL_SAFE.decode(payload)
+    })?;
     let json_payload: serde_json::Value = serde_json::from_slice(&decoded_payload)?;
     Ok(json_payload)
 }

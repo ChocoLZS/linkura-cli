@@ -5,9 +5,10 @@ use std::sync::{
 
 use crate::config::Global;
 use anyhow::{Context, Result};
-use chrono::{DateTime, Duration, TimeDelta, Utc};
+use chrono::{DateTime, Duration, Local, TimeDelta, Utc};
+use indicatif::{ProgressBar, ProgressStyle};
 use linkura_client::{
-    als::client::{self, Client, ConnectionInfo},
+    als::client::{Client, ConnectionInfo},
     api::extract_jwt_payload,
 };
 
@@ -23,6 +24,14 @@ pub fn run(ctx: &Global, connection_info: AlsConnectionInfo, watch_mode: bool) -
         || connection_info.port.is_none()
         || connection_info.room_id.is_none()
         || connection_info.token.is_none();
+    tracing::info!(
+        "Connection info: address: {:?}, port: {:?}, room_id: {:?}, token: {:?}, needs_fetch: {:?}",
+        connection_info.address,
+        connection_info.port,
+        connection_info.room_id,
+        connection_info.token,
+        needs_fetch_connection_info
+    );
     let connection_info = if needs_fetch_connection_info {
         fetch_connection_info(ctx, connection_info, watch_mode)?
     } else {
@@ -33,6 +42,10 @@ pub fn run(ctx: &Global, connection_info: AlsConnectionInfo, watch_mode: bool) -
             token: connection_info.token.unwrap(),
         }
     };
+    tracing::info!(
+        "Connecting to ALS server at {}:{} with room_id: {}",
+        connection_info.host, connection_info.port, connection_info.room_id
+    );
     run_client(ctx, connection_info)
 }
 
@@ -44,16 +57,7 @@ fn fetch_connection_info(
     let api_client = &ctx.api_client;
     let plan_list = api_client.get_plan_list()?;
     let now = Utc::now();
-    let mut res: Option<&serde_json::Value> = None;
-    for item in plan_list.as_array().unwrap().into_iter() {
-        let end_time = item.get("end_time").unwrap().as_str().unwrap();
-        let end_time = DateTime::parse_from_rfc3339(end_time).unwrap();
-        if now <= end_time {
-            res = Some(item)
-        } else {
-            break;
-        }
-    }
+    let res: Option<&serde_json::Value> = plan_list.as_array().unwrap().first();
     if res.is_none() {
         return Err(anyhow::anyhow!("No plan found"));
     }
@@ -63,19 +67,49 @@ fn fetch_connection_info(
     let live_id = item.get("live_id").unwrap().as_str().unwrap().to_string();
     // watch mode if setting
     const START_TIME_OFFSET: TimeDelta = Duration::minutes(10);
-    if now < live_start_time {
+    if now < live_start_time - START_TIME_OFFSET {
         if !watch_mode {
             return Err(anyhow::anyhow!("The plan has not started yet"));
         }
-        tracing::info!(
-            "The plan has not started yet, waiting for {} minutes",
-            (live_start_time - now.with_timezone(&live_start_time.timezone())).num_minutes()
+        let pb = ProgressBar::new_spinner();
+        pb.enable_steady_tick(std::time::Duration::from_millis(80));
+        pb.set_style(
+        ProgressStyle::with_template("{spinner:.blue} {msg}")
+            .unwrap()
+            .tick_strings(&[
+                "🕐 ",
+                "🕑 ",
+			    "🕒 ",
+                "🕓 ",
+                "🕔 ",
+                "🕕 ",
+                "🕖 ",
+                "🕗 ",
+                "🕘 ",
+                "🕙 ",
+                "🕚 ",
+                "🕛 ",
+            ]),
         );
-        std::thread::sleep(
-            (live_start_time - now.with_timezone(&live_start_time.timezone()))
-                .to_std()
-                .unwrap(),
-        );
+        loop {
+            let now = Utc::now();
+            let delta = live_start_time - now.with_timezone(&live_start_time.timezone()) - START_TIME_OFFSET;
+            if delta.num_seconds() <= 0 {
+                pb.finish_with_message("Live is starting soon, fetching connection info...");
+                break;
+            }
+            if delta.num_minutes() >= 0 && delta.num_seconds() >= 0 {
+                pb.set_message(format!(
+                    "[{}] Waiting for live to start at {} within {} minutes, {} seconds",
+                    now.with_timezone(&Local).format("%Y-%m-%d %H:%M:%S %:z"),
+                    (live_start_time.with_timezone(&Local) - START_TIME_OFFSET).format("%Y-%m-%d %H:%M:%S %:z"),
+                    delta.num_minutes(),
+                    delta.num_seconds() - 60 * delta.num_minutes()
+                ));
+                std::thread::sleep(std::time::Duration::from_secs(1));
+            }
+            
+        }
     }
     let live_type = item.get("live_type").unwrap().as_u64().unwrap();
     let token;
@@ -99,7 +133,6 @@ fn fetch_connection_info(
         std::thread::sleep(std::time::Duration::from_secs(5));
     }
     let payload_json = extract_jwt_payload(token.as_str())?;
-
     Ok(ConnectionInfo {
         host: connection_info
             .address

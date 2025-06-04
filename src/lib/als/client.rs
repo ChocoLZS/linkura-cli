@@ -307,6 +307,9 @@ impl Client {
             // 如果没有连接，尝试重连
             if self.stream.is_none() {
                 if reconnect_attempts >= self.config.max_reconnect_attempts {
+                    tracing::error!(
+                        "Max connection attempts reached: something went wrong, maybe token is expired"
+                    );
                     return Err(anyhow::anyhow!("Max connection attempts reached"));
                 }
                 tracing::info!(
