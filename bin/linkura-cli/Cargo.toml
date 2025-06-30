@@ -2,6 +2,7 @@
 name = "linkura-cli"
 version = "0.0.0"
 edition.workspace = true
+default-run = "linkura-cli"
 
 [dependencies]
 linkura-api.workspace = true
@@ -21,6 +22,7 @@ tracing.workspace = true
 indicatif = "0.17.11"
 inquire = "0.7.5"
 spinoff = "0.8.0"
+colored = "3.0.0"
 
 [[bin]]
 name = "linkura-cli"

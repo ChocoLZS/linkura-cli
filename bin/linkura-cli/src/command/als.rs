@@ -10,7 +10,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use linkura_packet::{
     als::client::{Client, ConnectionInfo},
 };
-use linkura_api::extract_jwt_payload;
+use linkura_common::jwt::extract_jwt_payload;
 
 pub struct AlsConnectionInfo {
     pub address: Option<String>,

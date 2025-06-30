@@ -1,6 +1,7 @@
 use crate::config::Global;
 use chrono::{Local, Utc};
-use linkura_api::{extract_jwt_payload, get_hls_url_from_archive};
+use linkura_api::{get_hls_url_from_archive};
+use linkura_common::jwt::extract_jwt_payload;
 
 pub fn run(ctx: &Global) {
     let args = &ctx.args;
