@@ -1,6 +1,6 @@
 use crate::config::Global;
 use chrono::{Local, Utc};
-use linkura_client::api::{extract_jwt_payload, get_hls_url_from_archive};
+use linkura_api::{extract_jwt_payload, get_hls_url_from_archive};
 
 pub fn run(ctx: &Global) {
     let args = &ctx.args;
@@ -12,9 +12,14 @@ pub fn run(ctx: &Global) {
         let res = api_client.get_with_meets_info(&id).unwrap();
         tracing::info!("wm info: {:?}", res);
     } else {
-        let res = wm_res.as_array().unwrap().first();
-        if let Some(res) = res {
-            print_latest_trailer_archive(ctx, res);
+        let trailers = wm_res.as_array().unwrap();
+        tracing::info!(
+            "Trailers: {:?}",
+            trailers
+        );
+        let first_trailer = trailers.first();
+        if let Some(trailer) = first_trailer {
+            print_latest_trailer_archive(ctx, trailer);
         }
     }
 
@@ -62,7 +67,9 @@ fn print_latest_trailer_archive(ctx: &Global, wm: &serde_json::Value) {
         );
         return;
     }
-    let maybe_started = Utc::now() >= chrono::DateTime::parse_from_rfc3339(start_time).unwrap() - chrono::Duration::minutes(10);
+    let maybe_started = Utc::now()
+        >= chrono::DateTime::parse_from_rfc3339(start_time).unwrap()
+            - chrono::Duration::minutes(10);
 
     if live_type == 2 {
         let res: Result<serde_json::Value, anyhow::Error> = api_client.get_with_meets_info(id);
@@ -91,7 +98,8 @@ fn print_latest_trailer_archive(ctx: &Global, wm: &serde_json::Value) {
             match token {
                 Ok(token) => {
                     let _ = extract_jwt_payload(token.as_str()).and_then(|payload| {
-                        tracing::info!("Room info: \n address: {}\n port: {}\n room_id: {}",
+                        tracing::info!(
+                            "Room info: \n address: {}\n port: {}\n room_id: {}",
                             payload["pod"]["address"].as_str().unwrap().to_string(),
                             payload["pod"]["port"].as_u64().unwrap(),
                             payload["room_id"].as_str().unwrap().to_string()

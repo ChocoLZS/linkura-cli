@@ -1,6 +1,6 @@
 use config::init;
 
-use linkura_client::log;
+use linkura_common::log;
 
 rust_i18n::i18n!("locales", fallback = "en");
 
@@ -36,7 +36,8 @@ fn main() {
                     token: token.clone(),
                 },
                 *watch,
-            ).map_err(|e| {
+            )
+            .map_err(|e| {
                 tracing::error!("Error running ALS command: {}", e);
                 std::process::exit(1);
             });

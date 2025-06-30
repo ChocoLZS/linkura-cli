@@ -5,8 +5,8 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-use linkura_client::als::client::{Client, ConnectionInfo};
-use linkura_client::log;
+use linkura_packet::als::client::{Client, ConnectionInfo};
+use linkura_common::log;
 
 /** ARG PARSER **/
 #[derive(Parser, Debug)]
@@ -21,12 +21,7 @@ use linkura_client::log;
 pub struct Args {
     #[clap(short('a'), long = "address", value_name = "ADDRESS")]
     pub addr: String,
-    #[clap(
-        short('p'),
-        long = "port",
-        value_name = "PORT",
-        default_value_t = 9201
-    )]
+    #[clap(short('p'), long = "port", value_name = "PORT", default_value_t = 9201)]
     pub port: u16,
     #[clap(short('r'), long = "room-id", value_name = "ROOM_ID")]
     pub room_id: String,

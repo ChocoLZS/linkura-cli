@@ -5,8 +5,8 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-use linkura_client::log;
-use linkura_client::mrs::client::{MrsClient, MrsConnectionInfo};
+use linkura_common::log;
+use linkura_packet::mrs::client::{MrsClient, MrsConnectionInfo};
 
 /** ARG PARSER **/
 #[derive(Parser, Debug)]

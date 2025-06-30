@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use linkura_client::api::{self, ApiClient, Credential};
+use linkura_api::{self, ApiClient, Credential};
 use rust_i18n::t;
 
 /** ARG PARSER **/
@@ -84,7 +84,7 @@ pub struct ConfigManager {
     current_dir_config_path: PathBuf,
     home_dir_config_path: PathBuf,
 
-    runtime_config_path: Option<PathBuf>,
+    runtime_config_path: PathBuf,
 }
 
 impl ConfigManager {
@@ -103,12 +103,13 @@ impl ConfigManager {
         home_dir_config_path.push(".config");
         home_dir_config_path.push("linkura-cli");
         home_dir_config_path.push("config.json");
+        let runtime_config_path = home_dir_config_path.clone();
 
         Self {
             args_config_path,
             current_dir_config_path,
             home_dir_config_path,
-            runtime_config_path: None,
+            runtime_config_path,
         }
     }
 
@@ -116,20 +117,20 @@ impl ConfigManager {
         // 1. 首先检查用户提供的args配置
         if let Some(config) = &self.args_config_path {
             if config.exists() {
-                self.runtime_config_path = Some(config.clone());
+                self.runtime_config_path = config.clone();
                 return Ok(Some(self.read_config(config)?));
             }
         }
 
         // 2. 检查当前目录下的配置文件
         if self.current_dir_config_path.exists() {
-            self.runtime_config_path = Some(self.current_dir_config_path.clone());
+            self.runtime_config_path = self.current_dir_config_path.clone();
             return Ok(Some(self.read_config(&self.current_dir_config_path)?));
         }
 
         // 3. 检查home目录下的配置文件
         if self.home_dir_config_path.exists() {
-            self.runtime_config_path = Some(self.home_dir_config_path.clone());
+            self.runtime_config_path = self.home_dir_config_path.clone();
             return Ok(Some(self.read_config(&self.home_dir_config_path)?));
         }
 
@@ -144,9 +145,7 @@ impl ConfigManager {
     }
 
     pub fn get_config_path(&self) -> &PathBuf {
-        self.runtime_config_path
-            .as_ref()
-            .unwrap_or(&self.home_dir_config_path)
+        &self.runtime_config_path   
     }
 
     fn read_config(&self, path: &Path) -> Result<Config> {
@@ -182,15 +181,15 @@ impl ConfigManager {
 pub struct Global {
     pub config: Config,
     pub config_manager: ConfigManager,
-    pub api_client: api::ApiClient,
+    pub api_client: linkura_api::ApiClient,
     pub args: Args,
 }
 
 impl Global {
     pub fn new(args: Args) -> Self {
         let args = args;
-        let mut api_client = api::ApiClient::new();
-        let mut config_manager = ConfigManager::new(None);
+        let mut api_client = linkura_api::ApiClient::new();
+        let mut config_manager = ConfigManager::new(args.config_path.clone());
 
         let config_res = config_manager.load_config();
 
@@ -310,7 +309,7 @@ pub fn init() -> Result<Global> {
         .context("Failed to save config")?;
     sp.success(&format!(
         "登陆成功！信息已保存至{}，session token: {}",
-        global.config_manager.current_dir_config_path.display(),
+        global.config_manager.get_config_path().display(),
         session_token
     ));
     Ok(global)

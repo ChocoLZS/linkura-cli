@@ -330,37 +330,62 @@ impl ApiClient {
         }))
     }
 
+    pub fn get_fes_live_connect_token(&self, live_id: &str) -> Result<String> {
+        let url = format!("{API_BASE}/feslive/connect_token");
+        let res = self
+            .client
+            .post(url)
+            .headers(self.runtime_header.clone())
+            .header("x-idempotency-key", gen_random_idempotency_key())
+            .json(&json!({
+                "live_id": live_id,
+            }))
+            .send()?;
+        if res.status() != reqwest::StatusCode::OK {
+            return Err(anyhow::anyhow!("Get connect token failed: {:?}", res));
+        }
+        let json: serde_json::Value = res.json()?;
+        let connect_token = json["audience_token"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Get connect token failed: {:?}", json))?;
+        Ok(connect_token.to_string())
+    }
 }
 
 pub fn get_hls_url_from_archive(url: &str) -> Result<String> {
-    let res = reqwest::blocking::Client::new().get(url).headers(
-        [(
-            header::USER_AGENT,
-            "UnityPlayer/2021.3.36f1 (UnityWebRequest/1.0, libcurl/8.5.0-DEV)".parse().unwrap(),
-        ),
-        (
-            header::ACCEPT,
-            "*/*".parse().unwrap(),
-        ),(
-            header::HOST,
-            "assets.link-like-lovelive.app".parse().unwrap(),
-        ),(
-            header::ACCEPT_ENCODING,
-            "deflate, gzip".parse().unwrap(),
-        ),(
-            "X-Unity-Version".parse().unwrap(),
-            "2021.3.36f1".parse().unwrap(),
-        )]
-        .iter()
-        .cloned()
-        .collect(),
-    ).send()?;
+    let res = reqwest::blocking::Client::new()
+        .get(url)
+        .headers(
+            [
+                (
+                    header::USER_AGENT,
+                    "UnityPlayer/2021.3.36f1 (UnityWebRequest/1.0, libcurl/8.5.0-DEV)"
+                        .parse()
+                        .unwrap(),
+                ),
+                (header::ACCEPT, "*/*".parse().unwrap()),
+                (
+                    header::HOST,
+                    "assets.link-like-lovelive.app".parse().unwrap(),
+                ),
+                (header::ACCEPT_ENCODING, "deflate, gzip".parse().unwrap()),
+                (
+                    "X-Unity-Version".parse().unwrap(),
+                    "2021.3.36f1".parse().unwrap(),
+                ),
+            ]
+            .iter()
+            .cloned()
+            .collect(),
+        )
+        .send()?;
     if res.status() != reqwest::StatusCode::OK {
         return Err(anyhow::anyhow!("Get archive failed: {:?}", res));
     }
     let json: serde_json::Value = res.json()?;
-    let hls_url = format!("{}/{}", 
-        json["path"].as_str().unwrap(), 
+    let hls_url = format!(
+        "{}/{}",
+        json["path"].as_str().unwrap(),
         json["playlist_file"].as_str().unwrap()
     );
     Ok(hls_url.to_string())
@@ -397,8 +422,6 @@ impl ApiClient {
     pub fn del_session_token(&mut self) {
         self.runtime_header.remove(header::AUTHORIZATION);
     }
-
-
 }
 
 pub fn extract_jwt_payload(jwt: &str) -> Result<serde_json::Value> {
@@ -407,9 +430,9 @@ pub fn extract_jwt_payload(jwt: &str) -> Result<serde_json::Value> {
         return Err(anyhow::anyhow!("Invalid JWT format"));
     }
     let payload = parts[1];
-    let decoded_payload = general_purpose::URL_SAFE_NO_PAD.decode(payload).or_else(|_| {
-        general_purpose::URL_SAFE.decode(payload)
-    })?;
+    let decoded_payload = general_purpose::URL_SAFE_NO_PAD
+        .decode(payload)
+        .or_else(|_| general_purpose::URL_SAFE.decode(payload))?;
     let json_payload: serde_json::Value = serde_json::from_slice(&decoded_payload)?;
     Ok(json_payload)
 }
@@ -417,10 +440,10 @@ pub fn extract_jwt_payload(jwt: &str) -> Result<serde_json::Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    const JWT: &'static str = "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJzZXJ2aWNlX2RvbWFpbiI6Imh0dHBzOi8vYXBpLmxpbmstbGlrZS1sb3ZlbGl2ZS5hcHAiLCJsaW5rX2xpa2VfaWQiOiJBQUFBQUFBQUEiLCJyb29tX2lkIjoiZGVmYXVsdC1mYWNiZGE1MS1iYjlkLTQyNjctYjRhYi01ZWYzYzg3OGJhZWMiLCJyb2xlIjoiYXVkaWVuY2UiLCJwb2QiOnsicm9sZSI6ImF1ZGllbmNlIiwic2NoZW1lIjoidGNwIiwiYWRkcmVzcyI6IjEwLjExNC41MTQuMTkxIiwicG9ydCI6OTgxMH0sImlzcyI6Imh0dHBzOi8vYXBpLmxpbmstbGlrZS1sb3ZlbGl2ZS5hcHAiLCJzdWIiOiJBQUFBQUFBQUEiLCJhdWQiOlsiQUFBQUFBQUFBIl0sImV4cCI6MTc0ODUxODU3NSwibmJmIjoxNzQ4NTE4NTYwLCJpYXQiOjE3NDg1MTg1NjB9.eddiZjzEH_I88w9lmOVBr2Z4BWShIv6yeM9TPZvKIts5rmPFwvBbJEKffkobXglOuUBp80svLoufyzOM_YSmDg";
     #[test]
     fn test_extract_jwt_payload() {
-        let jwt = "header.payload.signature";
+        let jwt = JWT;
         let result = extract_jwt_payload(jwt);
         assert!(result.is_ok());
     }
@@ -434,7 +457,6 @@ mod tests {
 
     #[test]
     fn test_jwt_payload_base64_decoding() {
-        const JWT: &'static str = "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJzZXJ2aWNlX2RvbWFpbiI6Imh0dHBzOi8vYXBpLmxpbmstbGlrZS1sb3ZlbGl2ZS5hcHAiLCJsaW5rX2xpa2VfaWQiOiJBQUFBQUFBQUEiLCJyb29tX2lkIjoiZGVmYXVsdC1mYWNiZGE1MS1iYjlkLTQyNjctYjRhYi01ZWYzYzg3OGJhZWMiLCJyb2xlIjoiYXVkaWVuY2UiLCJwb2QiOnsicm9sZSI6ImF1ZGllbmNlIiwic2NoZW1lIjoidGNwIiwiYWRkcmVzcyI6IjEwLjExNC41MTQuMTkxIiwicG9ydCI6OTgxMH0sImlzcyI6Imh0dHBzOi8vYXBpLmxpbmstbGlrZS1sb3ZlbGl2ZS5hcHAiLCJzdWIiOiJBQUFBQUFBQUEiLCJhdWQiOlsiQUFBQUFBQUFBIl0sImV4cCI6MTc0ODUxODU3NSwibmJmIjoxNzQ4NTE4NTYwLCJpYXQiOjE3NDg1MTg1NjB9.eddiZjzEH_I88w9lmOVBr2Z4BWShIv6yeM9TPZvKIts5rmPFwvBbJEKffkobXglOuUBp80svLoufyzOM_YSmDg";
         let payload = extract_jwt_payload(JWT).unwrap();
         assert_eq!(
             payload["service_domain"].as_str().unwrap(),

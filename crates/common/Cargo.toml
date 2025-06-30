@@ -1,0 +1,13 @@
+[package]
+name = "linkura-common"
+version = "0.0.0"
+description = "Linkura Common"
+
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+tracing.workspace = true
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }

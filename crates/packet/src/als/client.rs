@@ -257,6 +257,10 @@ impl Client {
                         tracing::error!("Failed to send stream to keepalive thread: {}", e);
                     }
                 }
+                // add timetimestamp append
+                // nanoseconds
+                let timestamp = std::time::Instant::now().elapsed().as_nanos();
+                self.runtime_state.saved_buffer.extend_from_slice(&timestamp.to_be_bytes());
 
                 self.save_raw_data(&packet_data, packet_data.len(), false)?;
             } else {
