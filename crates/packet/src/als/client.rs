@@ -171,7 +171,7 @@ impl Client {
                 "Client disconnected with remaining data in receive && saved buffer, saving to file"
             );
             let data_to_save = std::mem::take(&mut self.runtime_state.receive_buffer);
-            if let Err(e) = self.save_raw_data(&data_to_save, data_to_save.len(), true) {
+            if let Err(e) = self.save_raw_data(&data_to_save, true) {
                 tracing::error!("Failed to save remaining data: {}", e);
             }
         }
@@ -240,7 +240,7 @@ impl Client {
                 + 2;
 
             if self.runtime_state.receive_buffer.len() >= packet_length {
-                let packet_data = self.runtime_state.receive_buffer[0..packet_length].to_vec();
+                let mut packet_data = self.runtime_state.receive_buffer[0..packet_length].to_vec();
 
                 self.runtime_state.receive_buffer.drain(0..packet_length);
                 if self.runtime_state.state == ClientState::Join {
@@ -259,10 +259,13 @@ impl Client {
                 }
                 // add timetimestamp append
                 // nanoseconds
-                let timestamp = std::time::Instant::now().elapsed().as_nanos();
-                self.runtime_state.saved_buffer.extend_from_slice(&timestamp.to_be_bytes());
 
-                self.save_raw_data(&packet_data, packet_data.len(), false)?;
+                let length: u8 =  8;
+                let micros = chrono::Utc::now().timestamp_micros();
+                packet_data.extend_from_slice(&length.to_be_bytes());
+                packet_data.extend_from_slice(&micros.to_be_bytes());
+
+                self.save_raw_data(&packet_data, false)?;
             } else {
                 break;
             }
@@ -271,7 +274,10 @@ impl Client {
     }
 
     /// 保存原始数据
-    fn save_raw_data(&mut self, data: &[u8], size: usize, force: bool) -> Result<()> {
+    /// 保留的数据为
+    /// 原始数据 时间戳
+    /// 时间戳存储方式为大端字节序，包长|8字节微秒时间戳
+    fn save_raw_data(&mut self, data: &[u8], force: bool) -> Result<()> {
         self.runtime_state.saved_buffer.extend_from_slice(data);
         if self.runtime_state.saved_buffer.len() >= 1024 * 1024 || force {
             tracing::info!("Save buffer exceeded 1MB, saving data to file");
@@ -285,6 +291,7 @@ impl Client {
                 .with_context(|| format!("Failed to create file {}", file_path))?;
             file.write_all(&self.runtime_state.saved_buffer)
                 .with_context(|| format!("Failed to write data to {}", file_path))?;
+            let size = data.len();
             tracing::debug!("Raw data saved to {} ({} bytes)", file_path, size);
             self.runtime_state.increase_data_index();
             self.runtime_state.saved_buffer.clear();

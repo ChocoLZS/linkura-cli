@@ -170,7 +170,7 @@ fn fetch_connection_info(
     })
 }
 
-fn run_client(ctx: &Global, connection_info: ConnectionInfo) -> Result<()> {
+fn run_client(_ctx: &Global, connection_info: ConnectionInfo) -> Result<()> {
     let running_signal = Arc::new(AtomicBool::new(true));
     let running_signal_clone = running_signal.clone();
 
