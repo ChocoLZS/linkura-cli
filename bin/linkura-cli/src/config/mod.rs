@@ -38,6 +38,12 @@ pub struct Args {
     ///
     /// Default is "info".
     pub log_level: Option<String>,
+
+    #[clap(long = "player-id", value_name = "PLAYER_ID")]
+    pub player_id: Option<String>,
+    #[clap(long = "password", value_name = "PASSWORD")]
+    pub password: Option<String>,
+    
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
@@ -225,7 +231,7 @@ impl Global {
 
         let config = if config_res.is_err() {
             tracing::error!("Failed to load config: {:?}", config_res.err());
-            Self::initialize_config(&config_manager, &mut api_client, &spinner_manager)
+            Self::initialize_config(&args, &config_manager, &mut api_client, &spinner_manager)
         } else {
             match config_res.unwrap() {
                 Some(mut config) => {
@@ -260,7 +266,7 @@ impl Global {
 
                     config
                 }
-                None => Self::initialize_config(&config_manager, &mut api_client, &spinner_manager),
+                None => Self::initialize_config(&args, &config_manager, &mut api_client, &spinner_manager),
             }
         };
 
@@ -274,13 +280,13 @@ impl Global {
         }
     }
 
-    fn initialize_config(config_manager: &ConfigManager, api_client: &mut ApiClient, spinner_manager: &SpinnerManager) -> Config {
+    fn initialize_config(args: &Args, config_manager: &ConfigManager, api_client: &mut ApiClient, spinner_manager: &SpinnerManager) -> Config {
         tracing::warn!(
             "No config found, creating a new one to path: {}",
             config_manager.get_config_path().display()
         );
         // first time to init interactive
-        let credential = interactive::get_credential_with_simple_prompt(api_client, spinner_manager)
+        let credential = interactive::get_credential_with_simple_prompt(api_client, spinner_manager, args.player_id.clone(), args.password.clone())
             .expect("Failed to get credential");
         Config { credential }
     }
