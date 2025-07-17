@@ -1,3 +1,5 @@
+use clap::Parser;
+
 use config::init;
 
 use linkura_common::log;
@@ -11,9 +13,12 @@ use rust_i18n::t;
 
 use crate::config::Commands;
 fn main() {
-    log::init();
+    let args = config::Args::parse();
+    if !args.quiet {
+        log::init(args.log_level.clone());
+    }
 
-    let global = init().expect(&t!("config.initialize.failed"));
+    let global = init(args).expect(&t!("config.initialize.failed"));
     let args = &global.args;
 
     match &args.command {

@@ -5,17 +5,12 @@ use_common_crate!();
 define_api_struct!(WithLiveApi);
 
 impl<'a> WithLiveApi<'a> {
-    // pub fn new(client: &'a ApiClient) -> Self {
-    //     Self { client }
-    // }
-
     pub fn enter(&self, id: &str) -> Result<Response> {
         let url = format!("{API_BASE}/withlive/enter");
         let res = self
-            .api
             .client
             .post(url)
-            .headers(self.api.runtime_header.clone())
+            .headers(self.runtime_header.clone())
             .header("x-idempotency-key", gen_random_idempotency_key())
             .json(&json!({
                 "live_id": id,
@@ -27,10 +22,9 @@ impl<'a> WithLiveApi<'a> {
     pub fn connect_token(&self, live_id: &str) -> Result<Response> {
         let url = format!("{API_BASE}/withlive/connect_token");
         let res = self
-            .api
             .client
             .post(url)
-            .headers(self.api.runtime_header.clone())
+            .headers(self.runtime_header.clone())
             .header("x-idempotency-key", gen_random_idempotency_key())
             .json(&json!({
                 "live_id": live_id,

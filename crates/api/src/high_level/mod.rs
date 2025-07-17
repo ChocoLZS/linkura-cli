@@ -147,8 +147,8 @@ impl<'a> HighLevelApi<'a> {
         Ok(live_archive_list.clone())
     }
 
-    pub fn get_archive_list(&self) -> Result<serde_json::Value> {
-        let res = self.raw().archive().get_archive_list()?;
+    pub fn get_archive_list(&self, limit: Option<u32>) -> Result<serde_json::Value> {
+        let res = self.raw().archive().get_archive_list(limit)?;
         if res.status() != reqwest::StatusCode::OK {
             return Err(anyhow::anyhow!("Get archive list failed: {:?}", res));
         }

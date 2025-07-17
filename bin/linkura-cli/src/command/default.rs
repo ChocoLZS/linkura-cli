@@ -20,7 +20,7 @@ pub fn run(ctx: &Global) {
         }
     }
 
-    let archive_res: serde_json::Value = api_client.high_level().get_archive_list().unwrap();
+    let archive_res: serde_json::Value = api_client.high_level().get_archive_list(Some(4)).unwrap();
     let latest_archive_res = archive_res.as_array().unwrap()[0].clone();
     print_latest_archive_info(ctx, &latest_archive_res);
 }

@@ -35,7 +35,7 @@ pub struct Args {
 }
 fn main() -> Result<()> {
     let args = Args::parse();
-    log::init();
+    log::init(None);
     let running_signal = Arc::new(AtomicBool::new(true));
     let running_signal_clone = running_signal.clone();
 

@@ -5,10 +5,6 @@ use_common_crate!();
 define_api_struct!(AccountApi);
 
 impl<'a> AccountApi<'a> {
-    // pub fn new(client: &'a ApiClient) -> Self {
-    //     Self { client }
-    // }
-
     /// Returns the `device_specific_id`
     ///
     /// **Response example**
@@ -25,10 +21,9 @@ impl<'a> AccountApi<'a> {
     pub fn account_connect(&self, id: &str, password: &str) -> Result<Response> {
         let url = format!("{API_BASE}/account/connect");
         let res = self
-            .api
             .client
             .post(url)
-            .headers(self.api.runtime_header.clone())
+            .headers(self.runtime_header.clone())
             .header("x-idempotency-key", gen_random_idempotency_key())
             .json(&json!({
                 "provider": 1,

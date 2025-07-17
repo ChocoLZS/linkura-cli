@@ -5,10 +5,6 @@ use_common_crate!();
 define_api_struct!(UserApi);
 
 impl<'a> UserApi<'a> {
-    // pub fn new(client: &'a ApiClient) -> Self {
-    //     Self { client }
-    // }
-
     /// Returns the `session_token`
     ///
     /// **Return example**
@@ -23,10 +19,9 @@ impl<'a> UserApi<'a> {
     pub fn user_login(&self, id: &str, device_id: &str) -> Result<Response> {
         let url = format!("{API_BASE}/user/login");
         let res = self
-            .api
             .client
             .post(url)
-            .headers(self.api.runtime_header.clone())
+            .headers(self.runtime_header.clone())
             .header("x-idempotency-key", gen_random_idempotency_key())
             .header("x-device-specific-id", device_id)
             .json(&json!({

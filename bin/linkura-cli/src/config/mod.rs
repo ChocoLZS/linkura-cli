@@ -27,6 +27,17 @@ pub struct Args {
     pub id: Option<String>,
     #[clap(short('c'), long = "config", value_name = "CONFIG_PATH")]
     pub config_path: Option<String>,
+    #[clap(short('Q'), long = "quiet", action = clap::ArgAction::SetTrue)]
+    pub quiet: bool,
+    #[clap(short('l'), long = "loglevel", value_name = "LOG_LEVEL")]
+    /// Sets the log level for the application.
+    /// 
+    /// Valid values are, in order of verbosity:
+    /// 
+    /// `off`, `error`, `warn`, `info`, `debug`, `trace`
+    ///
+    /// Default is "info".
+    pub log_level: Option<String>,
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
@@ -70,8 +81,14 @@ pub struct ArgsALS {
 }
 #[derive(Debug, ClapArgs)]
 pub struct ArgsArchive {
-    #[clap(short('s'), long = "save-name", value_name = "SAVE_NAME")]
-    pub save_name: Option<String>,
+    #[clap(short('s'), long = "save-json", value_name = "SAVE_JSON")]
+    /// if provided, will save the archive to the file
+    /// with the given name, otherwise will just print the archive info
+    /// to the console.
+    pub save_json: Option<String>,
+    #[clap(short('l'), long = "limit", value_name = "LIMIT")]
+    /// limit the number of archives to fetch, default is 4
+    pub limit: Option<u32>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -273,8 +290,7 @@ impl Global {
 
 /*  CONFIG END **/
 
-pub fn init() -> Result<Global> {
-    let args = Args::parse();
+pub fn init(args: Args) -> Result<Global> {
     tracing::info!("Initializing config...");
     let mut global = Global::new(args);
     tracing::info!("Config initialized!");

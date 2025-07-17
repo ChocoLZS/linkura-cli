@@ -7,6 +7,9 @@ mod high_level;
 mod l4;
 mod macros;
 
+pub mod model {
+    
+}
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Credential {
     /// x-res-version
