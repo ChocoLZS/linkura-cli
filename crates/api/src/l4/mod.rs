@@ -1,11 +1,10 @@
 use crate::macros::{define_api_struct, use_common_crate};
 
 pub mod account;
-pub mod user;
 pub mod archive;
-pub mod withlive;
 pub mod feslive;
-
+pub mod user;
+pub mod withlive;
 
 use_common_crate!();
 define_api_struct!(LinkuraApi);
@@ -18,7 +17,7 @@ impl<'a> LinkuraApi<'a> {
     pub fn user(&self) -> user::UserApi {
         user::UserApi { api: self }
     }
-    
+
     pub fn archive(&self) -> archive::ArchiveApi {
         archive::ArchiveApi { api: self }
     }
@@ -26,7 +25,7 @@ impl<'a> LinkuraApi<'a> {
     pub fn with_live(&self) -> withlive::WithLiveApi {
         withlive::WithLiveApi { api: self }
     }
-    
+
     pub fn fes_live(&self) -> feslive::FesLiveApi {
         feslive::FesLiveApi { api: self }
     }

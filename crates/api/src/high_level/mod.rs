@@ -7,11 +7,9 @@ use crate::{LINKURA_APP_STORE_URL, WEB_UA};
 use_common_crate!();
 define_api_struct!(AssetsApi);
 
-impl <'a> AssetsApi<'a> {
+impl<'a> AssetsApi<'a> {
     pub fn get_hls_url_from_archive(&self, url: &str) -> Result<String> {
-        let res = self.assets_client
-            .get(url)
-            .send()?;
+        let res = self.assets_client.get(url).send()?;
         if res.status() != reqwest::StatusCode::OK {
             return Err(anyhow::anyhow!("Get archive failed: {:?}", res));
         }
@@ -27,7 +25,7 @@ impl <'a> AssetsApi<'a> {
 
 define_api_struct!(HighLevelApi);
 
-impl <'a> HighLevelApi<'a> {
+impl<'a> HighLevelApi<'a> {
     /// Get x-res-version from headers
     ///
     /// x-res-version is like: `R2504300@XXX`
@@ -93,8 +91,7 @@ impl <'a> HighLevelApi<'a> {
     /// }
     /// ```
     pub fn password_login(&self, id: &str, password: &str) -> Result<String> {
-        let res = self
-            .raw().account().account_connect(id, password)?;
+        let res = self.raw().account().account_connect(id, password)?;
         if res.status() != reqwest::StatusCode::OK {
             return Err(anyhow::anyhow!("Login failed: {:?}", res));
         }

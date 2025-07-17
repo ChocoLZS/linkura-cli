@@ -1,10 +1,10 @@
 use rand::Rng;
 use rand::distr::Alphanumeric;
-use reqwest::{header};
+use reqwest::header;
 use serde::{Deserialize, Serialize};
 
-mod l4;
 mod high_level;
+mod l4;
 mod macros;
 
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -85,9 +85,17 @@ impl ApiClient {
             assets_client: reqwest::blocking::Client::builder()
                 .default_headers({
                     let mut headers = header::HeaderMap::new();
-                    headers.insert(header::USER_AGENT, "UnityPlayer/2021.3.36f1 (UnityWebRequest/1.0, libcurl/8.5.0-DEV)".parse().unwrap());
+                    headers.insert(
+                        header::USER_AGENT,
+                        "UnityPlayer/2021.3.36f1 (UnityWebRequest/1.0, libcurl/8.5.0-DEV)"
+                            .parse()
+                            .unwrap(),
+                    );
                     headers.insert(header::ACCEPT, "*/*".parse().unwrap());
-                    headers.insert(header::HOST, "assets.link-like-lovelive.app".parse().unwrap());
+                    headers.insert(
+                        header::HOST,
+                        "assets.link-like-lovelive.app".parse().unwrap(),
+                    );
                     headers.insert(header::ACCEPT_ENCODING, "deflate, gzip".parse().unwrap());
                     headers.insert("X-Unity-Version", "2021.3.36f1".parse().unwrap());
                     headers
@@ -108,7 +116,6 @@ impl ApiClient {
     pub fn assets(&self) -> high_level::AssetsApi {
         high_level::AssetsApi { api: self }
     }
-
 }
 
 // setter

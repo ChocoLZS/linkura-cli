@@ -1,5 +1,5 @@
-use serde_json::json;
 use crate::macros::{define_api_struct, use_common_crate};
+use serde_json::json;
 
 use_common_crate!();
 define_api_struct!(UserApi);

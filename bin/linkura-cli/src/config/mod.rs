@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{Args as ClapArgs, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use spinoff::{Color, Spinner, spinners};
 use std::{
@@ -31,44 +31,56 @@ pub struct Args {
     pub command: Option<Commands>,
 }
 
+#[derive(Debug, ClapArgs)]
+pub struct ArgsMRS {
+    #[clap(short('a'), long = "address", value_name = "ADDRESS")]
+    pub addr: String,
+    #[clap(
+        short('p'),
+        long = "port",
+        value_name = "PORT",
+        default_value_t = 21011
+    )]
+    pub port: u16,
+    #[clap(short('r'), long = "room-id", value_name = "ROOM_ID")]
+    pub room_id: u32,
+    #[clap(short('i'), long = "player-id", value_name = "PLAYER_ID")]
+    pub player_id: u16,
+    #[clap(short('w'), long = "watch", value_name = "WATCH")]
+    pub watch: bool,
+}
+
+#[derive(Debug, ClapArgs)]
+pub struct ArgsALS {
+    #[clap(short('a'), long = "address", value_name = "ADDRESS")]
+    pub addr: Option<String>,
+    #[clap(short('p'), long = "port", value_name = "PORT")]
+    pub port: Option<u16>,
+    #[clap(short('l'), long = "room-id", value_name = "ROOM_ID")]
+    pub room_id: Option<String>,
+    #[clap(short('t'), long = "token", value_name = "TOKEN")]
+    pub token: Option<String>,
+    #[clap(
+        short('w'),
+        long = "watch",
+        value_name = "WATCH_MODE",
+        default_value_t = false
+    )]
+    pub watch: bool,
+}
+#[derive(Debug, ClapArgs)]
+pub struct ArgsArchive {
+    #[clap(short('s'), long = "save-name", value_name = "SAVE_NAME")]
+    pub save_name: Option<String>,
+}
+
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Get mrs data
-    MRS {
-        #[clap(short('a'), long = "address", value_name = "ADDRESS")]
-        addr: String,
-        #[clap(
-            short('p'),
-            long = "port",
-            value_name = "PORT",
-            default_value_t = 21011
-        )]
-        port: u16,
-        #[clap(short('r'), long = "room-id", value_name = "ROOM_ID")]
-        room_id: u32,
-        #[clap(short('i'), long = "player-id", value_name = "PLAYER_ID")]
-        player_id: u16,
-        #[clap(short('w'), long = "watch", value_name = "WATCH")]
-        watch: bool,
-    },
+    MRS(ArgsMRS),
     /// Get als data
-    ALS {
-        #[clap(short('a'), long = "address", value_name = "ADDRESS")]
-        addr: Option<String>,
-        #[clap(short('p'), long = "port", value_name = "PORT")]
-        port: Option<u16>,
-        #[clap(short('l'), long = "room-id", value_name = "ROOM_ID")]
-        room_id: Option<String>,
-        #[clap(short('t'), long = "token", value_name = "TOKEN")]
-        token: Option<String>,
-        #[clap(
-            short('w'),
-            long = "watch",
-            value_name = "WATCH_MODE",
-            default_value_t = false
-        )]
-        watch: bool,
-    },
+    ALS(ArgsALS),
+    Archive(ArgsArchive),
 }
 
 /** ARG PARSER END**/
@@ -145,7 +157,7 @@ impl ConfigManager {
     }
 
     pub fn get_config_path(&self) -> &PathBuf {
-        &self.runtime_config_path   
+        &self.runtime_config_path
     }
 
     fn read_config(&self, path: &Path) -> Result<Config> {
@@ -206,7 +218,8 @@ impl Global {
                             Color::Green,
                         );
                         // check if latest res_version and client_version
-                        let (res_version, client_version) = api_client.high_level().get_app_version().unwrap();
+                        let (res_version, client_version) =
+                            api_client.high_level().get_app_version().unwrap();
                         if let Some(res_version) = res_version {
                             if res_version != config.credential.res_version {
                                 sp.update_text(format!(
@@ -288,7 +301,8 @@ pub fn init() -> Result<Global> {
             // delete session token
             let session_token = global
                 .api_client
-                .high_level().device_id_login(
+                .high_level()
+                .device_id_login(
                     &global.config.credential.player_id,
                     &global.config.credential.device_specific_id,
                 )

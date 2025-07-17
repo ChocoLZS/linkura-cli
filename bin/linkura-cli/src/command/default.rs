@@ -13,10 +13,7 @@ pub fn run(ctx: &Global) {
         tracing::info!("wm info: {:?}", res);
     } else {
         let trailers = wm_res.as_array().unwrap();
-        tracing::info!(
-            "Trailers: {:?}",
-            trailers
-        );
+        tracing::info!("Trailers: {:?}", trailers);
         let first_trailer = trailers.first();
         if let Some(trailer) = first_trailer {
             print_latest_trailer_archive(ctx, trailer);
@@ -72,7 +69,8 @@ fn print_latest_trailer_archive(ctx: &Global, wm: &serde_json::Value) {
             - chrono::Duration::minutes(10);
 
     if live_type == 2 {
-        let res: Result<serde_json::Value, anyhow::Error> = api_client.high_level().get_with_meets_info(id);
+        let res: Result<serde_json::Value, anyhow::Error> =
+            api_client.high_level().get_with_meets_info(id);
         match res {
             Ok(res) => {
                 tracing::info!(
@@ -114,7 +112,8 @@ fn print_latest_trailer_archive(ctx: &Global, wm: &serde_json::Value) {
         }
     }
     if live_type == 1 {
-        let res: Result<serde_json::Value, anyhow::Error> = api_client.high_level().get_fes_live_info(id);
+        let res: Result<serde_json::Value, anyhow::Error> =
+            api_client.high_level().get_fes_live_info(id);
         match res {
             Ok(res) => {
                 tracing::info!(
@@ -144,7 +143,11 @@ fn print_latest_archive_info(ctx: &Global, archive: &serde_json::Value) {
     let video_url = archive.get("video_url").unwrap().as_str().unwrap();
     let mut real_url = String::new();
     if !link.is_empty() {
-        real_url = ctx.api_client.assets().get_hls_url_from_archive(link).unwrap_or_else(|_| String::new());
+        real_url = ctx
+            .api_client
+            .assets()
+            .get_hls_url_from_archive(link)
+            .unwrap_or_else(|_| String::new());
     }
     tracing::info!(
         "Latest archive: \n title: {:?}\n description: {:?}\n thumbnail: {:?}\n link: {:?}\n url: {:?}\n video_url: {:?}",

@@ -17,28 +17,28 @@ fn main() {
     let args = &global.args;
 
     match &args.command {
-        Some(Commands::MRS { .. }) => {
+        Some(Commands::MRS(_)) => {
             todo!("Implement MRS client command handling");
         }
-        Some(Commands::ALS {
-            addr,
-            port,
-            room_id,
-            token,
-            watch,
-        }) => {
+        Some(Commands::ALS(args)) => {
             let _ = command::als::run(
                 &global,
                 command::als::AlsConnectionInfo {
-                    address: addr.clone(),
-                    port: *port,
-                    room_id: room_id.clone(),
-                    token: token.clone(),
+                    address: args.addr.clone(),
+                    port: args.port,
+                    room_id: args.room_id.clone(),
+                    token: args.token.clone(),
                 },
-                *watch,
+                args.watch,
             )
             .map_err(|e| {
                 tracing::error!("Error running ALS command: {}", e);
+                std::process::exit(1);
+            });
+        }
+        Some(Commands::Archive(args)) => {
+            let _ = command::archive::run(&global, &args).map_err(|e| {
+                tracing::error!("Error running Archive command: {}", e);
                 std::process::exit(1);
             });
         }

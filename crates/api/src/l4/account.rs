@@ -1,5 +1,5 @@
-use serde_json::json;
 use crate::macros::{define_api_struct, use_common_crate};
+use serde_json::json;
 
 use_common_crate!();
 define_api_struct!(AccountApi);
@@ -8,7 +8,7 @@ impl<'a> AccountApi<'a> {
     // pub fn new(client: &'a ApiClient) -> Self {
     //     Self { client }
     // }
-    
+
     /// Returns the `device_specific_id`
     ///
     /// **Response example**

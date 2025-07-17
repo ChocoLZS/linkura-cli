@@ -7,10 +7,8 @@ use crate::config::Global;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Local, TimeDelta, Utc};
 use indicatif::{ProgressBar, ProgressStyle};
-use linkura_packet::{
-    als::client::{Client, ConnectionInfo},
-};
 use linkura_common::jwt::extract_jwt_payload;
+use linkura_packet::als::client::{Client, ConnectionInfo};
 
 pub struct AlsConnectionInfo {
     pub address: Option<String>,
@@ -125,7 +123,10 @@ fn fetch_connection_info(
         if now >= live_start_time - start_time_offset {
             if live_type == 2 {
                 // 401 需要尝试重新登录
-                match api_client.high_level().get_with_meets_connect_token(&live_id) {
+                match api_client
+                    .high_level()
+                    .get_with_meets_connect_token(&live_id)
+                {
                     Ok(t) => {
                         token = t;
                         break;

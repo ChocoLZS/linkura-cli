@@ -1,5 +1,5 @@
-use serde_json::json;
 use crate::macros::{define_api_struct, use_common_crate};
+use serde_json::json;
 
 use_common_crate!();
 define_api_struct!(WithLiveApi);
@@ -8,7 +8,7 @@ impl<'a> WithLiveApi<'a> {
     // pub fn new(client: &'a ApiClient) -> Self {
     //     Self { client }
     // }
-    
+
     pub fn enter(&self, id: &str) -> Result<Response> {
         let url = format!("{API_BASE}/withlive/enter");
         let res = self

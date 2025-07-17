@@ -8,7 +8,7 @@ impl<'a> FesLiveApi<'a> {
     // pub fn new(client: &'a ApiClient) -> Self {
     //     Self { client }
     // }
-    
+
     pub fn enter(&self, id: &str) -> Result<Response> {
         let url = format!("{API_BASE}/feslive/enter");
         let res = self

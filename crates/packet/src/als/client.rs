@@ -260,7 +260,7 @@ impl Client {
                 // add timetimestamp append
                 // nanoseconds
 
-                let length: u8 =  8;
+                let length: u8 = 8;
                 let micros = chrono::Utc::now().timestamp_micros();
                 packet_data.extend_from_slice(&length.to_be_bytes());
                 packet_data.extend_from_slice(&micros.to_be_bytes());
