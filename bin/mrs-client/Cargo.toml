@@ -1,0 +1,18 @@
+[package]
+name = "mrs-client"
+version = "0.0.0"
+edition.workspace = true
+
+[dependencies]
+linkura-packet.workspace = true
+linkura-common.workspace = true
+
+ctrlc.workspace = true
+tracing.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+chrono.workspace = true
+
+[[bin]]
+name = "mrs-client"
+path = "src/main.rs"
