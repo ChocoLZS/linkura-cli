@@ -21,7 +21,6 @@ tracing.workspace = true
 
 indicatif = "0.17.11"
 inquire = "0.7.5"
-spinoff = "0.8.0"
 colored = "3.0.0"
 
 [[bin]]

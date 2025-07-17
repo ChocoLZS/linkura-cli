@@ -3,7 +3,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-use crate::config::Global;
+use crate::{cli, config::Global};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Local, TimeDelta, Utc};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -87,10 +87,7 @@ fn fetch_connection_info(
         pb.set_style(
             ProgressStyle::with_template("{spinner:.blue} {msg}")
                 .unwrap()
-                .tick_strings(&[
-                    "🕐 ", "🕑 ", "🕒 ", "🕓 ", "🕔 ", "🕕 ", "🕖 ", "🕗 ", "🕘 ", "🕙 ", "🕚 ",
-                    "🕛 ",
-                ]),
+                .tick_strings(&cli::spinner::TICK_CLOCK),
         );
         loop {
             let now = Utc::now();

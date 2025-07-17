@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use clap::{Args as ClapArgs, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
-use spinoff::{Color, Spinner, spinners};
+use crate::cli::spinner::SpinnerManager;
 use std::{
     fs::{self},
     path::{Path, PathBuf},
@@ -212,11 +212,12 @@ pub struct Global {
     pub config_manager: ConfigManager,
     pub api_client: linkura_api::ApiClient,
     pub args: Args,
+    pub spinner_manager: SpinnerManager,
 }
 
 impl Global {
     pub fn new(args: Args) -> Self {
-        let args = args;
+        let spinner_manager = SpinnerManager::new(args.quiet);
         let mut api_client = linkura_api::ApiClient::new();
         let mut config_manager = ConfigManager::new(args.config_path.clone());
 
@@ -224,22 +225,18 @@ impl Global {
 
         let config = if config_res.is_err() {
             tracing::error!("Failed to load config: {:?}", config_res.err());
-            Self::initialize_config(&config_manager, &mut api_client)
+            Self::initialize_config(&config_manager, &mut api_client, &spinner_manager)
         } else {
             match config_res.unwrap() {
                 Some(mut config) => {
                     if !args.skip {
-                        let mut sp = Spinner::new(
-                            spinners::Dots,
-                            "Checking for linkura version...",
-                            Color::Green,
-                        );
+                        let sp = spinner_manager.create_spinner("Checking for linkura version...");
                         // check if latest res_version and client_version
                         let (res_version, client_version) =
                             api_client.high_level().get_app_version().unwrap();
                         if let Some(res_version) = res_version {
                             if res_version != config.credential.res_version {
-                                sp.update_text(format!(
+                                sp.set_message(format!(
                                     "New res version found, update from {} to {}",
                                     config.credential.res_version, res_version
                                 ));
@@ -250,7 +247,7 @@ impl Global {
 
                         if let Some(client_version) = client_version {
                             if client_version != config.credential.client_version {
-                                sp.update_text(format!(
+                                sp.set_message(format!(
                                     "New client version found, update from {} to {}",
                                     config.credential.client_version, client_version
                                 ));
@@ -258,12 +255,12 @@ impl Global {
                             }
                         }
 
-                        sp.success("Version check complete!");
+                        sp.finish_with_message("Version check complete!");
                     }
 
                     config
                 }
-                None => Self::initialize_config(&config_manager, &mut api_client),
+                None => Self::initialize_config(&config_manager, &mut api_client, &spinner_manager),
             }
         };
 
@@ -273,16 +270,17 @@ impl Global {
             config_manager,
             api_client,
             args,
+            spinner_manager,
         }
     }
 
-    fn initialize_config(config_manager: &ConfigManager, api_client: &mut ApiClient) -> Config {
+    fn initialize_config(config_manager: &ConfigManager, api_client: &mut ApiClient, spinner_manager: &SpinnerManager) -> Config {
         tracing::warn!(
             "No config found, creating a new one to path: {}",
             config_manager.get_config_path().display()
         );
         // first time to init interactive
-        let credential = interactive::get_credential_with_simple_prompt(api_client)
+        let credential = interactive::get_credential_with_simple_prompt(api_client, spinner_manager)
             .expect("Failed to get credential");
         Config { credential }
     }
@@ -295,7 +293,7 @@ pub fn init(args: Args) -> Result<Global> {
     let mut global = Global::new(args);
     tracing::info!("Config initialized!");
 
-    let mut sp = Spinner::new(spinners::Dots, "登陆中...", Color::Blue);
+    let sp = global.spinner_manager.create_spinner_with_color("登陆中...", "blue");
     let session_token = if global.config.credential.session_token.is_none() {
         let session_token = global.api_client.high_level().device_id_login(
             &global.config.credential.player_id,
@@ -308,11 +306,11 @@ pub fn init(args: Args) -> Result<Global> {
     };
     global.api_client.set_session_token(&session_token);
     // 测试登录态
-    sp.update_text("测试是否登录成功...");
+    sp.set_message("测试是否登录成功...");
     match global.api_client.high_level().get_plan_list() {
         Ok(_) => {}
         Err(_) => {
-            sp.update_text("测试获取信息失败，尝试重新登录");
+            sp.set_message("测试获取信息失败，尝试重新登录");
             global.api_client.del_session_token();
             // delete session token
             let session_token = global
@@ -337,7 +335,7 @@ pub fn init(args: Args) -> Result<Global> {
         .config_manager
         .save_config(&global.config)
         .context("Failed to save config")?;
-    sp.success(&format!(
+    sp.finish_with_message(format!(
         "登陆成功！信息已保存至{}，session token: {}",
         global.config_manager.get_config_path().display(),
         session_token
