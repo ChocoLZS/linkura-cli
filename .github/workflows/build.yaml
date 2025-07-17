@@ -59,10 +59,10 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
           sudo apt-get update -qq && sudo apt-get -y install \
-            pkg-config musl-tools
+            pkg-config musl-tools musl-dev
           echo PKG_CONFIG_ALLOW_CROSS=1 >> $GITHUB_ENV
-          echo OPENSSL_STATIC=1 >> $GITHUB_ENV
-          echo OPENSSL_VENDORED=1 >> $GITHUB_ENV
+          echo CC_x86_64_unknown_linux_musl=musl-gcc >> $GITHUB_ENV
+          echo CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc >> $GITHUB_ENV
 
       - name: Setup | Environment [-nix]
         if: matrix.target != 'x86_64-pc-windows-gnu' && matrix.target != 'x86_64-unknown-linux-musl'
