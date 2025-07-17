@@ -1,0 +1,88 @@
+name: Release
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      binary_name:
+        type: choice
+        description: "Binary name for release"
+        required: true
+        options:
+          - linkura-cli
+        default: linkura-cli
+      create_release:
+        type: boolean
+        description: "Create a release"
+        default: true
+      # features:
+      #   type: string
+      #   description: "Custom features to build"
+      archive_suffix:
+        type: choice
+        description: "Suffix for the archive bin filename."
+        options:
+          - '-'
+
+jobs:
+  create-release:
+    if: inputs.create_release == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/create-gh-release-action@v1
+        with:
+          prefix: ${{ inputs.binary_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  upload-assets:
+    needs: [create-release, ffmpeg-build]
+    if: |
+      always() &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-gnu
+            os: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      # - name: Setup | Protoc
+      #   uses: arduino/setup-protoc@v3
+      #   with:
+      #     repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup | Environment [-nix]
+        if: matrix.target != 'x86_64-pc-windows-gnu'
+        run: |
+          sudo apt-get update -qq && sudo apt-get -y install \
+            pkg-config libssl-dev
+          echo PKG_CONFIG_ALLOW_CROSS=1 >> $GITHUB_ENV
+  
+      - name: Setup | Environment [Windows]
+        if: matrix.target == 'x86_64-pc-windows-gnu'
+        run: |
+          sudo apt-get update -qq && sudo apt-get -y install \
+            mingw-w64
+          echo PKG_CONFIG_ALLOW_CROSS=1 >> $GITHUB_ENV
+
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          build-tool: cargo
+          bin: ${{ inputs.binary_name }}
+          archive: '$bin${{ inputs.archive_suffix }}$target'
+          target: ${{ matrix.target }}
+          # features: ${{ inputs.features || '' }}
+          tar: unix
+          zip: windows
+          token: ${{ secrets.GITHUB_TOKEN }}
