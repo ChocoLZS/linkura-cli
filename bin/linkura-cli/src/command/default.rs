@@ -1,16 +1,15 @@
 use crate::config::Global;
 use chrono::{Local, Utc};
-use linkura_api::{get_hls_url_from_archive};
 use linkura_common::jwt::extract_jwt_payload;
 
 pub fn run(ctx: &Global) {
     let args = &ctx.args;
 
     let api_client = &ctx.api_client;
-    let wm_res: serde_json::Value = api_client.get_plan_list().unwrap();
+    let wm_res: serde_json::Value = api_client.high_level().get_plan_list().unwrap();
 
     if let Some(id) = &args.id {
-        let res = api_client.get_with_meets_info(&id).unwrap();
+        let res = api_client.high_level().get_with_meets_info(&id).unwrap();
         tracing::info!("wm info: {:?}", res);
     } else {
         let trailers = wm_res.as_array().unwrap();
@@ -24,7 +23,7 @@ pub fn run(ctx: &Global) {
         }
     }
 
-    let archive_res: serde_json::Value = api_client.get_archive_list().unwrap();
+    let archive_res: serde_json::Value = api_client.high_level().get_archive_list().unwrap();
     let latest_archive_res = archive_res.as_array().unwrap()[0].clone();
     print_latest_archive_info(ctx, &latest_archive_res);
 }
@@ -73,7 +72,7 @@ fn print_latest_trailer_archive(ctx: &Global, wm: &serde_json::Value) {
             - chrono::Duration::minutes(10);
 
     if live_type == 2 {
-        let res: Result<serde_json::Value, anyhow::Error> = api_client.get_with_meets_info(id);
+        let res: Result<serde_json::Value, anyhow::Error> = api_client.high_level().get_with_meets_info(id);
         match res {
             Ok(res) => {
                 tracing::info!(
@@ -95,7 +94,7 @@ fn print_latest_trailer_archive(ctx: &Global, wm: &serde_json::Value) {
             }
         }
         if maybe_started {
-            let token = api_client.get_with_meets_connect_token(id);
+            let token = api_client.high_level().get_with_meets_connect_token(id);
             match token {
                 Ok(token) => {
                     let _ = extract_jwt_payload(token.as_str()).and_then(|payload| {
@@ -115,7 +114,7 @@ fn print_latest_trailer_archive(ctx: &Global, wm: &serde_json::Value) {
         }
     }
     if live_type == 1 {
-        let res: Result<serde_json::Value, anyhow::Error> = api_client.get_fes_live_info(id);
+        let res: Result<serde_json::Value, anyhow::Error> = api_client.high_level().get_fes_live_info(id);
         match res {
             Ok(res) => {
                 tracing::info!(
@@ -133,7 +132,7 @@ fn print_latest_trailer_archive(ctx: &Global, wm: &serde_json::Value) {
     }
 }
 
-fn print_latest_archive_info(_ctx: &Global, archive: &serde_json::Value) {
+fn print_latest_archive_info(ctx: &Global, archive: &serde_json::Value) {
     let title = archive.get("name").unwrap().as_str().unwrap();
     let description = archive.get("description").unwrap().as_str().unwrap();
     let thumbnail = archive
@@ -145,7 +144,7 @@ fn print_latest_archive_info(_ctx: &Global, archive: &serde_json::Value) {
     let video_url = archive.get("video_url").unwrap().as_str().unwrap();
     let mut real_url = String::new();
     if !link.is_empty() {
-        real_url = get_hls_url_from_archive(link).unwrap_or_else(|_| String::new());
+        real_url = ctx.api_client.assets().get_hls_url_from_archive(link).unwrap_or_else(|_| String::new());
     }
     tracing::info!(
         "Latest archive: \n title: {:?}\n description: {:?}\n thumbnail: {:?}\n link: {:?}\n url: {:?}\n video_url: {:?}",

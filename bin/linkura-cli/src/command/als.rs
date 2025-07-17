@@ -57,7 +57,7 @@ fn fetch_connection_info(
     watch_mode: bool,
 ) -> Result<ConnectionInfo> {
     let api_client = &ctx.api_client;
-    let plan_list = api_client.get_plan_list()?;
+    let plan_list = api_client.high_level().get_plan_list()?;
     let now = Utc::now();
     let res: Option<&serde_json::Value> = plan_list.as_array().unwrap().first();
     if res.is_none() {
@@ -125,7 +125,7 @@ fn fetch_connection_info(
         if now >= live_start_time - start_time_offset {
             if live_type == 2 {
                 // 401 需要尝试重新登录
-                match api_client.get_with_meets_connect_token(&live_id) {
+                match api_client.high_level().get_with_meets_connect_token(&live_id) {
                     Ok(t) => {
                         token = t;
                         break;
@@ -136,7 +136,7 @@ fn fetch_connection_info(
                 }
             }
             if live_type == 1 {
-                match api_client.get_fes_live_connect_token(&live_id) {
+                match api_client.high_level().get_fes_live_connect_token(&live_id) {
                     Ok(t) => {
                         token = t;
                         break;

@@ -206,7 +206,7 @@ impl Global {
                             Color::Green,
                         );
                         // check if latest res_version and client_version
-                        let (res_version, client_version) = api_client.get_app_version().unwrap();
+                        let (res_version, client_version) = api_client.high_level().get_app_version().unwrap();
                         if let Some(res_version) = res_version {
                             if res_version != config.credential.res_version {
                                 sp.update_text(format!(
@@ -268,7 +268,7 @@ pub fn init() -> Result<Global> {
 
     let mut sp = Spinner::new(spinners::Dots, "登陆中...", Color::Blue);
     let session_token = if global.config.credential.session_token.is_none() {
-        let session_token = global.api_client.device_id_login(
+        let session_token = global.api_client.high_level().device_id_login(
             &global.config.credential.player_id,
             &global.config.credential.device_specific_id,
         )?;
@@ -280,7 +280,7 @@ pub fn init() -> Result<Global> {
     global.api_client.set_session_token(&session_token);
     // 测试登录态
     sp.update_text("测试是否登录成功...");
-    match global.api_client.get_plan_list() {
+    match global.api_client.high_level().get_plan_list() {
         Ok(_) => {}
         Err(_) => {
             sp.update_text("测试获取信息失败，尝试重新登录");
@@ -288,7 +288,7 @@ pub fn init() -> Result<Global> {
             // delete session token
             let session_token = global
                 .api_client
-                .device_id_login(
+                .high_level().device_id_login(
                     &global.config.credential.player_id,
                     &global.config.credential.device_specific_id,
                 )

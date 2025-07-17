@@ -1223,6 +1223,7 @@ name = "linkura-packet"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "hex",
  "p256",
  "rand_core 0.6.4",
