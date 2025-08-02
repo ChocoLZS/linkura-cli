@@ -10,13 +10,11 @@ authors = ["ChocoLZS <chocoie@outlook.com>"]
 repository = "https://github.com/ChocoLZS/linkura-cli"
 license = ""
 
-[workspace.package.metadata.i18n]
-available-locales = ["en", "zh", "ja"]
-
 [workspace.dependencies]
 linkura-api = { path = "crates/api" }
 linkura-packet = { path = "crates/packet" }
 linkura-common = { path = "crates/common" }
+i18n = { path = "crates/i18n" }
 
 
 tracing = "0.1.41"

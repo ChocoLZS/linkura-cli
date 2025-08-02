@@ -827,6 +827,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "i18n"
+version = "0.0.0"
+dependencies = [
+ "rust-i18n",
+]
+
+[[package]]
 name = "iana-time-zone"
 version = "0.1.63"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1116,6 +1123,19 @@ dependencies = [
  "serde_json",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "linkura-downloader"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "i18n",
+ "linkura-common",
+ "rust-i18n",
+ "tracing",
 ]
 
 [[package]]
