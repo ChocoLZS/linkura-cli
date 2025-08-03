@@ -120,7 +120,21 @@ impl BaseDownloader for AlsDownloader {
         Ok(())
     }
 
+    // TODO: maybe use self.fetch_metadata in the future
     fn extract_folder_name(&self, url: &str) -> Result<String> {
-        self.base.extract_folder_name_from_url(url)
+        use url::Url;
+        let url_obj = Url::parse(url)
+            .map_err(|e| anyhow!("Invalid URL: {}", e))?;
+        
+        let path_segments: Vec<&str> = url_obj.path_segments()
+            .ok_or_else(|| anyhow!("URL has no path segments"))?
+            .collect();
+
+        if path_segments.len() < 2 {
+            return Err(anyhow!("URL path does not contain enough segments"));
+        }
+
+        let folder_name = path_segments[path_segments.len() - 2];
+        Ok(folder_name.to_string())
     }
 }

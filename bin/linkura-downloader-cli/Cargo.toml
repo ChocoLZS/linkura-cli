@@ -1,6 +1,6 @@
 [package]
 name = "linkura-downloader-cli"
-version = "0.0.1"
+version = "0.0.2"
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
@@ -20,7 +20,7 @@ tracing-subscriber.workspace = true
 rust-i18n.workspace = true
 tokio.workspace = true
 async-trait.workspace = true
-
+url.workspace = true
 
 
 [[bin]]

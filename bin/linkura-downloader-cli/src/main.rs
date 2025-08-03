@@ -2,7 +2,7 @@
 
 // i18n::init!();
 
-use std::path::Path;
+use std::{ops::Deref, path::Path};
 use anyhow::{Result, Error};
 use clap::{Args as ClapArgs, Parser, Subcommand};
 use i18n::t;
@@ -12,6 +12,7 @@ i18n::init!();
 
 use linkura_downloader::{AlsDownloader, BaseDownloader, MrsDownloader, R2Uploader};
 use linkura_common::log;
+use url::Url;
 
 
 /** ARG PARSER **/
@@ -88,7 +89,7 @@ pub struct ArgsSync {
     pub upload_concurrent: usize,
     
     // Additional options
-    #[clap(long = "delete-after-done", help = t!("downloader.cli.command.sync.args.delete_after_done").to_string())]
+    #[clap(long = "delete-after-done", help = t!("downloader.cli.command.sync.args.delete_after_done").to_string(), default_value = "true")]
     pub delete_after_done: bool,
 }
 
@@ -222,8 +223,8 @@ async fn main() -> Result<()> {
                 } else { 
                     "no prefix".to_string() 
                 });
-
-            uploader.upload_folder(&target_folder, sync_args.prefix.as_deref()).await?;
+            uploader.upload_folder(&target_folder, 
+                Some(sync_args.prefix.clone().unwrap_or(get_bucket_prefix(&sync_args.download_url)?).deref())).await?;
 
             // Delete downloaded files if requested
             if sync_args.delete_after_done {
@@ -241,4 +242,36 @@ async fn main() -> Result<()> {
         None => {},
     }
     Ok(())
+}
+
+fn get_bucket_prefix(url: &str) -> Result<String> {
+    let parsed_url = Url::parse(url)?;
+    let path = parsed_url.path();
+    
+    // Remove leading slash if present
+    let path = path.strip_prefix('/').unwrap_or(path);
+    
+    // Split path into segments and remove the last segment (filename)
+    let segments: Vec<&str> = path.split('/').collect();
+    if segments.len() <= 1 {
+        return Err(Error::msg("URL path too short to extract prefix"));
+    }
+    
+    // Join all segments except the last one
+    let prefix = segments[..segments.len()-1].join("/");
+    
+    Ok(prefix)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_get_bucket_prefix() {
+        let url = "https://example.org/archive/alst/directory_name/index.md";
+        let prefix = get_bucket_prefix(url);
+        assert!(prefix.is_ok());
+        assert_eq!(prefix.unwrap(), "archive/alst/directory_name");
+    }
 }

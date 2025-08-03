@@ -1209,7 +1209,7 @@ dependencies = [
 
 [[package]]
 name = "linkura-downloader-cli"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1222,6 +1222,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "url",
 ]
 
 [[package]]
