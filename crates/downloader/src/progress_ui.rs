@@ -188,22 +188,20 @@ impl ProgressReporter for TreeProgressReporter {
         let action_emoji = if inner.is_upload { "⬆️" } else { "⏳" };
         thread.progress_bar.set_message(format!("{} - {} {}", thread_id + 1, action_emoji, filename));
         
-        // 文件级别的进度条样式
         let file_emoji = if inner.is_upload { "📤" } else { "📄" };
-        let file_template = format!("    {{bar:30.green/yellow}} {} {{msg}} {{bytes:>7}}/{{total_bytes:7}}", file_emoji);
+        let file_template = format!("    {} {{msg}} {{total_bytes:>7}}", file_emoji);
         let file_style = ProgressStyle::with_template(&file_template)
-        .unwrap()
-        .progress_chars("#>-");
+            .unwrap();
         
         let file_pb = if let Some(existing_pb) = &thread.file_progress_bar {
-            // 如果已经有文件进度条，重用它并重置
+            // 如果已经有文件显示，重用它并重置
             existing_pb.reset();
             existing_pb.set_length(file_size);
             existing_pb.set_style(file_style);
             existing_pb.set_message("");
             existing_pb.clone()
         } else {
-            // 如果没有现有的进度条，创建新的
+            // 如果没有现有的显示，创建新的
             let new_pb = inner.multi_progress.insert_after(&thread.progress_bar, ProgressBar::new(file_size));
             new_pb.set_style(file_style);
             new_pb.set_message("");
@@ -232,7 +230,6 @@ impl ProgressReporter for TreeProgressReporter {
         let mut thread = inner.thread_progress[thread_id].lock().unwrap();
         
         if let Some(file_pb) = &thread.file_progress_bar {
-            // 完成文件进度条，显示为已完成状态
             file_pb.finish_with_message(format!("✓"));
         }
         
@@ -275,8 +272,6 @@ impl FileProgressReporter for IndicatifFileProgressReporter {
     fn update_progress(&self, downloaded: u64) {
         let previous_position = self.progress_bar.position();
         let new_bytes = downloaded.saturating_sub(previous_position);
-        
-        self.progress_bar.set_position(downloaded);
         
         // 更新总处理量和速率
         if new_bytes > 0 {
