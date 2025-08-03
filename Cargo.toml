@@ -14,6 +14,7 @@ license = ""
 linkura-api = { path = "crates/api" }
 linkura-packet = { path = "crates/packet" }
 linkura-common = { path = "crates/common" }
+linkura-downloader = { path = "crates/downloader" }
 i18n = { path = "crates/i18n" }
 
 
