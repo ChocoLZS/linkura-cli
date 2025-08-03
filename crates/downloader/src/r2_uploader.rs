@@ -9,12 +9,13 @@ use sha2::{Sha256, Digest};
 use hex;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
-use futures::stream::{self, StreamExt};
+use tokio::sync::mpsc;
 
 use crate::progress_ui::{ProgressReporter, FileProgressReporter, ProgressReporterFactory};
 
 type HmacSha256 = Hmac<Sha256>;
 
+#[derive(Clone)]
 pub struct R2Uploader {
     client: Client,
     account_id: String,
@@ -23,7 +24,7 @@ pub struct R2Uploader {
     bucket: String,
     endpoint: String,
     concurrent_uploads: usize,
-    progress_reporter: Option<Box<dyn ProgressReporter>>,
+    progress_reporter: Option<Arc<dyn ProgressReporter>>,
 }
 
 #[derive(Debug)]
@@ -73,9 +74,11 @@ impl R2Uploader {
         let client = Client::new();
 
         let progress_reporter = if show_progress {
-            Some(crate::progress_ui::TreeProgressReporterFactory.create_upload_reporter(0, concurrent_uploads))
+            let reporter = crate::progress_ui::TreeProgressReporterFactory.create_upload_reporter(0, concurrent_uploads);
+            Some(Arc::from(reporter))
         } else {
-            Some(crate::progress_ui::SilentProgressReporterFactory.create_upload_reporter(0, concurrent_uploads))
+            let reporter = crate::progress_ui::SilentProgressReporterFactory.create_upload_reporter(0, concurrent_uploads);
+            Some(Arc::from(reporter))
         };
 
         Ok(Self {
@@ -149,79 +152,86 @@ impl R2Uploader {
     }
 
     async fn upload_files_concurrent(&self, tasks: Vec<UploadTask>) -> Result<()> {
-        let tasks = Arc::new(tasks);
-        let task_index = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        if tasks.is_empty() {
+            return Ok(());
+        }
+
+        let (task_sender, task_receiver) = mpsc::unbounded_channel::<UploadTask>();
+        let task_receiver = Arc::new(tokio::sync::Mutex::new(task_receiver));
         
-        let results = stream::iter(0..self.concurrent_uploads)
-            .map(|thread_id| {
-                let tasks = Arc::clone(&tasks);
-                let task_index = Arc::clone(&task_index);
-                let uploader = self;
-                
-                async move {
-                    while let Some(task) = Self::get_next_task(&tasks, &task_index) {
-                        let file_reporter = if let Some(reporter) = &uploader.progress_reporter {
-                            reporter.assign_file_to_thread(
-                                thread_id,
-                                &task.local_path.file_name()
-                                    .unwrap_or_default()
-                                    .to_string_lossy(),
-                                task.file_size,
-                            )
-                        } else {
-                            None
-                        };
+        for task in tasks {
+            if task_sender.send(task).is_err() {
+                return Err(Error::msg("Failed to send task to queue"));
+            }
+        }
+        drop(task_sender);
 
-                        let result = uploader.upload_single_file(&task, file_reporter.as_ref()).await;
-                        
-                        if let Some(reporter) = &uploader.progress_reporter {
-                            reporter.finish_file(
-                                thread_id,
-                                &task.local_path.file_name()
-                                    .unwrap_or_default()
-                                    .to_string_lossy(),
-                            );
-                        }
+        let mut handles = Vec::new();
+        
+        for thread_id in 0..self.concurrent_uploads {
+            let receiver = Arc::clone(&task_receiver);
+            let uploader = self.clone();
+            
+            let handle = tokio::spawn(async move {
+                loop {
+                    let task = {
+                        let mut receiver = receiver.lock().await;
+                        receiver.recv().await
+                    };
+                    
+                    let task = match task {
+                        Some(task) => task,
+                        None => break, // 没有更多任务
+                    };
 
-                        if let Err(e) = result {
-                            return Err(e);
-                        }
+                    let file_reporter = if let Some(reporter) = &uploader.progress_reporter {
+                        reporter.assign_file_to_thread(
+                            thread_id,
+                            &task.local_path.file_name()
+                                .unwrap_or_default()
+                                .to_string_lossy(),
+                            task.file_size,
+                        )
+                    } else {
+                        None
+                    };
 
-                        // 只在静默模式下输出上传结果
-                        if uploader.progress_reporter.is_none() || 
-                           uploader.progress_reporter.as_ref().unwrap().as_any().is::<crate::progress_ui::SilentProgressReporter>() {
-                            println!("Uploaded: {} -> {}", task.local_path.display(), task.remote_key);
-                        }
+                    let result = uploader.upload_single_file(&task, file_reporter.as_ref()).await;
+                    
+                    if let Some(reporter) = &uploader.progress_reporter {
+                        reporter.finish_file(
+                            thread_id,
+                            &task.local_path.file_name()
+                                .unwrap_or_default()
+                                .to_string_lossy(),
+                        );
                     }
-                    Ok(())
+
+                    if let Err(e) = result {
+                        return Err(e);
+                    }
+
+                    if uploader.progress_reporter.is_none() || 
+                       uploader.progress_reporter.as_ref().unwrap().as_any().is::<crate::progress_ui::SilentProgressReporter>() {
+                    }
                 }
-            })
-            .buffer_unordered(self.concurrent_uploads)
-            .collect::<Vec<_>>()
-            .await;
+                Ok(())
+            });
+            
+            handles.push(handle);
+        }
+        
+        for handle in handles {
+            handle.await.map_err(|e| Error::msg(format!("Thread join error: {}", e)))??;
+        }
 
         if let Some(reporter) = &self.progress_reporter {
             reporter.finish_all();
         }
 
-        for result in results {
-            result?;
-        }
-
         Ok(())
     }
 
-    fn get_next_task(
-        tasks: &Arc<Vec<UploadTask>>,
-        task_index: &Arc<std::sync::atomic::AtomicUsize>,
-    ) -> Option<UploadTask> {
-        let index = task_index.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        if index < tasks.len() {
-            Some(tasks[index].clone())
-        } else {
-            None
-        }
-    }
 
     async fn upload_single_file(
         &self,
@@ -252,6 +262,7 @@ impl R2Uploader {
             .put(&url)
             .header("Authorization", authorization)
             .header("Content-Type", content_type)
+            .header("Content-Length", contents.len().to_string())
             .header("x-amz-date", now.format("%Y%m%dT%H%M%SZ").to_string())
             .header("x-amz-content-sha256", content_sha256)
             .body(contents)
