@@ -18,6 +18,7 @@ chrono.workspace = true
 tracing.workspace = true
 rust-i18n.workspace = true
 tokio.workspace = true
+async-trait.workspace = true
 
 [[bin]]
 name = "linkura-downloader-cli"

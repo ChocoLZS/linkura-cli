@@ -13,6 +13,7 @@ serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
 indicatif.workspace = true
+async-trait.workspace = true
 
 futures = "0.3"
 url = "2.0"

@@ -1,10 +1,12 @@
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use futures::future::join_all;
 use reqwest::Client;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
+use url::Url;
 
 use crate::progress_ui::{ProgressReporter, ProgressReporterFactory, SilentProgressReporterFactory, TreeProgressReporterFactory};
 
@@ -14,24 +16,32 @@ pub struct DownloadItem {
     pub filename: String,
 }
 
-pub struct Downloader {
+#[async_trait]
+pub trait BaseDownloader: Send + Sync {
+    async fn download(&self, url: &str, output_dir: &Path) -> Result<()>;
+}
+
+pub trait ProgressConfig {
+    fn new(concurrent_downloads: usize) -> Self;
+    fn with_progress(concurrent_downloads: usize, show_progress: bool) -> Self;
+    fn with_progress_factory(
+        concurrent_downloads: usize,
+        progress_factory: Box<dyn ProgressReporterFactory + Send + Sync>,
+    ) -> Self;
+}
+
+pub struct BaseDownloaderImpl {
     client: Client,
     concurrent_downloads: usize,
     progress_factory: Box<dyn ProgressReporterFactory + Send + Sync>,
 }
 
-impl Default for Downloader {
-    fn default() -> Self {
-        Self::new(10)
-    }
-}
-
-impl Downloader {
-    pub fn new(concurrent_downloads: usize) -> Self {
+impl ProgressConfig for BaseDownloaderImpl {
+    fn new(concurrent_downloads: usize) -> Self {
         Self::with_progress_factory(concurrent_downloads, Box::new(TreeProgressReporterFactory))
     }
 
-    pub fn with_progress(concurrent_downloads: usize, show_progress: bool) -> Self {
+    fn with_progress(concurrent_downloads: usize, show_progress: bool) -> Self {
         let factory: Box<dyn ProgressReporterFactory + Send + Sync> = if show_progress {
             Box::new(TreeProgressReporterFactory)
         } else {
@@ -40,7 +50,7 @@ impl Downloader {
         Self::with_progress_factory(concurrent_downloads, factory)
     }
 
-    pub fn with_progress_factory(
+    fn with_progress_factory(
         concurrent_downloads: usize,
         progress_factory: Box<dyn ProgressReporterFactory + Send + Sync>,
     ) -> Self {
@@ -50,7 +60,66 @@ impl Downloader {
             progress_factory,
         }
     }
+}
 
+impl BaseDownloaderImpl {
+
+    pub fn client(&self) -> &Client {
+        &self.client
+    }
+
+    pub fn extract_folder_name_from_url(&self, url_str: &str) -> Result<String> {
+        let url = Url::parse(url_str)
+            .map_err(|e| anyhow!("Invalid URL: {}", e))?;
+        
+        let path_segments: Vec<&str> = url.path_segments()
+            .ok_or_else(|| anyhow!("URL has no path segments"))?
+            .collect();
+
+        let folder_name = path_segments
+            .last()
+            .ok_or_else(|| anyhow!("No folder name found in path"))?;
+
+        Ok(folder_name.to_string())
+    }
+
+    pub fn extract_filename_from_url(&self, url_str: &str) -> Result<String> {
+        let url = Url::parse(url_str)
+            .map_err(|e| anyhow!("Invalid URL: {}", e))?;
+        
+        let path_segments: Vec<&str> = url.path_segments()
+            .ok_or_else(|| anyhow!("URL has no path segments"))?
+            .collect();
+
+        let filename = path_segments
+            .last()
+            .ok_or_else(|| anyhow!("No filename found in URL"))?;
+
+        Ok(filename.to_string())
+    }
+
+    pub fn get_base_url(&self, url_str: &str) -> Result<String> {
+        let url = Url::parse(url_str)
+            .map_err(|e| anyhow!("Invalid URL: {}", e))?;
+        
+        let mut path_segments: Vec<&str> = url.path_segments()
+            .ok_or_else(|| anyhow!("URL has no path segments"))?
+            .collect();
+
+        path_segments.pop();
+
+        let base_path = path_segments.join("/");
+        let base_url = format!("{}://{}/{}", 
+            url.scheme(), 
+            url.host_str().ok_or_else(|| anyhow!("URL has no host"))?,
+            base_path
+        );
+
+        Ok(base_url)
+    }
+}
+
+impl BaseDownloaderImpl {
     pub async fn download_files(
         &self,
         items: Vec<DownloadItem>,
@@ -72,14 +141,14 @@ impl Downloader {
                 let output_path = output_dir.join(&item.filename);
                 let progress_reporter = progress_reporter.as_ref();
                 let active_threads = active_threads.clone();
+                let concurrent_downloads = self.concurrent_downloads;
                 
                 async move {
                     let _permit = semaphore.acquire().await.unwrap();
                     
-                    // 获取一个空闲的线程ID (使用循环分配)
-                    let thread_id = active_threads.fetch_add(1, std::sync::atomic::Ordering::SeqCst) % self.concurrent_downloads;
+                    let thread_id = active_threads.fetch_add(1, std::sync::atomic::Ordering::SeqCst) % concurrent_downloads;
                     
-                    let result = self.download_single_file_with_progress_reporter(
+                    let result = Self::download_single_file_with_progress_reporter(
                         &client, 
                         &item.url, 
                         &output_path,
@@ -107,7 +176,6 @@ impl Downloader {
     }
 
     async fn download_single_file_with_progress_reporter(
-        &self,
         client: &Client,
         url: &str,
         output_path: &Path,
@@ -155,3 +223,5 @@ impl Downloader {
         Ok(())
     }
 }
+
+pub type Downloader = BaseDownloaderImpl;

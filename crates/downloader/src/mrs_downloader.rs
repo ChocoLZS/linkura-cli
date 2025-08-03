@@ -1,13 +1,10 @@
-use crate::downloader::{DownloadItem, Downloader};
-use crate::progress_ui::{ProgressReporterFactory, SilentProgressReporterFactory, TreeProgressReporterFactory};
+use crate::downloader::{BaseDownloader, BaseDownloaderImpl, DownloadItem, ProgressConfig};
 use anyhow::{anyhow, Result};
-use reqwest::Client;
+use async_trait::async_trait;
 use std::path::Path;
-use url::Url;
 
 pub struct MrsDownloader {
-    downloader: Downloader,
-    client: Client,
+    base: BaseDownloaderImpl,
 }
 
 impl Default for MrsDownloader {
@@ -18,58 +15,19 @@ impl Default for MrsDownloader {
 
 impl MrsDownloader {
     pub fn new(concurrent_downloads: usize) -> Self {
-        Self::with_progress(concurrent_downloads, true)
+        Self {
+            base: ProgressConfig::new(concurrent_downloads),
+        }
     }
 
     pub fn with_progress(concurrent_downloads: usize, show_progress: bool) -> Self {
-        let factory: Box<dyn ProgressReporterFactory + Send + Sync> = if show_progress {
-            Box::new(TreeProgressReporterFactory)
-        } else {
-            Box::new(SilentProgressReporterFactory)
-        };
-        Self::with_progress_factory(concurrent_downloads, factory)
-    }
-
-    fn with_progress_factory(
-        concurrent_downloads: usize,
-        progress_factory: Box<dyn ProgressReporterFactory + Send + Sync>,
-    ) -> Self {
         Self {
-            downloader: Downloader::with_progress_factory(concurrent_downloads, progress_factory),
-            client: Client::new(),
+            base: ProgressConfig::with_progress(concurrent_downloads, show_progress),
         }
-    }
-
-    pub async fn download(&self, url: &str, output_dir: &Path) -> Result<()> {
-        let iarc_content = self.fetch_iarc_content(url).await?;
-        let mut download_items = Vec::new();
-        
-        let folder_name = self.extract_folder_name(url)?;
-        let target_dir = output_dir.join(&folder_name);
-        let base_url = self.get_base_url(url)?;
-
-        download_items.push(DownloadItem {
-            url: url.to_string(),
-            filename: self.extract_filename(url)?,
-        });
-
-        let segment_files = self.parse_iarc_segments(&iarc_content)?;
-
-        for segment_file in segment_files {
-            let segment_url = format!("{}/{}", base_url, segment_file);
-            download_items.push(DownloadItem {
-                url: segment_url,
-                filename: segment_file,
-            });
-        }
-
-        self.downloader.download_files(download_items, &target_dir).await?;
-
-        Ok(())
     }
 
     async fn fetch_iarc_content(&self, url: &str) -> Result<Vec<u8>> {
-        let response = self.client.get(url).send().await?;
+        let response = self.base.client().get(url).send().await?;
         
         if !response.status().is_success() {
             return Err(anyhow!("Failed to fetch iarc file: HTTP {}", response.status()));
@@ -114,6 +72,7 @@ impl MrsDownloader {
     }
 
     fn extract_folder_name(&self, url: &str) -> Result<String> {
+        use url::Url;
         let url_obj = Url::parse(url)
             .map_err(|e| anyhow!("Invalid URL: {}", e))?;
         
@@ -129,38 +88,36 @@ impl MrsDownloader {
         Ok(folder_name.to_string())
     }
 
-    fn extract_filename(&self, url: &str) -> Result<String> {
-        let url_obj = Url::parse(url)
-            .map_err(|e| anyhow!("Invalid URL: {}", e))?;
+}
+
+#[async_trait]
+impl BaseDownloader for MrsDownloader {
+
+    async fn download(&self, url: &str, output_dir: &Path) -> Result<()> {
+        let iarc_content = self.fetch_iarc_content(url).await?;
+        let mut download_items = Vec::new();
         
-        let path_segments: Vec<&str> = url_obj.path_segments()
-            .ok_or_else(|| anyhow!("URL has no path segments"))?
-            .collect();
+        let folder_name = self.extract_folder_name(url)?;
+        let target_dir = output_dir.join(&folder_name);
+        let base_url = self.base.get_base_url(url)?;
 
-        let filename = path_segments
-            .last()
-            .ok_or_else(|| anyhow!("No filename found in URL"))?;
+        download_items.push(DownloadItem {
+            url: url.to_string(),
+            filename: self.base.extract_filename_from_url(url)?,
+        });
 
-        Ok(filename.to_string())
-    }
+        let segment_files = self.parse_iarc_segments(&iarc_content)?;
 
-    fn get_base_url(&self, url: &str) -> Result<String> {
-        let url_obj = Url::parse(url)
-            .map_err(|e| anyhow!("Invalid URL: {}", e))?;
-        
-        let mut path_segments: Vec<&str> = url_obj.path_segments()
-            .ok_or_else(|| anyhow!("URL has no path segments"))?
-            .collect();
+        for segment_file in segment_files {
+            let segment_url = format!("{}/{}", base_url, segment_file);
+            download_items.push(DownloadItem {
+                url: segment_url,
+                filename: segment_file,
+            });
+        }
 
-        path_segments.pop();
+        self.base.download_files(download_items, &target_dir).await?;
 
-        let base_path = path_segments.join("/");
-        let base_url = format!("{}://{}/{}", 
-            url_obj.scheme(), 
-            url_obj.host_str().ok_or_else(|| anyhow!("URL has no host"))?,
-            base_path
-        );
-
-        Ok(base_url)
+        Ok(())
     }
 }

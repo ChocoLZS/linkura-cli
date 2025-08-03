@@ -1,10 +1,8 @@
-use crate::downloader::{DownloadItem, Downloader};
-use crate::progress_ui::{ProgressReporterFactory, SilentProgressReporterFactory, TreeProgressReporterFactory};
+use crate::downloader::{BaseDownloader, BaseDownloaderImpl, DownloadItem, ProgressConfig};
 use anyhow::{anyhow, Result};
-use reqwest::Client;
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use url::Url;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AlsMetadata {
@@ -16,8 +14,7 @@ pub struct AlsMetadata {
 }
 
 pub struct AlsDownloader {
-    downloader: Downloader,
-    client: Client,
+    base: BaseDownloaderImpl,
 }
 
 impl Default for AlsDownloader {
@@ -28,68 +25,19 @@ impl Default for AlsDownloader {
 
 impl AlsDownloader {
     pub fn new(concurrent_downloads: usize) -> Self {
-        Self::with_progress(concurrent_downloads, true)
+        Self {
+            base: ProgressConfig::new(concurrent_downloads),
+        }
     }
 
     pub fn with_progress(concurrent_downloads: usize, show_progress: bool) -> Self {
-        let factory: Box<dyn ProgressReporterFactory + Send + Sync> = if show_progress {
-            Box::new(TreeProgressReporterFactory)
-        } else {
-            Box::new(SilentProgressReporterFactory)
-        };
-        Self::with_progress_factory(concurrent_downloads, factory)
-    }
-
-    fn with_progress_factory(
-        concurrent_downloads: usize,
-        progress_factory: Box<dyn ProgressReporterFactory + Send + Sync>,
-    ) -> Self {
         Self {
-            downloader: Downloader::with_progress_factory(concurrent_downloads, progress_factory),
-            client: Client::new(),
+            base: ProgressConfig::with_progress(concurrent_downloads, show_progress),
         }
-    }
-
-    pub async fn download(&self, url: &str, output_dir: &Path) -> Result<()> {
-        let metadata = self.fetch_metadata(url).await?;
-        let mut download_items = Vec::new();
-
-        let base_url = &metadata.path;
-        let folder_name = self.extract_folder_name(&metadata.path)?;
-        let target_dir = output_dir.join(folder_name);
-
-        download_items.push(DownloadItem {
-            url: url.to_string(),
-            filename: metadata.playlist_file.replace(".m3u8", ".md"),
-        });
-
-        let m3u8_url = format!("{}/{}", base_url, metadata.playlist_file);
-        download_items.push(DownloadItem {
-            url: m3u8_url.clone(),
-            filename: metadata.playlist_file.clone(),
-        });
-
-        if download_items.len() < 2 {
-            return Err(anyhow!("The url provided is invalid!"));
-        }
-
-        let m3u8_content = self.fetch_m3u8_content(&m3u8_url).await?;
-        let ts_files = self.parse_m3u8_segments(&m3u8_content)?;
-
-        for ts_file in ts_files {
-            let ts_url = format!("{}/{}", base_url, ts_file);
-            download_items.push(DownloadItem {
-                url: ts_url,
-                filename: ts_file,
-            });
-        }
-        self.downloader.download_files(download_items, &target_dir).await?;
-
-        Ok(())
     }
 
     async fn fetch_metadata(&self, url: &str) -> Result<AlsMetadata> {
-        let response = self.client.get(url).send().await?;
+        let response = self.base.client().get(url).send().await?;
         
         if !response.status().is_success() {
             return Err(anyhow!("Failed to fetch metadata: HTTP {}", response.status()));
@@ -103,7 +51,7 @@ impl AlsDownloader {
     }
 
     async fn fetch_m3u8_content(&self, url: &str) -> Result<String> {
-        let response = self.client.get(url).send().await?;
+        let response = self.base.client().get(url).send().await?;
         
         if !response.status().is_success() {
             return Err(anyhow!("Failed to fetch m3u8 file: HTTP {}", response.status()));
@@ -131,18 +79,45 @@ impl AlsDownloader {
         Ok(segments)
     }
 
-    fn extract_folder_name(&self, path: &str) -> Result<String> {
-        let url = Url::parse(path)
-            .map_err(|e| anyhow!("Invalid URL in path: {}", e))?;
-        
-        let path_segments: Vec<&str> = url.path_segments()
-            .ok_or_else(|| anyhow!("URL has no path segments"))?
-            .collect();
+}
 
-        let folder_name = path_segments
-            .last()
-            .ok_or_else(|| anyhow!("No folder name found in path"))?;
+#[async_trait]
+impl BaseDownloader for AlsDownloader {
+    async fn download(&self, url: &str, output_dir: &Path) -> Result<()> {
+        let metadata = self.fetch_metadata(url).await?;
+        let mut download_items = Vec::new();
 
-        Ok(folder_name.to_string())
+        let base_url = &metadata.path;
+        let folder_name = self.base.extract_folder_name_from_url(&metadata.path)?;
+        let target_dir = output_dir.join(folder_name);
+
+        download_items.push(DownloadItem {
+            url: url.to_string(),
+            filename: metadata.playlist_file.replace(".m3u8", ".md"),
+        });
+
+        let m3u8_url = format!("{}/{}", base_url, metadata.playlist_file);
+        download_items.push(DownloadItem {
+            url: m3u8_url.clone(),
+            filename: metadata.playlist_file.clone(),
+        });
+
+        if download_items.len() < 2 {
+            return Err(anyhow!("The url provided is invalid!"));
+        }
+
+        let m3u8_content = self.fetch_m3u8_content(&m3u8_url).await?;
+        let ts_files = self.parse_m3u8_segments(&m3u8_content)?;
+
+        for ts_file in ts_files {
+            let ts_url = format!("{}/{}", base_url, ts_file);
+            download_items.push(DownloadItem {
+                url: ts_url,
+                filename: ts_file,
+            });
+        }
+        self.base.download_files(download_items, &target_dir).await?;
+
+        Ok(())
     }
 }
