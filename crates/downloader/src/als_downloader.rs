@@ -1,4 +1,5 @@
 use crate::downloader::{DownloadItem, Downloader};
+use crate::progress_ui::{ProgressReporterFactory, SilentProgressReporterFactory, TreeProgressReporterFactory};
 use anyhow::{anyhow, Result};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -31,8 +32,20 @@ impl AlsDownloader {
     }
 
     pub fn with_progress(concurrent_downloads: usize, show_progress: bool) -> Self {
+        let factory: Box<dyn ProgressReporterFactory + Send + Sync> = if show_progress {
+            Box::new(TreeProgressReporterFactory)
+        } else {
+            Box::new(SilentProgressReporterFactory)
+        };
+        Self::with_progress_factory(concurrent_downloads, factory)
+    }
+
+    fn with_progress_factory(
+        concurrent_downloads: usize,
+        progress_factory: Box<dyn ProgressReporterFactory + Send + Sync>,
+    ) -> Self {
         Self {
-            downloader: Downloader::with_progress(concurrent_downloads, show_progress),
+            downloader: Downloader::with_progress_factory(concurrent_downloads, progress_factory),
             client: Client::new(),
         }
     }
