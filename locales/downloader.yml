@@ -50,10 +50,10 @@ downloader.cli.command.upload:
       zh: 'R2 秘密访问密钥（或设置 R2_SECRET_ACCESS_KEY 环境变量）'
       ja: 'R2シークレットアクセスキー（またはR2_SECRET_ACCESS_KEY環境変数を設定）'
       eng: 'R2 secret access key (or set R2_SECRET_ACCESS_KEY env var)'
-    folder:
-      zh: '要上传的本地文件夹'
-      ja: 'アップロードするローカルフォルダ'
-      eng: 'Local folder to upload'
+    path:
+      zh: '要上传的本地文件或文件夹'
+      ja: 'アップロードするローカルファイルまたはフォルダ'
+      eng: 'Local file or folder to upload'
     prefix:
       zh: '远程路径前缀（可选）'
       ja: 'リモートパスプレフィックス（オプション）'
@@ -62,8 +62,6 @@ downloader.cli.command.upload:
       zh: '并发上传数量，默认是 4'
       ja: '並行アップロード数、デフォルトは4です'
       eng: 'Concurrent uploads, default is 4'
-downloader.cli.command.sync:
-  args:
     delete_after_done:
       zh: '成功上传后删除下载的文件'
       ja: 'アップロード成功後にダウンロードしたファイルを削除'

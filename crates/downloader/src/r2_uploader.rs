@@ -93,6 +93,43 @@ impl R2Uploader {
         })
     }
 
+    pub async fn upload_file(
+        &self,
+        local_file: &Path,
+        remote_key: Option<&str>,
+    ) -> Result<()> {
+        if !local_file.is_file() {
+            return Err(Error::msg("Local path must be a file"));
+        }
+
+        let metadata = fs::metadata(local_file)?;
+        let file_size = metadata.len();
+        
+        // Generate remote key if not provided
+        let remote_key = match remote_key {
+            Some(key) => key.to_string(),
+            None => local_file.file_name()
+                .ok_or_else(|| Error::msg("Could not extract filename"))?
+                .to_string_lossy()
+                .to_string(),
+        };
+
+        let task = UploadTask {
+            local_path: local_file.to_path_buf(),
+            remote_key,
+            file_size,
+        };
+
+        if let Some(reporter) = &self.progress_reporter {
+            // Update the total files count to 1
+            if let Some(tree_reporter) = reporter.as_any().downcast_ref::<crate::progress_ui::TreeProgressReporter>() {
+                tree_reporter.set_total_files(1);
+            }
+        }
+
+        self.upload_files_concurrent(vec![task]).await
+    }
+
     pub async fn upload_folder(
         &self,
         local_folder: &Path,

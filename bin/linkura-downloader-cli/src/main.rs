@@ -19,7 +19,7 @@ use url::Url;
 #[derive(Parser, Debug)]
 #[command(
     name = "linkura-downloader-cli",
-    version = "0.0.0",
+    version = "0.0.3",
     author = "ChocoLZS, chocoielzs@outlook.com",
     about = t!("downloader.cli.about").to_string(),
     // long_about = None,
@@ -54,8 +54,8 @@ pub struct ArgsUpload {
     pub access_key: Option<String>,
     #[clap(short('s'), long = "secret-key", value_name = "SECRET_KEY", help = t!("downloader.cli.command.upload.args.secret_key").to_string())]
     pub secret_key: Option<String>,
-    #[clap(short('f'), long = "folder", value_name = "FOLDER", help = t!("downloader.cli.command.upload.args.folder").to_string())]
-    pub folder: String,
+    #[clap(short('f'), long = "path", value_name = "PATH", help = t!("downloader.cli.command.upload.args.path").to_string())]
+    pub path: String,
     #[clap(short('p'), long = "prefix", value_name = "PREFIX", help = t!("downloader.cli.command.upload.args.prefix").to_string())]
     pub prefix: Option<String>,
     #[clap(short('c'), long = "concurrent", value_name = "CONCURRENT", help = t!("downloader.cli.command.upload.args.concurrent").to_string(), default_value = "4")]
@@ -138,9 +138,9 @@ async fn main() -> Result<()> {
                 !quiet,
             ).await?;
 
-            let folder_path = Path::new(&upload_args.folder);
-            if !folder_path.exists() {
-                return Err(Error::msg(format!("Folder does not exist: {}", upload_args.folder)));
+            let path = Path::new(&upload_args.path);
+            if !path.exists() {
+                return Err(Error::msg(format!("Path does not exist: {}", upload_args.path)));
             }
 
             let env_bucket = std::env::var("R2_BUCKET").ok();
@@ -149,16 +149,31 @@ async fn main() -> Result<()> {
                 .or_else(|| env_bucket.as_ref().map(|s| s.as_str()))
                 .unwrap_or("[from env]");
 
-            info!("🚀 Starting R2 upload from '{}' to bucket '{}'", 
-                upload_args.folder, bucket_name);
-            info!("📊 Configuration: {} concurrent workers, {} mode",
-                upload_args.concurrent,
-                if upload_args.prefix.is_some() { 
-                    format!("prefix: '{}'", upload_args.prefix.as_ref().unwrap()) 
-                } else { 
-                    "no prefix".to_string() 
-                });
-            uploader.upload_folder(folder_path, upload_args.prefix.as_deref()).await?;
+            if path.is_file() {
+                info!("🚀 Starting R2 file upload from '{}' to bucket '{}'", 
+                    upload_args.path, bucket_name);
+                info!("📊 Configuration: {} concurrent workers, {} mode",
+                    upload_args.concurrent,
+                    if upload_args.prefix.is_some() { 
+                        format!("prefix: '{}'", upload_args.prefix.as_ref().unwrap()) 
+                    } else { 
+                        "no prefix".to_string() 
+                    });
+                uploader.upload_file(path, upload_args.prefix.as_deref()).await?;
+            } else if path.is_dir() {
+                info!("🚀 Starting R2 folder upload from '{}' to bucket '{}'", 
+                    upload_args.path, bucket_name);
+                info!("📊 Configuration: {} concurrent workers, {} mode",
+                    upload_args.concurrent,
+                    if upload_args.prefix.is_some() { 
+                        format!("prefix: '{}'", upload_args.prefix.as_ref().unwrap()) 
+                    } else { 
+                        "no prefix".to_string() 
+                    });
+                uploader.upload_folder(path, upload_args.prefix.as_deref()).await?;
+            } else {
+                return Err(Error::msg(format!("Path is neither a file nor a directory: {}", upload_args.path)));
+            }
             info!("✅ Upload completed successfully!");
         },
         Some(Commands::Sync(ref sync_args)) => {
