@@ -71,23 +71,6 @@ impl MrsDownloader {
         Ok(segments)
     }
 
-    fn extract_folder_name(&self, url: &str) -> Result<String> {
-        use url::Url;
-        let url_obj = Url::parse(url)
-            .map_err(|e| anyhow!("Invalid URL: {}", e))?;
-        
-        let path_segments: Vec<&str> = url_obj.path_segments()
-            .ok_or_else(|| anyhow!("URL has no path segments"))?
-            .collect();
-
-        if path_segments.len() < 2 {
-            return Err(anyhow!("URL path does not contain enough segments"));
-        }
-
-        let folder_name = path_segments[path_segments.len() - 2];
-        Ok(folder_name.to_string())
-    }
-
 }
 
 #[async_trait]
@@ -119,5 +102,22 @@ impl BaseDownloader for MrsDownloader {
         self.base.download_files(download_items, &target_dir).await?;
 
         Ok(())
+    }
+
+    fn extract_folder_name(&self, url: &str) -> Result<String> {
+        use url::Url;
+        let url_obj = Url::parse(url)
+            .map_err(|e| anyhow!("Invalid URL: {}", e))?;
+        
+        let path_segments: Vec<&str> = url_obj.path_segments()
+            .ok_or_else(|| anyhow!("URL has no path segments"))?
+            .collect();
+
+        if path_segments.len() < 2 {
+            return Err(anyhow!("URL path does not contain enough segments"));
+        }
+
+        let folder_name = path_segments[path_segments.len() - 2];
+        Ok(folder_name.to_string())
     }
 }

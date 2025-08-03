@@ -1221,6 +1221,7 @@ dependencies = [
  "rust-i18n",
  "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

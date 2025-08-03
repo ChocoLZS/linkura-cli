@@ -16,6 +16,7 @@ anyhow.workspace = true
 clap.workspace = true
 chrono.workspace = true
 tracing.workspace = true
+tracing-subscriber.workspace = true
 rust-i18n.workspace = true
 tokio.workspace = true
 async-trait.workspace = true

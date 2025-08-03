@@ -78,7 +78,6 @@ impl AlsDownloader {
 
         Ok(segments)
     }
-
 }
 
 #[async_trait]
@@ -119,5 +118,9 @@ impl BaseDownloader for AlsDownloader {
         self.base.download_files(download_items, &target_dir).await?;
 
         Ok(())
+    }
+
+    fn extract_folder_name(&self, url: &str) -> Result<String> {
+        self.base.extract_folder_name_from_url(url)
     }
 }

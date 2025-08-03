@@ -19,6 +19,7 @@ pub struct DownloadItem {
 #[async_trait]
 pub trait BaseDownloader: Send + Sync {
     async fn download(&self, url: &str, output_dir: &Path) -> Result<()>;
+    fn extract_folder_name(&self, url: &str) -> Result<String>;
 }
 
 pub trait ProgressConfig {
