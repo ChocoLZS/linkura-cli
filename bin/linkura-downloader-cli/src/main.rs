@@ -109,12 +109,13 @@ async fn main() -> Result<()> {
     }
     match args.command {
         Some(Commands::Download(ref download_args)) => {
+            let download_url = download_args.download_url.trim();
             let mut download_type = download_args.download_type.clone();
             if download_type.is_none() {
-                if download_args.download_url.ends_with(".md") {
+                if download_url.ends_with(".md") {
                     download_type = Some("als".into());
                 }
-                if download_args.download_url.ends_with(".iarc") {
+                if download_url.ends_with(".iarc") {
                     download_type = Some("mrs".into());
                 }
             }
@@ -126,7 +127,7 @@ async fn main() -> Result<()> {
                 }
             };
             
-            downloader.download(&download_args.download_url, Path::new("data")).await?;
+            downloader.download(download_url, Path::new("data")).await?;
         },
         Some(Commands::Upload(ref upload_args)) => {
             let uploader = R2Uploader::from_env_or_args(
@@ -179,17 +180,18 @@ async fn main() -> Result<()> {
         Some(Commands::Sync(ref sync_args)) => {
             // Step 1: Download
             info!("🔄 Starting sync operation: Download + Upload");
-            info!("📥 Phase 1: Downloading from '{}'", sync_args.download_url);
+            let download_url = sync_args.download_url.trim();
+            info!("📥 Phase 1: Downloading from '{}'", download_url);
 
             let download_dir = sync_args.download_directory.as_deref().unwrap_or("data");
             let download_path = Path::new(download_dir);
 
             let mut download_type = sync_args.download_type.clone();
             if download_type.is_none() {
-                if sync_args.download_url.ends_with(".md") {
+                if download_url.ends_with(".md") {
                     download_type = Some("als".into());
                 }
-                if sync_args.download_url.ends_with(".iarc") {
+                if download_url.ends_with(".iarc") {
                     download_type = Some("mrs".into());
                 }
             }
@@ -202,7 +204,7 @@ async fn main() -> Result<()> {
                 }
             };
             
-            downloader.download(&sync_args.download_url, download_path).await?;
+            downloader.download(download_url, download_path).await?;
 
             info!("✅ Download completed successfully!");
             info!("📤 Phase 2: Uploading to R2");
@@ -221,7 +223,7 @@ async fn main() -> Result<()> {
                 return Err(Error::msg(format!("Download directory does not exist: {}", download_dir)));
             }
 
-            let folder_name = downloader.extract_folder_name(&sync_args.download_url)?;
+            let folder_name = downloader.extract_folder_name(download_url)?;
             let target_folder = download_path.join(folder_name);
             let env_bucket = std::env::var("R2_BUCKET").ok();
             let bucket_name = sync_args.bucket.as_ref()
@@ -239,7 +241,7 @@ async fn main() -> Result<()> {
                     "no prefix".to_string() 
                 });
             uploader.upload_folder(&target_folder, 
-                Some(sync_args.prefix.clone().unwrap_or(get_bucket_prefix(&sync_args.download_url)?).deref())).await?;
+                Some(sync_args.prefix.clone().unwrap_or(get_bucket_prefix(download_url)?).deref())).await?;
 
             // Delete downloaded files if requested
             if sync_args.delete_after_done {
