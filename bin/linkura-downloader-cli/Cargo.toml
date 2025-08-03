@@ -1,0 +1,24 @@
+[package]
+name = "linkura-downloader-cli"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+metadata.workspace = true
+
+[dependencies]
+linkura-common.workspace = true
+linkura-downloader.workspace = true
+i18n.workspace = true
+
+anyhow.workspace = true
+clap.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+rust-i18n.workspace = true
+tokio.workspace = true
+
+[[bin]]
+name = "linkura-downloader-cli"
+path = "src/main.rs"

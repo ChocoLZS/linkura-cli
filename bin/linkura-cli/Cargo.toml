@@ -19,7 +19,7 @@ serde_json.workspace = true
 ctrlc.workspace = true
 tracing.workspace = true
 
-indicatif = "0.17.11"
+indicatif.workspace = true
 inquire = "0.7.5"
 colored = "3.0.0"
 

@@ -27,8 +27,12 @@ impl Default for AlsDownloader {
 
 impl AlsDownloader {
     pub fn new(concurrent_downloads: usize) -> Self {
+        Self::with_progress(concurrent_downloads, true)
+    }
+
+    pub fn with_progress(concurrent_downloads: usize, show_progress: bool) -> Self {
         Self {
-            downloader: Downloader::new(concurrent_downloads),
+            downloader: Downloader::with_progress(concurrent_downloads, show_progress),
             client: Client::new(),
         }
     }
@@ -52,6 +56,10 @@ impl AlsDownloader {
             filename: metadata.playlist_file.clone(),
         });
 
+        if download_items.len() < 2 {
+            return Err(anyhow!("The url provided is invalid!"));
+        }
+
         let m3u8_content = self.fetch_m3u8_content(&m3u8_url).await?;
         let ts_files = self.parse_m3u8_segments(&m3u8_content)?;
 
@@ -62,7 +70,6 @@ impl AlsDownloader {
                 filename: ts_file,
             });
         }
-
         self.downloader.download_files(download_items, &target_dir).await?;
 
         Ok(())

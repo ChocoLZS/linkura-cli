@@ -17,8 +17,12 @@ impl Default for MrsDownloader {
 
 impl MrsDownloader {
     pub fn new(concurrent_downloads: usize) -> Self {
+        Self::with_progress(concurrent_downloads, true)
+    }
+
+    pub fn with_progress(concurrent_downloads: usize, show_progress: bool) -> Self {
         Self {
-            downloader: Downloader::new(concurrent_downloads),
+            downloader: Downloader::with_progress(concurrent_downloads, show_progress),
             client: Client::new(),
         }
     }

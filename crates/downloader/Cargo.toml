@@ -1,5 +1,5 @@
 [package]
-name = "downloader"
+name = "linkura-downloader"
 version = "0.1.0"
 edition.workspace = true
 authors.workspace = true
@@ -12,5 +12,7 @@ reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
+indicatif.workspace = true
+
 futures = "0.3"
 url = "2.0"
