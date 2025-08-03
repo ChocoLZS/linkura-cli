@@ -9,10 +9,7 @@ use i18n::t;
 
 i18n::init!();
 
-use linkura_downloader::{AlsDownloader, BaseDownloader, MrsDownloader};
-
-mod r2_uploader;
-use r2_uploader::R2Uploader;
+use linkura_downloader::{AlsDownloader, BaseDownloader, MrsDownloader, R2Uploader};
 
 
 /** ARG PARSER **/
@@ -58,6 +55,8 @@ pub struct ArgsUpload {
     pub folder: String,
     #[clap(short('p'), long = "prefix", value_name = "PREFIX", help = t!("downloader.cli.command.upload.args.prefix").to_string())]
     pub prefix: Option<String>,
+    #[clap(short('c'), long = "concurrent", value_name = "CONCURRENT", help = t!("downloader.cli.command.upload.args.concurrent").to_string(), default_value = "4")]
+    pub concurrent: usize,
 }
 
 #[derive(Subcommand, Debug)]
@@ -97,6 +96,8 @@ async fn main() -> Result<()> {
                 upload_args.access_key.clone(),
                 upload_args.secret_key.clone(),
                 upload_args.bucket.clone(),
+                upload_args.concurrent,
+                !quiet,
             ).await?;
 
             let folder_path = Path::new(&upload_args.folder);
@@ -110,9 +111,23 @@ async fn main() -> Result<()> {
                 .or_else(|| env_bucket.as_ref().map(|s| s.as_str()))
                 .unwrap_or("[from env]");
 
-            println!("Starting upload from {} to bucket {}", upload_args.folder, bucket_name);
+            if !quiet {
+                println!("🚀 Starting R2 upload from '{}' to bucket '{}'", 
+                    upload_args.folder, bucket_name);
+                println!("📊 Configuration: {} concurrent workers, {} mode",
+                    upload_args.concurrent,
+                    if upload_args.prefix.is_some() { 
+                        format!("prefix: '{}'", upload_args.prefix.as_ref().unwrap()) 
+                    } else { 
+                        "no prefix".to_string() 
+                    });
+                println!();
+            }
             uploader.upload_folder(folder_path, upload_args.prefix.as_deref()).await?;
-            println!("Upload completed successfully!");
+            if !quiet {
+                println!();
+                println!("✅ Upload completed successfully!");
+            }
         },
         None => {},
     }

@@ -1,7 +1,6 @@
 use std::path::Path;
 use std::fs;
-use std::pin::Pin;
-use std::future::Future;
+use std::sync::Arc;
 use anyhow::{Result, Error};
 use reqwest::Client;
 use chrono::{DateTime, Utc};
@@ -10,6 +9,9 @@ use sha2::{Sha256, Digest};
 use hex;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
+use futures::stream::{self, StreamExt};
+
+use crate::progress_ui::{ProgressReporter, FileProgressReporter, ProgressReporterFactory};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -20,6 +22,15 @@ pub struct R2Uploader {
     secret_access_key: String,
     bucket: String,
     endpoint: String,
+    concurrent_uploads: usize,
+    progress_reporter: Option<Box<dyn ProgressReporter>>,
+}
+
+#[derive(Debug)]
+pub struct UploadTask {
+    pub local_path: std::path::PathBuf,
+    pub remote_key: String,
+    pub file_size: u64,
 }
 
 impl R2Uploader {
@@ -28,6 +39,8 @@ impl R2Uploader {
         access_key_id: Option<String>,
         secret_access_key: Option<String>,
         bucket: Option<String>,
+        concurrent_uploads: usize,
+        show_progress: bool,
     ) -> Result<Self> {
         let account_id = account_id
             .or_else(|| std::env::var("R2_ACCOUNT_ID").ok())
@@ -45,7 +58,7 @@ impl R2Uploader {
             .or_else(|| std::env::var("R2_BUCKET").ok())
             .ok_or_else(|| Error::msg("Bucket name not provided via argument or R2_BUCKET environment variable"))?;
 
-        Self::new(&account_id, &access_key_id, &secret_access_key, bucket).await
+        Self::new(&account_id, &access_key_id, &secret_access_key, bucket, concurrent_uploads, show_progress).await
     }
 
     pub async fn new(
@@ -53,9 +66,17 @@ impl R2Uploader {
         access_key_id: &str,
         secret_access_key: &str,
         bucket: String,
+        concurrent_uploads: usize,
+        show_progress: bool,
     ) -> Result<Self> {
         let endpoint = format!("https://{}.r2.cloudflarestorage.com", account_id);
         let client = Client::new();
+
+        let progress_reporter = if show_progress {
+            Some(crate::progress_ui::TreeProgressReporterFactory.create_upload_reporter(0, concurrent_uploads))
+        } else {
+            Some(crate::progress_ui::SilentProgressReporterFactory.create_upload_reporter(0, concurrent_uploads))
+        };
 
         Ok(Self {
             client,
@@ -64,6 +85,8 @@ impl R2Uploader {
             secret_access_key: secret_access_key.to_string(),
             bucket,
             endpoint,
+            concurrent_uploads,
+            progress_reporter,
         })
     }
 
@@ -76,16 +99,25 @@ impl R2Uploader {
             return Err(Error::msg("Local path must be a directory"));
         }
 
-        self.upload_folder_recursive(local_folder, local_folder, remote_prefix).await
+        let tasks = self.collect_upload_tasks(local_folder, local_folder, remote_prefix)?;
+        
+        if let Some(reporter) = &self.progress_reporter {
+            // Update the total files count
+            if let Some(tree_reporter) = reporter.as_any().downcast_ref::<crate::progress_ui::TreeProgressReporter>() {
+                tree_reporter.set_total_files(tasks.len() as u64);
+            }
+        }
+
+        self.upload_files_concurrent(tasks).await
     }
 
-    fn upload_folder_recursive<'a>(
-        &'a self,
-        base_folder: &'a Path,
-        current_folder: &'a Path,
-        remote_prefix: Option<&'a str>,
-    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>> {
-        Box::pin(async move {
+    fn collect_upload_tasks(
+        &self,
+        base_folder: &Path,
+        current_folder: &Path,
+        remote_prefix: Option<&str>,
+    ) -> Result<Vec<UploadTask>> {
+        let mut tasks = Vec::new();
         let entries = fs::read_dir(current_folder)?;
 
         for entry in entries {
@@ -93,30 +125,120 @@ impl R2Uploader {
             let path = entry.path();
 
             if path.is_file() {
+                let metadata = fs::metadata(&path)?;
+                let file_size = metadata.len();
+                
                 let relative_path = path.strip_prefix(base_folder)?;
                 let remote_key = match remote_prefix {
                     Some(prefix) => format!("{}/{}", prefix, relative_path.to_string_lossy().replace('\\', "/")),
                     None => relative_path.to_string_lossy().replace('\\', "/"),
                 };
 
-                self.upload_file(&path, &remote_key).await?;
-                println!("Uploaded: {} -> {}", path.display(), remote_key);
+                tasks.push(UploadTask {
+                    local_path: path,
+                    remote_key,
+                    file_size,
+                });
             } else if path.is_dir() {
-                self.upload_folder_recursive(base_folder, &path, remote_prefix).await?;
+                let mut sub_tasks = self.collect_upload_tasks(base_folder, &path, remote_prefix)?;
+                tasks.append(&mut sub_tasks);
             }
         }
 
-        Ok(())
-        })
+        Ok(tasks)
     }
 
-    async fn upload_file(&self, local_path: &Path, remote_key: &str) -> Result<()> {
-        let mut file = File::open(local_path).await?;
+    async fn upload_files_concurrent(&self, tasks: Vec<UploadTask>) -> Result<()> {
+        let tasks = Arc::new(tasks);
+        let task_index = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        
+        let results = stream::iter(0..self.concurrent_uploads)
+            .map(|thread_id| {
+                let tasks = Arc::clone(&tasks);
+                let task_index = Arc::clone(&task_index);
+                let uploader = self;
+                
+                async move {
+                    while let Some(task) = Self::get_next_task(&tasks, &task_index) {
+                        let file_reporter = if let Some(reporter) = &uploader.progress_reporter {
+                            reporter.assign_file_to_thread(
+                                thread_id,
+                                &task.local_path.file_name()
+                                    .unwrap_or_default()
+                                    .to_string_lossy(),
+                                task.file_size,
+                            )
+                        } else {
+                            None
+                        };
+
+                        let result = uploader.upload_single_file(&task, file_reporter.as_ref()).await;
+                        
+                        if let Some(reporter) = &uploader.progress_reporter {
+                            reporter.finish_file(
+                                thread_id,
+                                &task.local_path.file_name()
+                                    .unwrap_or_default()
+                                    .to_string_lossy(),
+                            );
+                        }
+
+                        if let Err(e) = result {
+                            return Err(e);
+                        }
+
+                        // 只在静默模式下输出上传结果
+                        if uploader.progress_reporter.is_none() || 
+                           uploader.progress_reporter.as_ref().unwrap().as_any().is::<crate::progress_ui::SilentProgressReporter>() {
+                            println!("Uploaded: {} -> {}", task.local_path.display(), task.remote_key);
+                        }
+                    }
+                    Ok(())
+                }
+            })
+            .buffer_unordered(self.concurrent_uploads)
+            .collect::<Vec<_>>()
+            .await;
+
+        if let Some(reporter) = &self.progress_reporter {
+            reporter.finish_all();
+        }
+
+        for result in results {
+            result?;
+        }
+
+        Ok(())
+    }
+
+    fn get_next_task(
+        tasks: &Arc<Vec<UploadTask>>,
+        task_index: &Arc<std::sync::atomic::AtomicUsize>,
+    ) -> Option<UploadTask> {
+        let index = task_index.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if index < tasks.len() {
+            Some(tasks[index].clone())
+        } else {
+            None
+        }
+    }
+
+    async fn upload_single_file(
+        &self,
+        task: &UploadTask,
+        file_reporter: Option<&Box<dyn FileProgressReporter>>,
+    ) -> Result<()> {
+        let mut file = File::open(&task.local_path).await?;
         let mut contents = Vec::new();
         file.read_to_end(&mut contents).await?;
 
-        let content_type = self.guess_content_type(local_path);
-        let url = format!("{}/{}/{}", self.endpoint, self.bucket, remote_key);
+        if let Some(reporter) = file_reporter {
+            reporter.set_total_size(task.file_size);
+            reporter.update_progress(task.file_size);
+        }
+
+        let content_type = self.guess_content_type(&task.local_path);
+        let url = format!("{}/{}/{}", self.endpoint, self.bucket, task.remote_key);
         
         // Calculate content SHA256
         let mut hasher = Sha256::new();
@@ -124,7 +246,7 @@ impl R2Uploader {
         let content_sha256 = hex::encode(hasher.finalize());
         
         let now = Utc::now();
-        let authorization = self.generate_auth_header("PUT", remote_key, &contents, content_type, &now)?;
+        let authorization = self.generate_auth_header("PUT", &task.remote_key, &contents, content_type, &now)?;
 
         let response = self.client
             .put(&url)
@@ -256,6 +378,16 @@ impl R2Uploader {
             Some("zip") => "application/zip",
             Some("xml") => "application/xml",
             _ => "application/octet-stream",
+        }
+    }
+}
+
+impl Clone for UploadTask {
+    fn clone(&self) -> Self {
+        Self {
+            local_path: self.local_path.clone(),
+            remote_key: self.remote_key.clone(),
+            file_size: self.file_size,
         }
     }
 }

@@ -1193,11 +1193,16 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "base64",
+ "chrono",
  "futures",
+ "hex",
+ "hmac",
  "indicatif",
  "reqwest",
  "serde",
  "serde_json",
+ "sha2",
  "tokio",
  "url",
 ]
@@ -1208,22 +1213,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64",
  "chrono",
  "clap",
- "hex",
- "hmac",
  "i18n",
  "linkura-common",
  "linkura-downloader",
- "reqwest",
  "rust-i18n",
- "serde",
- "serde_json",
- "sha2",
  "tokio",
  "tracing",
- "url",
 ]
 
 [[package]]

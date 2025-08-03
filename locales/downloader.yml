@@ -58,3 +58,7 @@ downloader.cli.command.upload:
       zh: '远程路径前缀（可选）'
       ja: 'リモートパスプレフィックス（オプション）'
       eng: 'Remote path prefix (optional)'
+    concurrent:
+      zh: '并发上传数量，默认是 4'
+      ja: '並行アップロード数、デフォルトは4です'
+      eng: 'Concurrent uploads, default is 4'
