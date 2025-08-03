@@ -11,6 +11,9 @@ i18n::init!();
 
 use linkura_downloader::{AlsDownloader, BaseDownloader, MrsDownloader};
 
+mod r2_uploader;
+use r2_uploader::R2Uploader;
+
 
 /** ARG PARSER **/
 #[derive(Parser, Debug)]
@@ -43,8 +46,18 @@ pub struct ArgsDownload {
 
 #[derive(Debug, ClapArgs)]
 pub struct ArgsUpload {
-    #[clap(short('h'), long = "help", help = t!("downloader.cli.command.upload.args.help").to_string())]
-    pub help: bool,
+    #[clap(short('b'), long = "bucket", value_name = "BUCKET", help = t!("downloader.cli.command.upload.args.bucket").to_string())]
+    pub bucket: Option<String>,
+    #[clap(short('a'), long = "account-id", value_name = "ACCOUNT_ID", help = t!("downloader.cli.command.upload.args.account_id").to_string())]
+    pub account_id: Option<String>,
+    #[clap(short('k'), long = "access-key", value_name = "ACCESS_KEY", help = t!("downloader.cli.command.upload.args.access_key").to_string())]
+    pub access_key: Option<String>,
+    #[clap(short('s'), long = "secret-key", value_name = "SECRET_KEY", help = t!("downloader.cli.command.upload.args.secret_key").to_string())]
+    pub secret_key: Option<String>,
+    #[clap(short('f'), long = "folder", value_name = "FOLDER", help = t!("downloader.cli.command.upload.args.folder").to_string())]
+    pub folder: String,
+    #[clap(short('p'), long = "prefix", value_name = "PREFIX", help = t!("downloader.cli.command.upload.args.prefix").to_string())]
+    pub prefix: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -78,14 +91,30 @@ async fn main() -> Result<()> {
             
             downloader.download(&download_args.download_url, Path::new("data")).await?;
         },
-        Some(Commands::Upload(ref upload_args)) => {},
+        Some(Commands::Upload(ref upload_args)) => {
+            let uploader = R2Uploader::from_env_or_args(
+                upload_args.account_id.clone(),
+                upload_args.access_key.clone(),
+                upload_args.secret_key.clone(),
+                upload_args.bucket.clone(),
+            ).await?;
+
+            let folder_path = Path::new(&upload_args.folder);
+            if !folder_path.exists() {
+                return Err(Error::msg(format!("Folder does not exist: {}", upload_args.folder)));
+            }
+
+            let env_bucket = std::env::var("R2_BUCKET").ok();
+            let bucket_name = upload_args.bucket.as_ref()
+                .map(|s| s.as_str())
+                .or_else(|| env_bucket.as_ref().map(|s| s.as_str()))
+                .unwrap_or("[from env]");
+
+            println!("Starting upload from {} to bucket {}", upload_args.folder, bucket_name);
+            uploader.upload_folder(folder_path, upload_args.prefix.as_deref()).await?;
+            println!("Upload completed successfully!");
+        },
         None => {},
     }
     Ok(())
-    // let downloader = AlsDownloader::with_progress(16, true);
-    // downloader
-    // .download(URL, Path::new("data")).await.map_err(|e| {
-    //     Error::msg(format!("Error downloading file, maybe the url provided is not fit for als format: {}", e))
-    // })
-    // println!("{}", t!("hello_world"));
 }
