@@ -158,7 +158,7 @@ impl ProgressReporter for TreeProgressReporter {
         
         // 文件级别的进度条样式
         let file_style = ProgressStyle::with_template(
-            "    {bar:30.green/yellow} {bytes:>7}/{total_bytes:7} 📄 {msg}"
+            "    {bar:30.green/yellow} 📄 {msg} {bytes:>7}/{total_bytes:7}"
         )
         .unwrap()
         .progress_chars("#>-");
@@ -168,13 +168,13 @@ impl ProgressReporter for TreeProgressReporter {
             existing_pb.reset();
             existing_pb.set_length(file_size);
             existing_pb.set_style(file_style);
-            existing_pb.set_message(filename.to_string());
+            existing_pb.set_message("");
             existing_pb.clone()
         } else {
             // 如果没有现有的进度条，创建新的
             let new_pb = inner.multi_progress.insert_after(&thread.progress_bar, ProgressBar::new(file_size));
             new_pb.set_style(file_style);
-            new_pb.set_message(filename.to_string());
+            new_pb.set_message("");
             new_pb
         };
         
@@ -200,7 +200,7 @@ impl ProgressReporter for TreeProgressReporter {
         
         if let Some(file_pb) = &thread.file_progress_bar {
             // 完成文件进度条，显示为已完成状态
-            file_pb.finish_with_message(format!("✓ {}", filename));
+            file_pb.finish_with_message(format!("✓"));
         }
         
         // 更新线程状态为已完成该文件，等待新任务
