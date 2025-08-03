@@ -9,3 +9,4 @@ license.workspace = true
 
 [dependencies]
 rust-i18n.workspace = true
+sys-locale = "0.3"

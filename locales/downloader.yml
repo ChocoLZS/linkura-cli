@@ -1,0 +1,9 @@
+# eng is trick for rust_i18n
+
+_version: 2
+downloader:
+  cli:
+    about:
+      zh: "林库拉的动捕回放下载器"
+      ja: "リンクラの動捕再生ダウンローダー"
+      eng: "Linkura Motion Capture Playback Downloader"
