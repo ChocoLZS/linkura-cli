@@ -1,5 +1,13 @@
 name: Build
-on: [push]
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags-ignore:
+      - '**'
 
 jobs:
   build:
@@ -7,9 +15,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            name: linkura-x86_64-unknown-linux-gnu.tar.gz
+          # - target: x86_64-unknown-linux-gnu
+          #   os: ubuntu-latest
+          #   name: linkura-x86_64-unknown-linux-gnu.tar.gz
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
             name: linkura-x86_64-unknown-linux-musl.tar.gz

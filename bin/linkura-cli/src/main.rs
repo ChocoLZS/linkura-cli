@@ -4,7 +4,7 @@ use config::init;
 
 use linkura_common::log;
 
-rust_i18n::i18n!("locales", fallback = "en");
+rust_i18n::i18n!("../../locales", fallback = "en");
 
 mod command;
 mod config;
