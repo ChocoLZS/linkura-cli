@@ -52,8 +52,10 @@ jobs:
           template_content=$(cat .github/release_template.md)
           release_body="${template_content//VERSION/$tag_name}"
           
-          # Save to a temporary changelog file
-          echo "$release_body" > release_changelog.md
+          # Save to output
+          echo "release_body<<EOF" >> $GITHUB_OUTPUT
+          echo "$release_body" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       
       - name: Create Release
         uses: softprops/action-gh-release@v1
