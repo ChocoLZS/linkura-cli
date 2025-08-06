@@ -1,7 +1,1041 @@
-// use prost::encode_length_delimiter()
+use anyhow::{anyhow, Result, Context};
+use chrono::{DateTime, Utc};
+use prost::Message;
+use std::fs::File;
+use std::io::{BufReader, Read, Seek, Write};
 
 pub mod proto {
     pub mod alstromeria {
         include!(concat!(env!("OUT_DIR"), "/als.rs"));
     }
+}
+
+use proto::alstromeria::DataPack;
+use prost::bytes::Buf;
+
+#[derive(Debug)]
+pub struct PacketInfo {
+    pub length: u16,
+    pub timestamp: DateTime<Utc>,
+    pub data_pack: DataPack,
+    pub raw_data: Vec<u8>,
+}
+
+#[derive(Debug)]
+pub struct MixedPacketInfo {
+    pub format: MixedPacketFormat,
+    pub timestamp: Option<DateTime<Utc>>,
+    pub data_pack: Option<DataPack>,
+    pub raw_data: Vec<u8>,
+}
+
+#[derive(Debug)]
+pub enum MixedPacketFormat {
+    // Format 1: int16 length (big endian) + int8 unused (0x00) + byte[length-3] protobuf data
+    ProtobufFormat { length: u16, unused: u8 },
+    // Format 2: int8 length + int64 timestamp  
+    TimestampFormat { length: u8, timestamp: DateTime<Utc> },
+}
+
+#[derive(Debug, Clone)]
+pub struct ProtobufField {
+    pub field_number: u32,
+    pub wire_type: u8,
+    pub field_name: String,
+    pub raw_bytes: Vec<u8>,
+}
+
+pub fn parse_protobuf_fields(data: &[u8]) -> Vec<ProtobufField> {
+    let mut fields = Vec::new();
+    let mut cursor = std::io::Cursor::new(data);
+    
+    while cursor.position() < data.len() as u64 {
+        match parse_protobuf_field(&mut cursor) {
+            Ok(field) => fields.push(field),
+            Err(_) => break,
+        }
+    }
+    
+    fields
+}
+
+fn parse_protobuf_field(cursor: &mut std::io::Cursor<&[u8]>) -> Result<ProtobufField> {
+    let start_pos = cursor.position();
+    
+    // Read varint (field number and wire type)
+    let tag = read_varint(cursor)?;
+    let field_number = (tag >> 3) as u32;
+    let wire_type = (tag & 0x7) as u8;
+    
+    let field_name = match wire_type {
+        0 => "Varint".to_string(),
+        1 => "64-bit".to_string(),
+        2 => "Length-delimited".to_string(),
+        3 => "Start group (deprecated)".to_string(),
+        4 => "End group (deprecated)".to_string(),
+        5 => "32-bit".to_string(),
+        _ => format!("Unknown wire type {}", wire_type),
+    };
+    
+    // Skip field data based on wire type
+    let field_data_start = cursor.position();
+    match wire_type {
+        0 => {
+            // Varint
+            read_varint(cursor)?;
+        }
+        1 => {
+            // 64-bit
+            if cursor.remaining() < 8 {
+                return Err(anyhow!("Not enough bytes for 64-bit field"));
+            }
+            cursor.advance(8);
+        }
+        2 => {
+            // Length-delimited
+            let length = read_varint(cursor)?;
+            if cursor.remaining() < length as usize {
+                return Err(anyhow!("Not enough bytes for length-delimited field"));
+            }
+            cursor.advance(length as usize);
+        }
+        5 => {
+            // 32-bit
+            if cursor.remaining() < 4 {
+                return Err(anyhow!("Not enough bytes for 32-bit field"));
+            }
+            cursor.advance(4);
+        }
+        _ => {
+            return Err(anyhow!("Unsupported wire type: {}", wire_type));
+        }
+    }
+    
+    let end_pos = cursor.position();
+    let field_bytes = cursor.get_ref()[(start_pos as usize)..(end_pos as usize)].to_vec();
+    
+    Ok(ProtobufField {
+        field_number,
+        wire_type,
+        field_name,
+        raw_bytes: field_bytes,
+    })
+}
+
+fn read_varint(cursor: &mut std::io::Cursor<&[u8]>) -> Result<u64> {
+    let mut result = 0u64;
+    let mut shift = 0;
+    
+    loop {
+        if cursor.remaining() == 0 {
+            return Err(anyhow!("Unexpected end of data while reading varint"));
+        }
+        
+        let byte = cursor.get_u8();
+        result |= ((byte & 0x7F) as u64) << shift;
+        
+        if (byte & 0x80) == 0 {
+            break;
+        }
+        
+        shift += 7;
+        if shift >= 64 {
+            return Err(anyhow!("Varint too long"));
+        }
+    }
+    
+    Ok(result)
+}
+
+// Unified formatting functions
+pub fn format_packet_unified(writer: &mut OutputWriter, packet_number: usize, length: u16, timestamp: Option<DateTime<Utc>>, data_pack: Option<&DataPack>, raw_data: &[u8], format_type: &str) -> Result<()> {
+    writer.writeln(&format!("=== Packet #{}: {} bytes ===", packet_number, length))?;
+    writer.writeln(&format!("  Format: {}", format_type))?;
+    
+    if let Some(ts) = timestamp {
+        writer.writeln(&format!("  Timestamp: {} ({})", 
+            ts.format("%Y-%m-%d %H:%M:%S%.6f UTC"),
+            ts.timestamp_micros()))?;
+    }
+    
+    // Show protobuf field analysis for all packets containing protobuf data
+    if !raw_data.is_empty() {
+        writer.writeln(&format!("  Raw data length: {} bytes", raw_data.len()))?;
+        
+        // Show first 32 bytes in hex
+        let debug_len = 32.min(raw_data.len());
+        writer.writeln(&format!("  Raw data (first {} bytes): {}", debug_len,
+            raw_data[..debug_len].iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" ")))?;
+        
+        // Try to parse protobuf fields
+        let fields = parse_protobuf_fields(raw_data);
+        if !fields.is_empty() {
+            writer.writeln("  Protobuf Fields:")?;
+            for field in &fields {
+                writer.writeln(&format!("    Field #{}: {} (wire type: {}, {} bytes)", 
+                    field.field_number, 
+                    field.field_name,
+                    field.wire_type,
+                    field.raw_bytes.len()))?;
+                
+                // Show field bytes
+                let field_hex = field.raw_bytes.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" ");
+                writer.writeln(&format!("      Raw bytes: {}", field_hex))?;
+            }
+        }
+    }
+    
+    // Show detailed data pack information if available
+    if let Some(data_pack) = data_pack {
+        print_data_pack_details_unified(writer, data_pack)?;
+    }
+    
+    writer.writeln("")?; // Empty line for better readability
+    Ok(())
+}
+
+fn print_data_pack_details_unified(writer: &mut OutputWriter, data_pack: &DataPack) -> Result<()> {
+    if let Some(control) = &data_pack.control {
+        writer.writeln("  Control message:")?;
+        match control {
+            proto::alstromeria::data_pack::Control::Data(data) => {
+                writer.writeln(&format!("    Type: Data, Value: {}", data))?;
+            }
+            proto::alstromeria::data_pack::Control::Close(close) => {
+                writer.writeln(&format!("    Type: Close, Cause: {}", close.cause))?;
+            }
+            proto::alstromeria::data_pack::Control::Ping(ping) => {
+                writer.writeln(&format!("    Type: Ping, Value: {}", ping))?;
+            }
+            proto::alstromeria::data_pack::Control::Pong(pong) => {
+                writer.writeln(&format!("    Type: Pong, Value: {}", pong))?;
+            }
+            proto::alstromeria::data_pack::Control::SegmentStartedAt(timestamp) => {
+                writer.writeln(&format!("    Type: SegmentStartedAt, Timestamp: {}", timestamp))?;
+            }
+            proto::alstromeria::data_pack::Control::CacheEnded(ended) => {
+                writer.writeln(&format!("    Type: CacheEnded, Value: {}", ended))?;
+            }
+        }
+    } else {
+        writer.writeln("  No control message")?;
+    }
+    
+    if !data_pack.frames.is_empty() {
+        writer.writeln(&format!("  Frames ({}):", data_pack.frames.len()))?;
+        for (i, frame) in data_pack.frames.iter().enumerate() {
+            writer.writeln(&format!("    Frame #{}: ", i + 1))?;
+            if let Some(message) = &frame.message {
+                use proto::alstromeria::data_frame::Message;
+                match message {
+                    Message::AuthorizeRequest(req) => {
+                        writer.writeln(&format!("      Message: AuthorizeRequest (token: {} bytes)", req.token.len()))?;
+                    }
+                    Message::CreateRoomRequest(req) => {
+                        writer.writeln(&format!("      Message: CreateRoomRequest (room_id: {:?})", 
+                            String::from_utf8_lossy(&req.room_id)))?;
+                    }
+                    Message::JoinRoomRequest(req) => {
+                        writer.writeln(&format!("      Message: JoinRoomRequest (room_id: {:?}, methods: {:?})", 
+                            String::from_utf8_lossy(&req.room_id), req.methods))?;
+                    }
+                    Message::InstantiateObjectRequest(req) => {
+                        writer.writeln(&format!("      Message: InstantiateObjectRequest (object_id: {}, prefab: {:?})", 
+                            req.object_id, String::from_utf8_lossy(&req.prefab_name)))?;
+                    }
+                    Message::UpdateObjectRequest(req) => {
+                        writer.writeln(&format!("      Message: UpdateObjectRequest (object_id: {}, method: {})", 
+                            req.object_id, req.method))?;
+                    }
+                    Message::DestroyObjectRequest(req) => {
+                        writer.writeln(&format!("      Message: DestroyObjectRequest (object_id: {})", req.object_id))?;
+                    }
+                    Message::LeaveRoomRequest(_) => {
+                        writer.writeln("      Message: LeaveRoomRequest")?;
+                    }
+                    Message::DeleteRoomRequest(req) => {
+                        writer.writeln(&format!("      Message: DeleteRoomRequest (room_id: {:?})", 
+                            String::from_utf8_lossy(&req.room_id)))?;
+                    }
+                    Message::DebugMessage(msg) => {
+                        writer.writeln(&format!("      Message: DebugMessage (device_time: {}, text: {:?})", 
+                            msg.device_time, String::from_utf8_lossy(&msg.text)))?;
+                    }
+                    Message::Nop(_) => {
+                        writer.writeln("      Message: Nop")?;
+                    }
+                    Message::InstantiateObject(obj) => {
+                        writer.writeln(&format!("      Message: InstantiateObject (object_id: {}, owner: {:?}, prefab: {:?})", 
+                            obj.object_id, String::from_utf8_lossy(&obj.owner_id), 
+                            String::from_utf8_lossy(&obj.prefab_name)))?;
+                    }
+                    Message::UpdateObject(obj) => {
+                        writer.writeln(&format!("      Message: UpdateObject (object_id: {}, method: {})", 
+                            obj.object_id, obj.method))?;
+                    }
+                    Message::DestroyObject(obj) => {
+                        writer.writeln(&format!("      Message: DestroyObject (object_id: {})", obj.object_id))?;
+                    }
+                    Message::Room(room) => {
+                        writer.writeln(&format!("      Message: Room (id: {:?}, started: {}, ended: {})", 
+                            String::from_utf8_lossy(&room.id), room.started_at, room.ended_at))?;
+                    }
+                    Message::AuthorizeResponse(resp) => {
+                        writer.writeln(&format!("      Message: AuthorizeResponse (player_id: {:?}, role: {})", 
+                            String::from_utf8_lossy(&resp.player_id), resp.role))?;
+                    }
+                    Message::CreateRoomResponse(resp) => {
+                        if let Some(room) = &resp.room {
+                            writer.writeln(&format!("      Message: CreateRoomResponse (room_id: {:?})", 
+                                String::from_utf8_lossy(&room.id)))?;
+                        } else {
+                            writer.writeln("      Message: CreateRoomResponse (no room)")?;
+                        }
+                    }
+                    Message::JoinRoomResponse(resp) => {
+                        if let Some(room) = &resp.room {
+                            writer.writeln(&format!("      Message: JoinRoomResponse (room_id: {:?}, joined_at: {})", 
+                                String::from_utf8_lossy(&room.id), resp.joined_at))?;
+                        } else {
+                            writer.writeln(&format!("      Message: JoinRoomResponse (joined_at: {})", resp.joined_at))?;
+                        }
+                    }
+                    Message::LeaveRoomResponse(_) => {
+                        writer.writeln("      Message: LeaveRoomResponse")?;
+                    }
+                    Message::DeleteRoomResponse(_) => {
+                        writer.writeln("      Message: DeleteRoomResponse")?;
+                    }
+                    Message::LiveStatus(live) => {
+                        writer.writeln(&format!("      Message: LiveStatus (room_id: {:?}, status: {:?})", 
+                            String::from_utf8_lossy(&live.room_id), live.status()))?;
+                    }
+                    Message::PodClose(close) => {
+                        writer.writeln(&format!("      Message: PodClose (cause: {})", close.cause))?;
+                    }
+                    Message::UpdateOperatorSource(update) => {
+                        writer.writeln(&format!("      Message: UpdateOperatorSource (urls: {:?})", 
+                            update.src_urls.iter().map(|url| String::from_utf8_lossy(url)).collect::<Vec<_>>()))?;
+                    }
+                    Message::LiveRoom(room) => {
+                        writer.writeln(&format!("      Message: LiveRoom (id: {:?})", 
+                            String::from_utf8_lossy(&room.id)))?;
+                    }
+                    Message::LivePlayerStatus(status) => {
+                        writer.writeln(&format!("      Message: LivePlayerStatus ({:?})", status))?;
+                    }
+                    Message::ErrorCode(code) => {
+                        writer.writeln(&format!("      Message: ErrorCode ({})", code))?;
+                    }
+                    Message::ErrorMessage(msg) => {
+                        writer.writeln(&format!("      Message: ErrorMessage ({:?})", String::from_utf8_lossy(msg)))?;
+                    }
+                }
+            } else {
+                writer.writeln("      No message in frame")?;
+            }
+        }
+    } else {
+        writer.writeln("  No frames")?;
+    }
+    
+    Ok(())
+}
+
+
+pub struct ProtoPacketReader {
+    reader: BufReader<File>,
+}
+
+impl ProtoPacketReader {
+    pub fn new(file: File) -> Self {
+        Self {
+            reader: BufReader::new(file),
+        }
+    }
+
+    pub fn read_packets(&mut self) -> Result<Vec<PacketInfo>> {
+        self.read_packets_with_limit(8)
+    }
+    
+    pub fn read_packets_with_limit(&mut self, limit: usize) -> Result<Vec<PacketInfo>> {
+        let mut writer = OutputWriter::new(None)?;
+        self.read_packets_with_limit_and_writer(&mut writer, limit)
+    }
+    
+    pub fn read_packets_with_limit_and_writer(&mut self, writer: &mut OutputWriter, limit: usize) -> Result<Vec<PacketInfo>> {
+        let mut packets = Vec::new();
+        let mut packet_count = 0;
+        
+        loop {
+            packet_count += 1;
+            if packet_count > limit {
+                break;
+            }
+            match self.read_packet() {
+                Ok(packet) => {
+                    format_packet_unified(
+                        writer,
+                        packet_count, 
+                        packet.length, 
+                        Some(packet.timestamp),
+                        Some(&packet.data_pack),
+                        &packet.raw_data,
+                        "Standard protobuf format (int16 length + int8 unused + int64 timestamp + protobuf data)"
+                    )?;
+                    
+                    packets.push(packet);
+                }
+                Err(e) => {
+                    let error_msg = e.to_string();
+                    if error_msg.contains("EOF") || error_msg.contains("UnexpectedEof") {
+                        writer.writeln(&format!("Reached end of file after {} packets", packets.len()))?;
+                        break;
+                    }
+                    writer.writeln(&format!("Error reading packet #{}: {}", packet_count, e))?;
+                    return Err(e.context(format!("Failed at packet #{}", packet_count)));
+                }
+            }
+        }
+        
+        Ok(packets)
+    }
+
+    fn read_packet(&mut self) -> Result<PacketInfo> {
+        let length = self.read_u16_be()
+            .with_context(|| "Failed to read packet length")?;
+        
+        if length < 9 {
+            return Err(anyhow!("Invalid packet length: {}, must be at least 9", length));
+        }
+
+        let unused = self.read_u8()
+            .with_context(|| "Failed to read unused byte")?;
+        if unused != 0x01 {
+            return Err(anyhow!("Invalid unused byte: expected 0x01, got 0x{:02x}", unused));
+        }
+
+        let timestamp_micros = self.read_u64_be()
+            .with_context(|| "Failed to read timestamp")?;
+        let timestamp = DateTime::from_timestamp_micros(timestamp_micros as i64)
+            .ok_or_else(|| anyhow!("Invalid timestamp: {}", timestamp_micros))?;
+
+        let data_length = length - 9;
+        let mut data = vec![0u8; data_length as usize];
+        self.reader.read_exact(&mut data)
+            .with_context(|| format!("Failed to read protobuf data of length {}", data_length))?;
+
+        let data_pack = DataPack::decode(data.as_slice())
+            .map_err(|e| {
+                anyhow!("Failed to decode protobuf data (length: {}): {}", data_length, e)
+            })?;
+
+        Ok(PacketInfo {
+            length,
+            timestamp,
+            data_pack,
+            raw_data: data,
+        })
+    }
+
+    fn read_u16_be(&mut self) -> Result<u16> {
+        let mut buf = [0u8; 2];
+        self.reader.read_exact(&mut buf)?;
+        Ok(u16::from_be_bytes(buf))
+    }
+
+    fn read_u8(&mut self) -> Result<u8> {
+        let mut buf = [0u8; 1];
+        self.reader.read_exact(&mut buf)?;
+        Ok(buf[0])
+    }
+
+    fn read_u64_be(&mut self) -> Result<u64> {
+        let mut buf = [0u8; 8];
+        self.reader.read_exact(&mut buf)?;
+        Ok(u64::from_be_bytes(buf))
+    }
+}
+
+pub struct MixedPacketReader {
+    reader: BufReader<File>,
+}
+
+impl MixedPacketReader {
+    pub fn new(file: File) -> Self {
+        Self {
+            reader: BufReader::new(file),
+        }
+    }
+
+    pub fn read_mixed_packets(&mut self) -> Result<Vec<MixedPacketInfo>> {
+        self.read_mixed_packets_with_limit(8)
+    }
+    
+    pub fn read_mixed_packets_with_limit(&mut self, limit: usize) -> Result<Vec<MixedPacketInfo>> {
+        let mut writer = OutputWriter::new(None)?;
+        self.read_mixed_packets_with_limit_and_writer(&mut writer, limit)
+    }
+    
+    pub fn read_mixed_packets_with_limit_and_writer(&mut self, writer: &mut OutputWriter, limit: usize) -> Result<Vec<MixedPacketInfo>> {
+        let mut packets = Vec::new();
+        let mut packet_count = 0;
+        
+        loop {
+            packet_count += 1;
+            if packet_count > limit {
+                break;
+            }
+            match self.read_mixed_packet() {
+                Ok(packet) => {
+                    let (format_desc, length, timestamp) = match &packet.format {
+                        MixedPacketFormat::ProtobufFormat { length, unused } => {
+                            (format!("Mixed protobuf format (int16 length {} + int8 unused 0x{:02x} + protobuf data)", length, unused), *length, None)
+                        }
+                        MixedPacketFormat::TimestampFormat { length, timestamp } => {
+                            (format!("Mixed timestamp format (int8 length {} + int64 timestamp)", length), *length as u16, Some(*timestamp))
+                        }
+                    };
+                    
+                    format_packet_unified(
+                        writer,
+                        packet_count, 
+                        length, 
+                        timestamp,
+                        packet.data_pack.as_ref(),
+                        &packet.raw_data,
+                        &format_desc
+                    )?;
+                    
+                    packets.push(packet);
+                }
+                Err(e) => {
+                    let error_msg = e.to_string();
+                    if error_msg.contains("EOF") || error_msg.contains("UnexpectedEof") {
+                        writer.writeln(&format!("Reached end of file after {} packets", packets.len()))?;
+                        break;
+                    }
+                    writer.writeln(&format!("Error reading mixed packet #{}: {}", packet_count, e))?;
+                    return Err(e.context(format!("Failed at mixed packet #{}", packet_count)));
+                }
+            }
+        }
+        
+        Ok(packets)
+    }
+
+    fn read_mixed_packet(&mut self) -> Result<MixedPacketInfo> {
+        // Try to peek first byte to determine format
+        let mut peek_buf = [0u8; 1];
+        self.reader.read_exact(&mut peek_buf)
+            .with_context(|| "Failed to read first byte")?;
+        
+        // Read the second byte to help determine the format
+        let mut second_buf = [0u8; 1];
+        self.reader.read_exact(&mut second_buf)
+            .with_context(|| "Failed to read second byte")?;
+        println!("First byte: 0x{:02x}, Second byte: 0x{:02x}", peek_buf[0], second_buf[0]);
+        let first_two_bytes = u16::from_be_bytes([peek_buf[0], second_buf[0]]);
+        
+        // Heuristic: if the first two bytes as big-endian u16 form a reasonable length (> 3 and < 65536)
+        // and the next byte is 0x00, it's likely the protobuf format
+        let mut third_buf = [0u8; 1];
+        match self.reader.read_exact(&mut third_buf) {
+            Ok(_) => {
+                if third_buf[0] == 0x00 && first_two_bytes >= 3 && first_two_bytes < 32768 {
+                    // This looks like protobuf format: int16 length + int8 unused(0x00) + data
+                    self.read_protobuf_format_packet(first_two_bytes, third_buf[0])
+                } else {
+                    // This looks like timestamp format: int8 length + int64 timestamp
+                    // Reconstruct the data and read as timestamp format
+                    let length = peek_buf[0];
+                    
+                    // We've already read 3 bytes, need 5 more for the int64 timestamp
+                    let mut timestamp_buf = [0u8; 8];
+                    timestamp_buf[0] = second_buf[0];
+                    timestamp_buf[1] = third_buf[0];
+                    self.reader.read_exact(&mut timestamp_buf[2..])?;
+                    
+                    let timestamp_micros = u64::from_be_bytes(timestamp_buf);
+                    let timestamp = DateTime::from_timestamp_micros(timestamp_micros as i64)
+                        .ok_or_else(|| anyhow!("Invalid timestamp: {}", timestamp_micros))?;
+                    
+                    let mut raw_data = Vec::new();
+                    if length > 9 {
+                        let remaining_length = length as usize - 9; // 1 byte length + 8 bytes timestamp
+                        raw_data = vec![0u8; remaining_length];
+                        self.reader.read_exact(&mut raw_data)?;
+                    }
+                    
+                    Ok(MixedPacketInfo {
+                        format: MixedPacketFormat::TimestampFormat { length, timestamp },
+                        timestamp: Some(timestamp),
+                        data_pack: None,
+                        raw_data,
+                    })
+                }
+            }
+            Err(_) => {
+                // Not enough data, probably end of file
+                Err(anyhow!("Unexpected end of file"))
+            }
+        }
+    }
+
+    fn read_protobuf_format_packet(&mut self, length: u16, unused: u8) -> Result<MixedPacketInfo> {
+        if length < 3 {
+            return Err(anyhow!("Invalid protobuf packet length: {}, must be at least 3", length));
+        }
+
+        let data_length = length - 1; // unused(1)
+        println!("Reading protobuf packet with length: {}, unused: 0x{:02x}", data_length, unused);
+        let mut data = vec![0u8; data_length as usize];
+        self.reader.read_exact(&mut data)
+            .with_context(|| format!("Failed to read protobuf data of length {}", data_length))?;
+
+        // Try to parse as protobuf
+        let data_pack = match DataPack::decode(data.as_slice()) {
+            Ok(pack) => Some(pack),
+            Err(e) => {
+                println!("  Warning: Failed to decode protobuf data: {}", e);
+                None
+            }
+        };
+
+        Ok(MixedPacketInfo {
+            format: MixedPacketFormat::ProtobufFormat { length, unused },
+            timestamp: None,
+            data_pack,
+            raw_data: data,
+        })
+    }
+
+
+    fn read_u16_be(&mut self) -> Result<u16> {
+        let mut buf = [0u8; 2];
+        self.reader.read_exact(&mut buf)?;
+        Ok(u16::from_be_bytes(buf))
+    }
+
+    fn read_u8(&mut self) -> Result<u8> {
+        let mut buf = [0u8; 1];
+        self.reader.read_exact(&mut buf)?;
+        Ok(buf[0])
+    }
+
+    fn read_u64_be(&mut self) -> Result<u64> {
+        let mut buf = [0u8; 8];
+        self.reader.read_exact(&mut buf)?;
+        Ok(u64::from_be_bytes(buf))
+    }
+}
+
+pub fn format_packet_info(packet: &PacketInfo) -> String {
+    let mut output = String::new();
+    
+    output.push_str(&format!("=== Packet ===\n"));
+    output.push_str(&format!("Length: {} bytes\n", packet.length));
+    output.push_str(&format!("Timestamp: {} ({})\n", 
+        packet.timestamp.format("%Y-%m-%d %H:%M:%S%.6f UTC"),
+        packet.timestamp.timestamp_micros()
+    ));
+    
+    output.push_str(&format!("Data Pack:\n"));
+    output.push_str(&format_data_pack(&packet.data_pack, 1));
+    
+    output
+}
+
+fn format_data_pack(data_pack: &DataPack, indent_level: usize) -> String {
+    let indent = "  ".repeat(indent_level);
+    let mut output = String::new();
+    
+    if let Some(control) = &data_pack.control {
+        output.push_str(&format!("{}Control: ", indent));
+        match control {
+            proto::alstromeria::data_pack::Control::Data(data) => {
+                output.push_str(&format!("Data({})\n", data));
+            }
+            proto::alstromeria::data_pack::Control::Close(close) => {
+                output.push_str(&format!("Close(cause: {})\n", close.cause));
+            }
+            proto::alstromeria::data_pack::Control::Ping(ping) => {
+                output.push_str(&format!("Ping({})\n", ping));
+            }
+            proto::alstromeria::data_pack::Control::Pong(pong) => {
+                output.push_str(&format!("Pong({})\n", pong));
+            }
+            proto::alstromeria::data_pack::Control::SegmentStartedAt(timestamp) => {
+                output.push_str(&format!("SegmentStartedAt({})\n", timestamp));
+            }
+            proto::alstromeria::data_pack::Control::CacheEnded(ended) => {
+                output.push_str(&format!("CacheEnded({})\n", ended));
+            }
+        }
+    }
+    
+    if !data_pack.frames.is_empty() {
+        output.push_str(&format!("{}Frames ({}):\n", indent, data_pack.frames.len()));
+        for (i, frame) in data_pack.frames.iter().enumerate() {
+            output.push_str(&format!("{}  Frame {}:\n", indent, i));
+            output.push_str(&format_data_frame(frame, indent_level + 2));
+        }
+    }
+    
+    output
+}
+
+fn format_data_frame(frame: &proto::alstromeria::DataFrame, indent_level: usize) -> String {
+    let indent = "  ".repeat(indent_level);
+    let mut output = String::new();
+    
+    if let Some(message) = &frame.message {
+        use proto::alstromeria::data_frame::Message;
+        
+        output.push_str(&format!("{}Message: ", indent));
+        match message {
+            Message::AuthorizeRequest(req) => {
+                output.push_str(&format!("AuthorizeRequest(token: {} bytes)\n", req.token.len()));
+            }
+            Message::CreateRoomRequest(req) => {
+                output.push_str(&format!("CreateRoomRequest(room_id: {:?})\n", 
+                    String::from_utf8_lossy(&req.room_id)));
+            }
+            Message::JoinRoomRequest(req) => {
+                output.push_str(&format!("JoinRoomRequest(room_id: {:?}, methods: {:?})\n", 
+                    String::from_utf8_lossy(&req.room_id), req.methods));
+            }
+            Message::InstantiateObjectRequest(req) => {
+                output.push_str(&format!("InstantiateObjectRequest(object_id: {}, prefab: {:?})\n", 
+                    req.object_id, String::from_utf8_lossy(&req.prefab_name)));
+            }
+            Message::UpdateObjectRequest(req) => {
+                output.push_str(&format!("UpdateObjectRequest(object_id: {}, method: {})\n", 
+                    req.object_id, req.method));
+            }
+            Message::DestroyObjectRequest(req) => {
+                output.push_str(&format!("DestroyObjectRequest(object_id: {})\n", req.object_id));
+            }
+            Message::LeaveRoomRequest(_) => {
+                output.push_str("LeaveRoomRequest\n");
+            }
+            Message::DeleteRoomRequest(req) => {
+                output.push_str(&format!("DeleteRoomRequest(room_id: {:?})\n", 
+                    String::from_utf8_lossy(&req.room_id)));
+            }
+            Message::DebugMessage(msg) => {
+                output.push_str(&format!("DebugMessage(device_time: {}, text: {:?})\n", 
+                    msg.device_time, String::from_utf8_lossy(&msg.text)));
+            }
+            Message::Nop(_) => {
+                output.push_str("Nop\n");
+            }
+            Message::InstantiateObject(obj) => {
+                output.push_str(&format!("InstantiateObject(object_id: {}, owner: {:?}, prefab: {:?})\n", 
+                    obj.object_id, String::from_utf8_lossy(&obj.owner_id), 
+                    String::from_utf8_lossy(&obj.prefab_name)));
+            }
+            Message::UpdateObject(obj) => {
+                output.push_str(&format!("UpdateObject(object_id: {}, method: {})\n", 
+                    obj.object_id, obj.method));
+            }
+            Message::DestroyObject(obj) => {
+                output.push_str(&format!("DestroyObject(object_id: {})\n", obj.object_id));
+            }
+            Message::Room(room) => {
+                output.push_str(&format!("Room(id: {:?}, started: {}, ended: {})\n", 
+                    String::from_utf8_lossy(&room.id), room.started_at, room.ended_at));
+            }
+            Message::AuthorizeResponse(resp) => {
+                output.push_str(&format!("AuthorizeResponse(player_id: {:?}, role: {})\n", 
+                    String::from_utf8_lossy(&resp.player_id), resp.role));
+            }
+            Message::CreateRoomResponse(resp) => {
+                if let Some(room) = &resp.room {
+                    output.push_str(&format!("CreateRoomResponse(room_id: {:?})\n", 
+                        String::from_utf8_lossy(&room.id)));
+                } else {
+                    output.push_str("CreateRoomResponse(no room)\n");
+                }
+            }
+            Message::JoinRoomResponse(resp) => {
+                if let Some(room) = &resp.room {
+                    output.push_str(&format!("JoinRoomResponse(room_id: {:?}, joined_at: {})\n", 
+                        String::from_utf8_lossy(&room.id), resp.joined_at));
+                } else {
+                    output.push_str(&format!("JoinRoomResponse(joined_at: {})\n", resp.joined_at));
+                }
+            }
+            Message::LeaveRoomResponse(_) => {
+                output.push_str("LeaveRoomResponse\n");
+            }
+            Message::DeleteRoomResponse(_) => {
+                output.push_str("DeleteRoomResponse\n");
+            }
+            Message::LiveStatus(live) => {
+                output.push_str(&format!("LiveStatus(room_id: {:?}, status: {:?})\n", 
+                    String::from_utf8_lossy(&live.room_id), live.status()));
+            }
+            Message::PodClose(close) => {
+                output.push_str(&format!("PodClose(cause: {})\n", close.cause));
+            }
+            Message::UpdateOperatorSource(update) => {
+                output.push_str(&format!("UpdateOperatorSource(urls: {:?})\n", 
+                    update.src_urls.iter().map(|url| String::from_utf8_lossy(url)).collect::<Vec<_>>()));
+            }
+            Message::LiveRoom(room) => {
+                output.push_str(&format!("LiveRoom(id: {:?})\n", 
+                    String::from_utf8_lossy(&room.id)));
+            }
+            Message::LivePlayerStatus(status) => {
+                output.push_str(&format!("LivePlayerStatus({:?})\n", status));
+            }
+            Message::ErrorCode(code) => {
+                output.push_str(&format!("ErrorCode({})\n", code));
+            }
+            Message::ErrorMessage(msg) => {
+                output.push_str(&format!("ErrorMessage({:?})\n", String::from_utf8_lossy(msg)));
+            }
+        }
+    }
+    
+    output
+}
+
+pub fn analyze_binary_file(file_path: &str) -> Result<()> {
+    analyze_binary_file_with_count(file_path, 8)
+}
+
+pub fn analyze_binary_file_with_count(file_path: &str, packet_count: usize) -> Result<()> {
+    let mut writer = OutputWriter::new(None)?;
+    let mut file = File::open(file_path)
+        .with_context(|| format!("Failed to open file: {}", file_path))?;
+    
+    let metadata = file.metadata()
+        .with_context(|| format!("Failed to read file metadata: {}", file_path))?;
+    
+    writer.writeln(&format!("Analyzing binary file: {}", file_path))?;
+    writer.writeln(&format!("File size: {} bytes", metadata.len()))?;
+    writer.writeln(&format!("Analyzing first {} packets", packet_count))?;
+    
+    // Debug: show first 32 bytes of the file
+    let mut debug_buffer = vec![0u8; 32.min(metadata.len() as usize)];
+    file.read_exact(&mut debug_buffer)?;
+    writer.writeln(&format!("First {} bytes (hex): {}", debug_buffer.len(), 
+        debug_buffer.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" ")))?;
+    
+    // Reset file position
+    file.seek(std::io::SeekFrom::Start(0))?;
+    
+    writer.writeln("==========================================")?;
+    writer.writeln("")?;
+    
+    let mut reader = ProtoPacketReader::new(file);
+    
+    let packets = match reader.read_packets_with_limit_and_writer(&mut writer, packet_count) {
+        Ok(packets) => packets,
+        Err(e) => {
+            return Err(anyhow!("Failed to read packets from file '{}': {}", file_path, e));
+        }
+    };
+    
+    writer.writeln(&format!("Total packets found: {}", packets.len()))?;
+    writer.flush()?;
+    
+    Ok(())
+}
+
+pub fn analyze_mixed_binary_file(file_path: &str) -> Result<()> {
+    analyze_mixed_binary_file_with_count(file_path, 8)
+}
+
+pub fn analyze_mixed_binary_file_with_count(file_path: &str, packet_count: usize) -> Result<()> {
+    let mut writer = OutputWriter::new(None)?;
+    let mut file = File::open(file_path)
+        .with_context(|| format!("Failed to open file: {}", file_path))?;
+    
+    let metadata = file.metadata()
+        .with_context(|| format!("Failed to read file metadata: {}", file_path))?;
+    
+    writer.writeln(&format!("Analyzing mixed format binary file: {}", file_path))?;
+    writer.writeln(&format!("File size: {} bytes", metadata.len()))?;
+    writer.writeln(&format!("Analyzing first {} packets", packet_count))?;
+    
+    // Debug: show first 32 bytes of the file
+    let mut debug_buffer = vec![0u8; 32.min(metadata.len() as usize)];
+    file.read_exact(&mut debug_buffer)?;
+    writer.writeln(&format!("First {} bytes (hex): {}", debug_buffer.len(), 
+        debug_buffer.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" ")))?;
+    
+    // Reset file position
+    file.seek(std::io::SeekFrom::Start(0))?;
+    
+    writer.writeln("==========================================")?;
+    writer.writeln("")?;
+    
+    let mut reader = MixedPacketReader::new(file);
+    
+    let packets = match reader.read_mixed_packets_with_limit_and_writer(&mut writer, packet_count) {
+        Ok(packets) => packets,
+        Err(e) => {
+            return Err(anyhow!("Failed to read mixed packets from file '{}': {}", file_path, e));
+        }
+    };
+    
+    writer.writeln(&format!("Total mixed packets found: {}", packets.len()))?;
+    
+    // Summary
+    let mut protobuf_count = 0;
+    let mut timestamp_count = 0;
+    
+    for packet in &packets {
+        match packet.format {
+            MixedPacketFormat::ProtobufFormat { .. } => protobuf_count += 1,
+            MixedPacketFormat::TimestampFormat { .. } => timestamp_count += 1,
+        }
+    }
+    
+    writer.writeln("")?;
+    writer.writeln("Summary:")?;
+    writer.writeln(&format!("  Protobuf format packets: {}", protobuf_count))?;
+    writer.writeln(&format!("  Timestamp format packets: {}", timestamp_count))?;
+    writer.flush()?;
+    
+    Ok(())
+}
+
+pub struct OutputWriter {
+    writer: Box<dyn Write>,
+}
+
+impl OutputWriter {
+    pub fn new(output_path: Option<&str>) -> Result<Self> {
+        let writer: Box<dyn Write> = match output_path {
+            Some(path) => Box::new(File::create(path)
+                .with_context(|| format!("Failed to create output file: {}", path))?),
+            None => Box::new(std::io::stdout()),
+        };
+        
+        Ok(Self { writer })
+    }
+    
+    pub fn writeln(&mut self, content: &str) -> Result<()> {
+        writeln!(self.writer, "{}", content)
+            .with_context(|| "Failed to write to output")?;
+        Ok(())
+    }
+    
+    pub fn write(&mut self, content: &str) -> Result<()> {
+        write!(self.writer, "{}", content)
+            .with_context(|| "Failed to write to output")?;
+        Ok(())
+    }
+    
+    pub fn flush(&mut self) -> Result<()> {
+        self.writer.flush()
+            .with_context(|| "Failed to flush output")?;
+        Ok(())
+    }
+}
+
+pub fn analyze_binary_file_with_output(file_path: &str, output_path: Option<&str>) -> Result<()> {
+    analyze_binary_file_with_output_and_count(file_path, output_path, 8)
+}
+
+pub fn analyze_binary_file_with_output_and_count(file_path: &str, output_path: Option<&str>, packet_count: usize) -> Result<()> {
+    let mut writer = OutputWriter::new(output_path)?;
+    let mut file = File::open(file_path)
+        .with_context(|| format!("Failed to open file: {}", file_path))?;
+    
+    let metadata = file.metadata()
+        .with_context(|| format!("Failed to read file metadata: {}", file_path))?;
+    
+    writer.writeln(&format!("Analyzing binary file: {}", file_path))?;
+    writer.writeln(&format!("File size: {} bytes", metadata.len()))?;
+    writer.writeln(&format!("Analyzing first {} packets", packet_count))?;
+    
+    // Debug: show first 32 bytes of the file
+    let mut debug_buffer = vec![0u8; 32.min(metadata.len() as usize)];
+    file.read_exact(&mut debug_buffer)?;
+    writer.writeln(&format!("First {} bytes (hex): {}", debug_buffer.len(), 
+        debug_buffer.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" ")))?;
+    
+    // Reset file position
+    file.seek(std::io::SeekFrom::Start(0))?;
+    
+    writer.writeln("===========================================")?;
+    writer.writeln("")?;
+    
+    let mut reader = ProtoPacketReader::new(file);
+    
+    let packets = match reader.read_packets_with_limit_and_writer(&mut writer, packet_count) {
+        Ok(packets) => packets,
+        Err(e) => {
+            return Err(anyhow!("Failed to read packets from file '{}': {}", file_path, e));
+        }
+    };
+    
+    writer.writeln(&format!("Total packets found: {}", packets.len()))?;
+    writer.flush()?;
+    
+    Ok(())
+}
+
+pub fn analyze_mixed_binary_file_with_output(file_path: &str, output_path: Option<&str>) -> Result<()> {
+    analyze_mixed_binary_file_with_output_and_count(file_path, output_path, 8)
+}
+
+pub fn analyze_mixed_binary_file_with_output_and_count(file_path: &str, output_path: Option<&str>, packet_count: usize) -> Result<()> {
+    let mut writer = OutputWriter::new(output_path)?;
+    let mut file = File::open(file_path)
+        .with_context(|| format!("Failed to open file: {}", file_path))?;
+    
+    let metadata = file.metadata()
+        .with_context(|| format!("Failed to read file metadata: {}", file_path))?;
+    
+    writer.writeln(&format!("Analyzing mixed format binary file: {}", file_path))?;
+    writer.writeln(&format!("File size: {} bytes", metadata.len()))?;
+    writer.writeln(&format!("Analyzing first {} packets", packet_count))?;
+    
+    // Debug: show first 32 bytes of the file
+    let mut debug_buffer = vec![0u8; 32.min(metadata.len() as usize)];
+    file.read_exact(&mut debug_buffer)?;
+    writer.writeln(&format!("First {} bytes (hex): {}", debug_buffer.len(), 
+        debug_buffer.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" ")))?;
+    
+    // Reset file position
+    file.seek(std::io::SeekFrom::Start(0))?;
+    
+    writer.writeln("===========================================")?;
+    writer.writeln("")?;
+    
+    let mut reader = MixedPacketReader::new(file);
+    
+    let packets = match reader.read_mixed_packets_with_limit_and_writer(&mut writer, packet_count) {
+        Ok(packets) => packets,
+        Err(e) => {
+            return Err(anyhow!("Failed to read mixed packets from file '{}': {}", file_path, e));
+        }
+    };
+    
+    writer.writeln(&format!("Total mixed packets found: {}", packets.len()))?;
+    
+    // Summary
+    let mut protobuf_count = 0;
+    let mut timestamp_count = 0;
+    
+    for packet in &packets {
+        match packet.format {
+            MixedPacketFormat::ProtobufFormat { .. } => protobuf_count += 1,
+            MixedPacketFormat::TimestampFormat { .. } => timestamp_count += 1,
+        }
+    }
+    
+    writer.writeln("")?;
+    writer.writeln("Summary:")?;
+    writer.writeln(&format!("  Protobuf format packets: {}", protobuf_count))?;
+    writer.writeln(&format!("  Timestamp format packets: {}", timestamp_count))?;
+    writer.flush()?;
+    
+    Ok(())
 }

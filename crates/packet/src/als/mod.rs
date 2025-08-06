@@ -1,3 +1,3 @@
 pub mod client;
 mod packet;
-mod proto;
+pub mod proto;

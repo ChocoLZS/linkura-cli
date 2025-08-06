@@ -9,6 +9,7 @@ use chrono::{DateTime, Duration, Local, TimeDelta, Utc};
 use indicatif::{ProgressBar, ProgressStyle};
 use linkura_common::jwt::extract_jwt_payload;
 use linkura_packet::als::client::{Client, ConnectionInfo};
+use linkura_packet::als::proto;
 
 pub struct AlsConnectionInfo {
     pub address: Option<String>,
@@ -199,5 +200,37 @@ fn run_client(_ctx: &Global, connection_info: ConnectionInfo) -> Result<()> {
     let now = chrono::Local::now();
     tracing::info!("Program ended at: {}", now.format("%Y-%m-%d %H:%M:%S"));
 
+    Ok(())
+}
+
+pub fn analyze(file_path: &str, output_path: Option<&str>, packet_count: usize) -> Result<()> {
+    tracing::info!("Starting ALS packet analysis for file: {}", file_path);
+    tracing::info!("Analyzing first {} packets", packet_count);
+    
+    if let Some(output) = output_path {
+        tracing::info!("Output will be written to: {}", output);
+        proto::analyze_binary_file_with_output_and_count(file_path, Some(output), packet_count)
+            .context("Failed to analyze binary protobuf packet file with output")?;
+    } else {
+        proto::analyze_binary_file_with_count(file_path, packet_count)
+            .context("Failed to analyze binary protobuf packet file")?;
+    }
+    
+    Ok(())
+}
+
+pub fn analyze_mixed(file_path: &str, output_path: Option<&str>, packet_count: usize) -> Result<()> {
+    tracing::info!("Starting ALS mixed format packet analysis for file: {}", file_path);
+    tracing::info!("Analyzing first {} packets", packet_count);
+    
+    if let Some(output) = output_path {
+        tracing::info!("Output will be written to: {}", output);
+        proto::analyze_mixed_binary_file_with_output_and_count(file_path, Some(output), packet_count)
+            .context("Failed to analyze mixed format binary packet file with output")?;
+    } else {
+        proto::analyze_mixed_binary_file_with_count(file_path, packet_count)
+            .context("Failed to analyze mixed format binary packet file")?;
+    }
+    
     Ok(())
 }
