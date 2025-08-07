@@ -69,22 +69,6 @@ pub struct ArgsMRS {
 
 #[derive(Debug, ClapArgs)]
 pub struct ArgsALS {
-    #[command(subcommand)]
-    pub command: Option<AlsCommands>,
-}
-
-#[derive(Subcommand, Debug)]
-pub enum AlsCommands {
-    /// Connect to ALS server and receive live data
-    Connect(ArgsAlsConnect),
-    /// Analyze binary protobuf packet file
-    Analyze(ArgsAlsAnalyze),
-    /// Analyze mixed format binary packet file (protobuf + timestamp formats)
-    AnalyzeMixed(ArgsAlsAnalyze),
-}
-
-#[derive(Debug, ClapArgs)]
-pub struct ArgsAlsConnect {
     #[clap(short('a'), long = "address", value_name = "ADDRESS")]
     pub addr: Option<String>,
     #[clap(short('p'), long = "port", value_name = "PORT")]
@@ -100,21 +84,6 @@ pub struct ArgsAlsConnect {
         default_value_t = false
     )]
     pub watch: bool,
-}
-
-#[derive(Debug, ClapArgs)]
-pub struct ArgsAlsAnalyze {
-    #[clap(value_name = "FILE_PATH")]
-    /// Path to the binary protobuf packet file to analyze
-    pub file_path: String,
-    
-    #[clap(short('o'), long = "output", value_name = "OUTPUT_PATH")]
-    /// Optional output file path to save analysis results
-    pub output_path: Option<String>,
-    
-    #[clap(short('n'), long = "count", value_name = "PACKET_COUNT", default_value_t = 8)]
-    /// Number of packets to analyze (default: 8)
-    pub packet_count: usize,
 }
 #[derive(Debug, ClapArgs)]
 pub struct ArgsArchive {
