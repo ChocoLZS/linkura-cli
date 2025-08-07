@@ -5,12 +5,12 @@ use std::fs::File;
 use std::io::{BufReader, Read, Seek, Write};
 
 pub mod proto {
-    pub mod alstromeria {
+    pub mod als {
         include!(concat!(env!("OUT_DIR"), "/als.rs"));
     }
 }
 
-use proto::alstromeria::DataPack;
+use proto::als::DataPack;
 use prost::bytes::Buf;
 
 #[derive(Debug)]
@@ -184,26 +184,26 @@ fn read_varint(cursor: &mut std::io::Cursor<&[u8]>) -> Result<u64> {
 }
 
 // Helper functions for formatting target types
-fn format_instantiate_object_target(target: &Option<proto::alstromeria::instantiate_object::Target>) -> String {
+fn format_instantiate_object_target(target: &Option<proto::als::instantiate_object::Target>) -> String {
     match target {
-        Some(proto::alstromeria::instantiate_object::Target::CurrentPlayer(_)) => "CurrentPlayer".to_string(),
-        Some(proto::alstromeria::instantiate_object::Target::RoomAll(room)) => {
+        Some(proto::als::instantiate_object::Target::CurrentPlayer(_)) => "CurrentPlayer".to_string(),
+        Some(proto::als::instantiate_object::Target::RoomAll(room)) => {
             format!("RoomAll (room_id: {:?})", String::from_utf8_lossy(&room.room_id))
         }
-        Some(proto::alstromeria::instantiate_object::Target::PlayerId(player_id)) => {
+        Some(proto::als::instantiate_object::Target::PlayerId(player_id)) => {
             format!("PlayerId ({:?})", String::from_utf8_lossy(player_id))
         }
         None => "None".to_string(),
     }
 }
 
-fn format_update_object_target(target: &Option<proto::alstromeria::update_object::Target>) -> String {
+fn format_update_object_target(target: &Option<proto::als::update_object::Target>) -> String {
     match target {
-        Some(proto::alstromeria::update_object::Target::CurrentPlayer(_)) => "CurrentPlayer".to_string(),
-        Some(proto::alstromeria::update_object::Target::RoomAll(room)) => {
+        Some(proto::als::update_object::Target::CurrentPlayer(_)) => "CurrentPlayer".to_string(),
+        Some(proto::als::update_object::Target::RoomAll(room)) => {
             format!("RoomAll (room_id: {:?})", String::from_utf8_lossy(&room.room_id))
         }
-        Some(proto::alstromeria::update_object::Target::PlayerId(player_id)) => {
+        Some(proto::als::update_object::Target::PlayerId(player_id)) => {
             format!("PlayerId ({:?})", String::from_utf8_lossy(player_id))
         }
         None => "None".to_string(),
@@ -211,18 +211,18 @@ fn format_update_object_target(target: &Option<proto::alstromeria::update_object
 }
 
 impl ControlMessageStats {
-    pub fn update_from_control(&mut self, control: &proto::alstromeria::data_pack::Control) {
+    pub fn update_from_control(&mut self, control: &proto::als::data_pack::Control) {
         match control {
-            proto::alstromeria::data_pack::Control::Data(_) => {
+            proto::als::data_pack::Control::Data(_) => {
                 self.data_count += 1;
             }
-            proto::alstromeria::data_pack::Control::Pong(_) => {
+            proto::als::data_pack::Control::Pong(_) => {
                 self.pong_count += 1;
             }
-            proto::alstromeria::data_pack::Control::SegmentStartedAt(_) => {
+            proto::als::data_pack::Control::SegmentStartedAt(_) => {
                 self.segment_started_at_count += 1;
             }
-            proto::alstromeria::data_pack::Control::CacheEnded(_) => {
+            proto::als::data_pack::Control::CacheEnded(_) => {
                 self.cache_ended_count += 1;
             }
         }
@@ -231,9 +231,9 @@ impl ControlMessageStats {
 }
 
 impl FrameMessageStats {
-    pub fn update_from_frame(&mut self, frame: &proto::alstromeria::DataFrame) {
+    pub fn update_from_frame(&mut self, frame: &proto::als::DataFrame) {
         if let Some(message) = &frame.message {
-            use proto::alstromeria::data_frame::Message;
+            use proto::als::data_frame::Message;
             match message {
                 Message::InstantiateObject(_) => self.instantiate_object_count += 1,
                 Message::UpdateObject(_) => self.update_object_count += 1,
@@ -484,16 +484,16 @@ fn print_data_pack_details_unified(writer: &mut OutputWriter, data_pack: &DataPa
     if let Some(control) = &data_pack.control {
         writer.writeln("  Control message:")?;
         match control {
-            proto::alstromeria::data_pack::Control::Data(data) => {
+            proto::als::data_pack::Control::Data(data) => {
                 writer.writeln(&format!("    Type: Data, Value: {}", data))?;
             }
-            proto::alstromeria::data_pack::Control::Pong(pong) => {
+            proto::als::data_pack::Control::Pong(pong) => {
                 writer.writeln(&format!("    Type: Pong, Value: {}", pong))?;
             }
-            proto::alstromeria::data_pack::Control::SegmentStartedAt(timestamp) => {
+            proto::als::data_pack::Control::SegmentStartedAt(timestamp) => {
                 writer.writeln(&format!("    Type: SegmentStartedAt, Timestamp: {}", timestamp))?;
             }
-            proto::alstromeria::data_pack::Control::CacheEnded(ended) => {
+            proto::als::data_pack::Control::CacheEnded(ended) => {
                 writer.writeln(&format!("    Type: CacheEnded, Value: {}", ended))?;
             }
         }
@@ -506,7 +506,7 @@ fn print_data_pack_details_unified(writer: &mut OutputWriter, data_pack: &DataPa
         for (i, frame) in data_pack.frames.iter().enumerate() {
             writer.writeln(&format!("    Frame #{}: ", i + 1))?;
             if let Some(message) = &frame.message {
-                use proto::alstromeria::data_frame::Message;
+                use proto::als::data_frame::Message;
                 match message {
                     Message::InstantiateObject(obj) => {
                         let target_desc = format_instantiate_object_target(&obj.target);
@@ -1031,16 +1031,16 @@ fn format_data_pack(data_pack: &DataPack, indent_level: usize) -> String {
     if let Some(control) = &data_pack.control {
         output.push_str(&format!("{}Control: ", indent));
         match control {
-            proto::alstromeria::data_pack::Control::Data(data) => {
+            proto::als::data_pack::Control::Data(data) => {
                 output.push_str(&format!("Data({})\n", data));
             }
-            proto::alstromeria::data_pack::Control::Pong(pong) => {
+            proto::als::data_pack::Control::Pong(pong) => {
                 output.push_str(&format!("Pong({})\n", pong));
             }
-            proto::alstromeria::data_pack::Control::SegmentStartedAt(timestamp) => {
+            proto::als::data_pack::Control::SegmentStartedAt(timestamp) => {
                 output.push_str(&format!("SegmentStartedAt({})\n", timestamp));
             }
-            proto::alstromeria::data_pack::Control::CacheEnded(ended) => {
+            proto::als::data_pack::Control::CacheEnded(ended) => {
                 output.push_str(&format!("CacheEnded({})\n", ended));
             }
         }
@@ -1057,12 +1057,12 @@ fn format_data_pack(data_pack: &DataPack, indent_level: usize) -> String {
     output
 }
 
-fn format_data_frame(frame: &proto::alstromeria::DataFrame, indent_level: usize) -> String {
+fn format_data_frame(frame: &proto::als::DataFrame, indent_level: usize) -> String {
     let indent = "  ".repeat(indent_level);
     let mut output = String::new();
     
     if let Some(message) = &frame.message {
-        use proto::alstromeria::data_frame::Message;
+        use proto::als::data_frame::Message;
         
         output.push_str(&format!("{}Message: ", indent));
         match message {
