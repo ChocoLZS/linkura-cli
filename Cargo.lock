@@ -1240,6 +1240,7 @@ dependencies = [
  "i18n",
  "linkura-common",
  "linkura-downloader",
+ "linkura-packet",
  "rust-i18n",
  "tokio",
  "tracing",

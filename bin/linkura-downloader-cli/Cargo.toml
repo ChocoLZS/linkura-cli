@@ -10,6 +10,7 @@ metadata.workspace = true
 [dependencies]
 linkura-common.workspace = true
 linkura-downloader.workspace = true
+linkura-packet.workspace = true
 i18n.workspace = true
 
 anyhow.workspace = true

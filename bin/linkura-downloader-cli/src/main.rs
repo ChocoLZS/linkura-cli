@@ -12,6 +12,7 @@ i18n::init!();
 
 use linkura_downloader::{AlsDownloader, BaseDownloader, MrsDownloader, R2Uploader};
 use linkura_common::log;
+use linkura_packet::als::proto;
 use url::Url;
 
 
@@ -63,6 +64,18 @@ pub struct ArgsUpload {
 }
 
 #[derive(Debug, ClapArgs)]
+pub struct ArgsAnalyze {
+    #[clap(short('t'), long = "type", value_name = "TYPE", help = "Analysis type: 'standard' or 'mixed'", default_value = "standard")]
+    pub analysis_type: String,
+    #[clap(short('o'), long = "output", value_name = "OUTPUT", help = "Output file path (optional)")]
+    pub output_path: Option<String>,
+    #[clap(short('c'), long = "count", value_name = "COUNT", help = "Number of packets to analyze", default_value = "8")]
+    pub packet_count: usize,
+    #[clap(value_name = "FILE", help = "Input binary file path")]
+    pub file_path: String,
+}
+
+#[derive(Debug, ClapArgs)]
 pub struct ArgsSync {
     // Download parameters
     #[clap(short('t'), long = "type", value_name = "TYPE", help = t!("downloader.cli.command.download.args.type").to_string())]
@@ -98,6 +111,7 @@ pub enum Commands {
     Download(ArgsDownload),
     Upload(ArgsUpload),
     Sync(ArgsSync),
+    Analyze(ArgsAnalyze),
 }
 
 #[tokio::main]
@@ -255,6 +269,46 @@ async fn main() -> Result<()> {
 
             info!("✅ Sync operation completed successfully!");
             info!("🎉 Download + Upload finished!");
+        },
+        Some(Commands::Analyze(ref analyze_args)) => {
+            info!("🔍 Starting ALS packet analysis for file: {}", analyze_args.file_path);
+            info!("📊 Analysis type: {}, Packet count: {}", analyze_args.analysis_type, analyze_args.packet_count);
+            
+            if let Some(ref output) = analyze_args.output_path {
+                info!("📄 Output will be written to: {}", output);
+            }
+            
+            // Convert async context to sync for the analysis functions
+            let _result = tokio::task::spawn_blocking({
+                let file_path = analyze_args.file_path.clone();
+                let output_path = analyze_args.output_path.clone();
+                let packet_count = analyze_args.packet_count;
+                let analysis_type = analyze_args.analysis_type.clone();
+                
+                move || {
+                    match analysis_type.as_str() {
+                        "standard" => {
+                            if let Some(output) = output_path {
+                                proto::analyze_binary_file_with_output_and_count(&file_path, Some(&output), packet_count)
+                            } else {
+                                proto::analyze_binary_file_with_count(&file_path, packet_count)
+                            }
+                        }
+                        "mixed" => {
+                            if let Some(output) = output_path {
+                                proto::analyze_mixed_binary_file_with_output_and_count(&file_path, Some(&output), packet_count)
+                            } else {
+                                proto::analyze_mixed_binary_file_with_count(&file_path, packet_count)
+                            }
+                        }
+                        _ => {
+                            Err(anyhow::anyhow!("Unknown analysis type: {}. Use 'standard' or 'mixed'", analysis_type))
+                        }
+                    }
+                }
+            }).await??;
+            
+            info!("✅ ALS packet analysis completed successfully!");
         },
         None => {},
     }
