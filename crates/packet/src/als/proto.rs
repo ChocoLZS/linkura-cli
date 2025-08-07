@@ -48,8 +48,6 @@ pub struct ProtobufField {
 #[derive(Debug, Default, Clone)]
 pub struct ControlMessageStats {
     pub data_count: u32,
-    pub close_count: u32,
-    pub ping_count: u32,
     pub pong_count: u32,
     pub segment_started_at_count: u32,
     pub cache_ended_count: u32,
@@ -58,33 +56,18 @@ pub struct ControlMessageStats {
 
 #[derive(Debug, Default, Clone)]
 pub struct FrameMessageStats {
-    pub authorize_request_count: u32,
-    pub create_room_request_count: u32,
-    pub join_room_request_count: u32,
-    pub instantiate_object_request_count: u32,
-    pub update_object_request_count: u32,
-    pub destroy_object_request_count: u32,
-    pub leave_room_request_count: u32,
-    pub delete_room_request_count: u32,
-    pub debug_message_count: u32,
-    pub nop_count: u32,
     pub instantiate_object_count: u32,
     pub update_object_count: u32,
     pub destroy_object_count: u32,
     pub room_count: u32,
     pub authorize_response_count: u32,
-    pub create_room_response_count: u32,
     pub join_room_response_count: u32,
-    pub leave_room_response_count: u32,
-    pub delete_room_response_count: u32,
-    pub live_status_count: u32,
-    pub pod_close_count: u32,
-    pub update_operator_source_count: u32,
-    pub live_room_count: u32,
-    pub live_player_status_count: u32,
-    pub error_code_count: u32,
-    pub error_message_count: u32,
     pub total_frame_messages: u32,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct UnknownFieldStats {
+    pub unknown_fields: std::collections::HashMap<u32, u32>, // field_number -> count
 }
 
 #[derive(Debug, Default, Clone)]
@@ -95,6 +78,7 @@ pub struct PacketAnalysisStats {
     pub total_frames: u32,
     pub control_stats: ControlMessageStats,
     pub frame_stats: FrameMessageStats,
+    pub unknown_field_stats: UnknownFieldStats,
 }
 
 pub fn parse_protobuf_fields(data: &[u8]) -> Vec<ProtobufField> {
@@ -130,7 +114,7 @@ fn parse_protobuf_field(cursor: &mut std::io::Cursor<&[u8]>) -> Result<ProtobufF
     };
     
     // Skip field data based on wire type
-    let field_data_start = cursor.position();
+    let _field_data_start = cursor.position();
     match wire_type {
         0 => {
             // Varint
@@ -200,40 +184,11 @@ fn read_varint(cursor: &mut std::io::Cursor<&[u8]>) -> Result<u64> {
 }
 
 // Helper functions for formatting target types
-fn format_target_type(target: &Option<proto::alstromeria::instantiate_object_request::Target>) -> String {
+fn format_instantiate_object_target(target: &Option<proto::alstromeria::instantiate_object::Target>) -> String {
     match target {
-        Some(proto::alstromeria::instantiate_object_request::Target::GlobalAll(_)) => "GlobalAll".to_string(),
-        Some(proto::alstromeria::instantiate_object_request::Target::RoomAll(room)) => {
-            format!("RoomAll (room_id: {:?})", String::from_utf8_lossy(&room.room_id))
-        }
-        Some(proto::alstromeria::instantiate_object_request::Target::RoomOthers(room)) => {
-            format!("RoomOthers (room_id: {:?}, operator: {:?})", 
-                String::from_utf8_lossy(&room.room_id),
-                String::from_utf8_lossy(&room.operator_player_id))
-        }
-        Some(proto::alstromeria::instantiate_object_request::Target::RoomRole(role)) => {
-            format!("RoomRole (room_id: {:?}, roles: {:?})", 
-                String::from_utf8_lossy(&role.room_id), role.role)
-        }
-        None => "None".to_string(),
-    }
-}
-
-fn format_target_type_with_player(target: &Option<proto::alstromeria::instantiate_object::Target>) -> String {
-    match target {
-        Some(proto::alstromeria::instantiate_object::Target::GlobalAll(_)) => "GlobalAll".to_string(),
         Some(proto::alstromeria::instantiate_object::Target::CurrentPlayer(_)) => "CurrentPlayer".to_string(),
         Some(proto::alstromeria::instantiate_object::Target::RoomAll(room)) => {
             format!("RoomAll (room_id: {:?})", String::from_utf8_lossy(&room.room_id))
-        }
-        Some(proto::alstromeria::instantiate_object::Target::RoomOthers(room)) => {
-            format!("RoomOthers (room_id: {:?}, operator: {:?})", 
-                String::from_utf8_lossy(&room.room_id),
-                String::from_utf8_lossy(&room.operator_player_id))
-        }
-        Some(proto::alstromeria::instantiate_object::Target::RoomRole(role)) => {
-            format!("RoomRole (room_id: {:?}, roles: {:?})", 
-                String::from_utf8_lossy(&role.room_id), role.role)
         }
         Some(proto::alstromeria::instantiate_object::Target::PlayerId(player_id)) => {
             format!("PlayerId ({:?})", String::from_utf8_lossy(player_id))
@@ -242,40 +197,11 @@ fn format_target_type_with_player(target: &Option<proto::alstromeria::instantiat
     }
 }
 
-fn format_update_object_request_target(target: &Option<proto::alstromeria::update_object_request::Target>) -> String {
-    match target {
-        Some(proto::alstromeria::update_object_request::Target::GlobalAll(_)) => "GlobalAll".to_string(),
-        Some(proto::alstromeria::update_object_request::Target::RoomAll(room)) => {
-            format!("RoomAll (room_id: {:?})", String::from_utf8_lossy(&room.room_id))
-        }
-        Some(proto::alstromeria::update_object_request::Target::RoomOthers(room)) => {
-            format!("RoomOthers (room_id: {:?}, operator: {:?})", 
-                String::from_utf8_lossy(&room.room_id),
-                String::from_utf8_lossy(&room.operator_player_id))
-        }
-        Some(proto::alstromeria::update_object_request::Target::RoomRole(role)) => {
-            format!("RoomRole (room_id: {:?}, roles: {:?})", 
-                String::from_utf8_lossy(&role.room_id), role.role)
-        }
-        None => "None".to_string(),
-    }
-}
-
 fn format_update_object_target(target: &Option<proto::alstromeria::update_object::Target>) -> String {
     match target {
-        Some(proto::alstromeria::update_object::Target::GlobalAll(_)) => "GlobalAll".to_string(),
         Some(proto::alstromeria::update_object::Target::CurrentPlayer(_)) => "CurrentPlayer".to_string(),
         Some(proto::alstromeria::update_object::Target::RoomAll(room)) => {
             format!("RoomAll (room_id: {:?})", String::from_utf8_lossy(&room.room_id))
-        }
-        Some(proto::alstromeria::update_object::Target::RoomOthers(room)) => {
-            format!("RoomOthers (room_id: {:?}, operator: {:?})", 
-                String::from_utf8_lossy(&room.room_id),
-                String::from_utf8_lossy(&room.operator_player_id))
-        }
-        Some(proto::alstromeria::update_object::Target::RoomRole(role)) => {
-            format!("RoomRole (room_id: {:?}, roles: {:?})", 
-                String::from_utf8_lossy(&role.room_id), role.role)
         }
         Some(proto::alstromeria::update_object::Target::PlayerId(player_id)) => {
             format!("PlayerId ({:?})", String::from_utf8_lossy(player_id))
@@ -289,12 +215,6 @@ impl ControlMessageStats {
         match control {
             proto::alstromeria::data_pack::Control::Data(_) => {
                 self.data_count += 1;
-            }
-            proto::alstromeria::data_pack::Control::Close(_) => {
-                self.close_count += 1;
-            }
-            proto::alstromeria::data_pack::Control::Ping(_) => {
-                self.ping_count += 1;
             }
             proto::alstromeria::data_pack::Control::Pong(_) => {
                 self.pong_count += 1;
@@ -315,34 +235,63 @@ impl FrameMessageStats {
         if let Some(message) = &frame.message {
             use proto::alstromeria::data_frame::Message;
             match message {
-                Message::AuthorizeRequest(_) => self.authorize_request_count += 1,
-                Message::CreateRoomRequest(_) => self.create_room_request_count += 1,
-                Message::JoinRoomRequest(_) => self.join_room_request_count += 1,
-                Message::InstantiateObjectRequest(_) => self.instantiate_object_request_count += 1,
-                Message::UpdateObjectRequest(_) => self.update_object_request_count += 1,
-                Message::DestroyObjectRequest(_) => self.destroy_object_request_count += 1,
-                Message::LeaveRoomRequest(_) => self.leave_room_request_count += 1,
-                Message::DeleteRoomRequest(_) => self.delete_room_request_count += 1,
-                Message::DebugMessage(_) => self.debug_message_count += 1,
-                Message::Nop(_) => self.nop_count += 1,
                 Message::InstantiateObject(_) => self.instantiate_object_count += 1,
                 Message::UpdateObject(_) => self.update_object_count += 1,
                 Message::DestroyObject(_) => self.destroy_object_count += 1,
                 Message::Room(_) => self.room_count += 1,
                 Message::AuthorizeResponse(_) => self.authorize_response_count += 1,
-                Message::CreateRoomResponse(_) => self.create_room_response_count += 1,
                 Message::JoinRoomResponse(_) => self.join_room_response_count += 1,
-                Message::LeaveRoomResponse(_) => self.leave_room_response_count += 1,
-                Message::DeleteRoomResponse(_) => self.delete_room_response_count += 1,
-                Message::LiveStatus(_) => self.live_status_count += 1,
-                Message::PodClose(_) => self.pod_close_count += 1,
-                Message::UpdateOperatorSource(_) => self.update_operator_source_count += 1,
-                Message::LiveRoom(_) => self.live_room_count += 1,
-                Message::LivePlayerStatus(_) => self.live_player_status_count += 1,
-                Message::ErrorCode(_) => self.error_code_count += 1,
-                Message::ErrorMessage(_) => self.error_message_count += 1,
             }
             self.total_frame_messages += 1;
+        }
+    }
+}
+
+impl UnknownFieldStats {
+    pub fn update_from_raw_data(&mut self, raw_data: &[u8]) {
+        let fields = parse_protobuf_fields(raw_data);
+        for field in fields {
+            // Check if this field number is unknown/unhandled
+            if !self.is_known_field_number(field.field_number) {
+                *self.unknown_fields.entry(field.field_number).or_insert(0) += 1;
+            }
+        }
+    }
+    
+    fn is_known_field_number(&self, field_number: u32) -> bool {
+        // Known field numbers from datapack.proto
+        match field_number {
+            // DataPack fields
+            2 => true,  // data 
+            10 => true, // pong
+            14 => true, // segment_started_at
+            15 => true, // cache_ended
+            16 => true, // frames
+            // DataFrame fields  
+            128 => true, // instantiate_object
+            129 => true, // update_object
+            130 => true, // destroy_object
+            143 => true, // room
+            144 => true, // authorize_response
+            147 => true, // join_room_response
+            // InstantiateObject fields
+            3 => true,  // current_player target
+            4 => true,  // room_all target
+            7 => true,  // player_id target
+            8 => true,  // object_id
+            9 => true,  // owner_id
+            11 => true, // init_data
+            // UpdateObject fields (reuses some target fields)
+            6 => true,  // player_id target (different field num than InstantiateObject)
+            // DestroyObject fields (reuses UpdateObject target field numbers)
+            // Room fields
+            1 => true,  // id
+            // Note: fields 2 and 3 are already covered above in different contexts
+            // AuthorizeResponse fields
+            // (reuses id=1, role=2, allowed_room_ids=3)
+            // JoinRoomResponse fields  
+            // (reuses room=1, joined_at=2)
+            _ => false,
         }
     }
 }
@@ -364,6 +313,10 @@ impl PacketAnalysisStats {
                 self.frame_stats.update_from_frame(frame);
             }
         }
+    }
+    
+    pub fn update_from_raw_data(&mut self, raw_data: &[u8]) {
+        self.unknown_field_stats.update_from_raw_data(raw_data);
     }
 }
 
@@ -389,16 +342,6 @@ pub fn format_statistics(writer: &mut OutputWriter, stats: &PacketAnalysisStats)
                 control.data_count, 
                 control.data_count as f64 / control.total_control_messages as f64 * 100.0))?;
         }
-        if control.close_count > 0 {
-            writer.writeln(&format!("  Close: {} ({:.1}%)", 
-                control.close_count, 
-                control.close_count as f64 / control.total_control_messages as f64 * 100.0))?;
-        }
-        if control.ping_count > 0 {
-            writer.writeln(&format!("  Ping: {} ({:.1}%)", 
-                control.ping_count, 
-                control.ping_count as f64 / control.total_control_messages as f64 * 100.0))?;
-        }
         if control.pong_count > 0 {
             writer.writeln(&format!("  Pong: {} ({:.1}%)", 
                 control.pong_count, 
@@ -423,60 +366,8 @@ pub fn format_statistics(writer: &mut OutputWriter, stats: &PacketAnalysisStats)
     if frame.total_frame_messages > 0 {
         writer.writeln("Frame Message Types:")?;
         
-        // Request messages
-        let request_count = frame.authorize_request_count + frame.create_room_request_count + 
-            frame.join_room_request_count + frame.instantiate_object_request_count +
-            frame.update_object_request_count + frame.destroy_object_request_count +
-            frame.leave_room_request_count + frame.delete_room_request_count;
-        
-        if request_count > 0 {
-            writer.writeln("  Request Messages:")?;
-            if frame.authorize_request_count > 0 {
-                writer.writeln(&format!("    AuthorizeRequest: {} ({:.1}%)", 
-                    frame.authorize_request_count, 
-                    frame.authorize_request_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-            }
-            if frame.create_room_request_count > 0 {
-                writer.writeln(&format!("    CreateRoomRequest: {} ({:.1}%)", 
-                    frame.create_room_request_count, 
-                    frame.create_room_request_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-            }
-            if frame.join_room_request_count > 0 {
-                writer.writeln(&format!("    JoinRoomRequest: {} ({:.1}%)", 
-                    frame.join_room_request_count, 
-                    frame.join_room_request_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-            }
-            if frame.instantiate_object_request_count > 0 {
-                writer.writeln(&format!("    InstantiateObjectRequest: {} ({:.1}%)", 
-                    frame.instantiate_object_request_count, 
-                    frame.instantiate_object_request_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-            }
-            if frame.update_object_request_count > 0 {
-                writer.writeln(&format!("    UpdateObjectRequest: {} ({:.1}%)", 
-                    frame.update_object_request_count, 
-                    frame.update_object_request_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-            }
-            if frame.destroy_object_request_count > 0 {
-                writer.writeln(&format!("    DestroyObjectRequest: {} ({:.1}%)", 
-                    frame.destroy_object_request_count, 
-                    frame.destroy_object_request_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-            }
-            if frame.leave_room_request_count > 0 {
-                writer.writeln(&format!("    LeaveRoomRequest: {} ({:.1}%)", 
-                    frame.leave_room_request_count, 
-                    frame.leave_room_request_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-            }
-            if frame.delete_room_request_count > 0 {
-                writer.writeln(&format!("    DeleteRoomRequest: {} ({:.1}%)", 
-                    frame.delete_room_request_count, 
-                    frame.delete_room_request_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-            }
-        }
-        
         // Response messages
-        let response_count = frame.authorize_response_count + frame.create_room_response_count + 
-            frame.join_room_response_count + frame.leave_room_response_count + 
-            frame.delete_room_response_count;
+        let response_count = frame.authorize_response_count + frame.join_room_response_count;
         
         if response_count > 0 {
             writer.writeln("  Response Messages:")?;
@@ -485,25 +376,10 @@ pub fn format_statistics(writer: &mut OutputWriter, stats: &PacketAnalysisStats)
                     frame.authorize_response_count, 
                     frame.authorize_response_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
             }
-            if frame.create_room_response_count > 0 {
-                writer.writeln(&format!("    CreateRoomResponse: {} ({:.1}%)", 
-                    frame.create_room_response_count, 
-                    frame.create_room_response_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-            }
             if frame.join_room_response_count > 0 {
                 writer.writeln(&format!("    JoinRoomResponse: {} ({:.1}%)", 
                     frame.join_room_response_count, 
                     frame.join_room_response_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-            }
-            if frame.leave_room_response_count > 0 {
-                writer.writeln(&format!("    LeaveRoomResponse: {} ({:.1}%)", 
-                    frame.leave_room_response_count, 
-                    frame.leave_room_response_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-            }
-            if frame.delete_room_response_count > 0 {
-                writer.writeln(&format!("    DeleteRoomResponse: {} ({:.1}%)", 
-                    frame.delete_room_response_count, 
-                    frame.delete_room_response_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
             }
         }
         
@@ -528,71 +404,26 @@ pub fn format_statistics(writer: &mut OutputWriter, stats: &PacketAnalysisStats)
             }
         }
         
-        // Live-related messages
-        let live_count = frame.live_status_count + frame.live_room_count + frame.live_player_status_count;
-        if live_count > 0 {
-            writer.writeln("  Live Messages:")?;
-            if frame.live_status_count > 0 {
-                writer.writeln(&format!("    LiveStatus: {} ({:.1}%)", 
-                    frame.live_status_count, 
-                    frame.live_status_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-            }
-            if frame.live_room_count > 0 {
-                writer.writeln(&format!("    LiveRoom: {} ({:.1}%)", 
-                    frame.live_room_count, 
-                    frame.live_room_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-            }
-            if frame.live_player_status_count > 0 {
-                writer.writeln(&format!("    LivePlayerStatus: {} ({:.1}%)", 
-                    frame.live_player_status_count, 
-                    frame.live_player_status_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-            }
-        }
-        
         // Other messages
         if frame.room_count > 0 {
             writer.writeln(&format!("  Room: {} ({:.1}%)", 
                 frame.room_count, 
                 frame.room_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
         }
-        if frame.debug_message_count > 0 {
-            writer.writeln(&format!("  DebugMessage: {} ({:.1}%)", 
-                frame.debug_message_count, 
-                frame.debug_message_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-        }
-        if frame.nop_count > 0 {
-            writer.writeln(&format!("  Nop: {} ({:.1}%)", 
-                frame.nop_count, 
-                frame.nop_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-        }
-        if frame.pod_close_count > 0 {
-            writer.writeln(&format!("  PodClose: {} ({:.1}%)", 
-                frame.pod_close_count, 
-                frame.pod_close_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-        }
-        if frame.update_operator_source_count > 0 {
-            writer.writeln(&format!("  UpdateOperatorSource: {} ({:.1}%)", 
-                frame.update_operator_source_count, 
-                frame.update_operator_source_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-        }
-        
-        // Error messages
-        let error_count = frame.error_code_count + frame.error_message_count;
-        if error_count > 0 {
-            writer.writeln("  Error Messages:")?;
-            if frame.error_code_count > 0 {
-                writer.writeln(&format!("    ErrorCode: {} ({:.1}%)", 
-                    frame.error_code_count, 
-                    frame.error_code_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-            }
-            if frame.error_message_count > 0 {
-                writer.writeln(&format!("    ErrorMessage: {} ({:.1}%)", 
-                    frame.error_message_count, 
-                    frame.error_message_count as f64 / frame.total_frame_messages as f64 * 100.0))?;
-            }
-        }
         
         writer.writeln(&format!("  Total Frame Messages: {}", frame.total_frame_messages))?;
+    }
+
+        // Unknown field statistics
+    if !stats.unknown_field_stats.unknown_fields.is_empty() {
+        writer.writeln("Unknown Field Numbers Found:")?;
+        let mut unknown_fields: Vec<_> = stats.unknown_field_stats.unknown_fields.iter().collect();
+        unknown_fields.sort_by_key(|(field_num, _)| *field_num);
+        
+        for (field_number, count) in unknown_fields {
+            writer.writeln(&format!("  Field #{}: {} occurrences", field_number, count))?;
+        }
+        writer.writeln("")?;
     }
     
     writer.writeln("================================================")?;
@@ -656,12 +487,6 @@ fn print_data_pack_details_unified(writer: &mut OutputWriter, data_pack: &DataPa
             proto::alstromeria::data_pack::Control::Data(data) => {
                 writer.writeln(&format!("    Type: Data, Value: {}", data))?;
             }
-            proto::alstromeria::data_pack::Control::Close(close) => {
-                writer.writeln(&format!("    Type: Close, Cause: {}", close.cause))?;
-            }
-            proto::alstromeria::data_pack::Control::Ping(ping) => {
-                writer.writeln(&format!("    Type: Ping, Value: {}", ping))?;
-            }
             proto::alstromeria::data_pack::Control::Pong(pong) => {
                 writer.writeln(&format!("    Type: Pong, Value: {}", pong))?;
             }
@@ -683,70 +508,8 @@ fn print_data_pack_details_unified(writer: &mut OutputWriter, data_pack: &DataPa
             if let Some(message) = &frame.message {
                 use proto::alstromeria::data_frame::Message;
                 match message {
-                    Message::AuthorizeRequest(req) => {
-                        writer.writeln(&format!("      Message: AuthorizeRequest (token: {} bytes)", req.token.len()))?;
-                    }
-                    Message::CreateRoomRequest(req) => {
-                        writer.writeln(&format!("      Message: CreateRoomRequest (room_id: {:?})", 
-                            String::from_utf8_lossy(&req.room_id)))?;
-                    }
-                    Message::JoinRoomRequest(req) => {
-                        writer.writeln(&format!("      Message: JoinRoomRequest (room_id: {:?}, methods: {:?})", 
-                            String::from_utf8_lossy(&req.room_id), req.methods))?;
-                    }
-                    Message::InstantiateObjectRequest(req) => {
-                        let target_desc = format_target_type(&req.target);
-                        writer.writeln(&format!("      Message: InstantiateObjectRequest"))?;
-                        writer.writeln(&format!("        Object ID: {}", req.object_id))?;
-                        writer.writeln(&format!("        Prefab Name: {:?}", String::from_utf8_lossy(&req.prefab_name)))?;
-                        writer.writeln(&format!("        Target: {}", target_desc))?;
-                        if !req.init_data.is_empty() {
-                            writer.writeln(&format!("        Init Data: {} bytes", req.init_data.len()))?;
-                            let init_data_hex = req.init_data.iter()
-                                .take(32)
-                                .map(|b| format!("{:02x}", b))
-                                .collect::<Vec<_>>()
-                                .join(" ");
-                            writer.writeln(&format!("        Init Data (first {} bytes): {}", 
-                                32.min(req.init_data.len()), init_data_hex))?;
-                        }
-                    }
-                    Message::UpdateObjectRequest(req) => {
-                        let target_desc = format_update_object_request_target(&req.target);
-                        writer.writeln(&format!("      Message: UpdateObjectRequest"))?;
-                        writer.writeln(&format!("        Object ID: {}", req.object_id))?;
-                        writer.writeln(&format!("        Method: {}", req.method))?;
-                        writer.writeln(&format!("        Target: {}", target_desc))?;
-                        if !req.payload.is_empty() {
-                            writer.writeln(&format!("        Payload: {} bytes", req.payload.len()))?;
-                            let payload_hex = req.payload.iter()
-                                .take(32)
-                                .map(|b| format!("{:02x}", b))
-                                .collect::<Vec<_>>()
-                                .join(" ");
-                            writer.writeln(&format!("        Payload (first {} bytes): {}", 
-                                32.min(req.payload.len()), payload_hex))?;
-                        }
-                    }
-                    Message::DestroyObjectRequest(req) => {
-                        writer.writeln(&format!("      Message: DestroyObjectRequest (object_id: {})", req.object_id))?;
-                    }
-                    Message::LeaveRoomRequest(_) => {
-                        writer.writeln("      Message: LeaveRoomRequest")?;
-                    }
-                    Message::DeleteRoomRequest(req) => {
-                        writer.writeln(&format!("      Message: DeleteRoomRequest (room_id: {:?})", 
-                            String::from_utf8_lossy(&req.room_id)))?;
-                    }
-                    Message::DebugMessage(msg) => {
-                        writer.writeln(&format!("      Message: DebugMessage (device_time: {}, text: {:?})", 
-                            msg.device_time, String::from_utf8_lossy(&msg.text)))?;
-                    }
-                    Message::Nop(_) => {
-                        writer.writeln("      Message: Nop")?;
-                    }
                     Message::InstantiateObject(obj) => {
-                        let target_desc = format_target_type_with_player(&obj.target);
+                        let target_desc = format_instantiate_object_target(&obj.target);
                         writer.writeln(&format!("      Message: InstantiateObject"))?;
                         writer.writeln(&format!("        Object ID: {}", obj.object_id))?;
                         writer.writeln(&format!("        Owner ID: {:?}", String::from_utf8_lossy(&obj.owner_id)))?;
@@ -791,14 +554,6 @@ fn print_data_pack_details_unified(writer: &mut OutputWriter, data_pack: &DataPa
                         writer.writeln(&format!("      Message: AuthorizeResponse (player_id: {:?}, role: {})", 
                             String::from_utf8_lossy(&resp.player_id), resp.role))?;
                     }
-                    Message::CreateRoomResponse(resp) => {
-                        if let Some(room) = &resp.room {
-                            writer.writeln(&format!("      Message: CreateRoomResponse (room_id: {:?})", 
-                                String::from_utf8_lossy(&room.id)))?;
-                        } else {
-                            writer.writeln("      Message: CreateRoomResponse (no room)")?;
-                        }
-                    }
                     Message::JoinRoomResponse(resp) => {
                         if let Some(room) = &resp.room {
                             writer.writeln(&format!("      Message: JoinRoomResponse (room_id: {:?}, joined_at: {})", 
@@ -806,36 +561,6 @@ fn print_data_pack_details_unified(writer: &mut OutputWriter, data_pack: &DataPa
                         } else {
                             writer.writeln(&format!("      Message: JoinRoomResponse (joined_at: {})", resp.joined_at))?;
                         }
-                    }
-                    Message::LeaveRoomResponse(_) => {
-                        writer.writeln("      Message: LeaveRoomResponse")?;
-                    }
-                    Message::DeleteRoomResponse(_) => {
-                        writer.writeln("      Message: DeleteRoomResponse")?;
-                    }
-                    Message::LiveStatus(live) => {
-                        writer.writeln(&format!("      Message: LiveStatus (room_id: {:?}, status: {:?})", 
-                            String::from_utf8_lossy(&live.room_id), live.status()))?;
-                    }
-                    Message::PodClose(close) => {
-                        writer.writeln(&format!("      Message: PodClose (cause: {})", close.cause))?;
-                    }
-                    Message::UpdateOperatorSource(update) => {
-                        writer.writeln(&format!("      Message: UpdateOperatorSource (urls: {:?})", 
-                            update.src_urls.iter().map(|url| String::from_utf8_lossy(url)).collect::<Vec<_>>()))?;
-                    }
-                    Message::LiveRoom(room) => {
-                        writer.writeln(&format!("      Message: LiveRoom (id: {:?})", 
-                            String::from_utf8_lossy(&room.id)))?;
-                    }
-                    Message::LivePlayerStatus(status) => {
-                        writer.writeln(&format!("      Message: LivePlayerStatus ({:?})", status))?;
-                    }
-                    Message::ErrorCode(code) => {
-                        writer.writeln(&format!("      Message: ErrorCode ({})", code))?;
-                    }
-                    Message::ErrorMessage(msg) => {
-                        writer.writeln(&format!("      Message: ErrorMessage ({:?})", String::from_utf8_lossy(msg)))?;
                     }
                 }
             } else {
@@ -882,6 +607,7 @@ impl ProtoPacketReader {
                     
                     // Update statistics
                     stats.update_from_packet(&packet.data_pack);
+                    stats.update_from_raw_data(&packet.raw_data);
                     
                     format_packet_unified(
                         writer,
@@ -1062,6 +788,7 @@ impl MixedPacketReader {
                     if let Some(data_pack) = &packet.data_pack {
                         stats.update_from_packet(data_pack);
                     }
+                    stats.update_from_raw_data(&packet.raw_data);
                     
                     let (format_desc, length, timestamp) = match &packet.format {
                         MixedPacketFormat::ProtobufFormat { length, unused } => {
@@ -1307,12 +1034,6 @@ fn format_data_pack(data_pack: &DataPack, indent_level: usize) -> String {
             proto::alstromeria::data_pack::Control::Data(data) => {
                 output.push_str(&format!("Data({})\n", data));
             }
-            proto::alstromeria::data_pack::Control::Close(close) => {
-                output.push_str(&format!("Close(cause: {})\n", close.cause));
-            }
-            proto::alstromeria::data_pack::Control::Ping(ping) => {
-                output.push_str(&format!("Ping({})\n", ping));
-            }
             proto::alstromeria::data_pack::Control::Pong(pong) => {
                 output.push_str(&format!("Pong({})\n", pong));
             }
@@ -1345,46 +1066,8 @@ fn format_data_frame(frame: &proto::alstromeria::DataFrame, indent_level: usize)
         
         output.push_str(&format!("{}Message: ", indent));
         match message {
-            Message::AuthorizeRequest(req) => {
-                output.push_str(&format!("AuthorizeRequest(token: {} bytes)\n", req.token.len()));
-            }
-            Message::CreateRoomRequest(req) => {
-                output.push_str(&format!("CreateRoomRequest(room_id: {:?})\n", 
-                    String::from_utf8_lossy(&req.room_id)));
-            }
-            Message::JoinRoomRequest(req) => {
-                output.push_str(&format!("JoinRoomRequest(room_id: {:?}, methods: {:?})\n", 
-                    String::from_utf8_lossy(&req.room_id), req.methods));
-            }
-            Message::InstantiateObjectRequest(req) => {
-                let target_desc = format_target_type(&req.target);
-                output.push_str(&format!("InstantiateObjectRequest(object_id: {}, prefab: {:?}, target: {})\n", 
-                    req.object_id, String::from_utf8_lossy(&req.prefab_name), target_desc));
-            }
-            Message::UpdateObjectRequest(req) => {
-                let target_desc = format_update_object_request_target(&req.target);
-                output.push_str(&format!("UpdateObjectRequest(object_id: {}, method: {}, target: {})\n", 
-                    req.object_id, req.method, target_desc));
-            }
-            Message::DestroyObjectRequest(req) => {
-                output.push_str(&format!("DestroyObjectRequest(object_id: {})\n", req.object_id));
-            }
-            Message::LeaveRoomRequest(_) => {
-                output.push_str("LeaveRoomRequest\n");
-            }
-            Message::DeleteRoomRequest(req) => {
-                output.push_str(&format!("DeleteRoomRequest(room_id: {:?})\n", 
-                    String::from_utf8_lossy(&req.room_id)));
-            }
-            Message::DebugMessage(msg) => {
-                output.push_str(&format!("DebugMessage(device_time: {}, text: {:?})\n", 
-                    msg.device_time, String::from_utf8_lossy(&msg.text)));
-            }
-            Message::Nop(_) => {
-                output.push_str("Nop\n");
-            }
             Message::InstantiateObject(obj) => {
-                let target_desc = format_target_type_with_player(&obj.target);
+                let target_desc = format_instantiate_object_target(&obj.target);
                 output.push_str(&format!("InstantiateObject(object_id: {}, owner: {:?}, prefab: {:?}, target: {})\n", 
                     obj.object_id, String::from_utf8_lossy(&obj.owner_id), 
                     String::from_utf8_lossy(&obj.prefab_name), target_desc));
@@ -1405,14 +1088,6 @@ fn format_data_frame(frame: &proto::alstromeria::DataFrame, indent_level: usize)
                 output.push_str(&format!("AuthorizeResponse(player_id: {:?}, role: {})\n", 
                     String::from_utf8_lossy(&resp.player_id), resp.role));
             }
-            Message::CreateRoomResponse(resp) => {
-                if let Some(room) = &resp.room {
-                    output.push_str(&format!("CreateRoomResponse(room_id: {:?})\n", 
-                        String::from_utf8_lossy(&room.id)));
-                } else {
-                    output.push_str("CreateRoomResponse(no room)\n");
-                }
-            }
             Message::JoinRoomResponse(resp) => {
                 if let Some(room) = &resp.room {
                     output.push_str(&format!("JoinRoomResponse(room_id: {:?}, joined_at: {})\n", 
@@ -1420,36 +1095,6 @@ fn format_data_frame(frame: &proto::alstromeria::DataFrame, indent_level: usize)
                 } else {
                     output.push_str(&format!("JoinRoomResponse(joined_at: {})\n", resp.joined_at));
                 }
-            }
-            Message::LeaveRoomResponse(_) => {
-                output.push_str("LeaveRoomResponse\n");
-            }
-            Message::DeleteRoomResponse(_) => {
-                output.push_str("DeleteRoomResponse\n");
-            }
-            Message::LiveStatus(live) => {
-                output.push_str(&format!("LiveStatus(room_id: {:?}, status: {:?})\n", 
-                    String::from_utf8_lossy(&live.room_id), live.status()));
-            }
-            Message::PodClose(close) => {
-                output.push_str(&format!("PodClose(cause: {})\n", close.cause));
-            }
-            Message::UpdateOperatorSource(update) => {
-                output.push_str(&format!("UpdateOperatorSource(urls: {:?})\n", 
-                    update.src_urls.iter().map(|url| String::from_utf8_lossy(url)).collect::<Vec<_>>()));
-            }
-            Message::LiveRoom(room) => {
-                output.push_str(&format!("LiveRoom(id: {:?})\n", 
-                    String::from_utf8_lossy(&room.id)));
-            }
-            Message::LivePlayerStatus(status) => {
-                output.push_str(&format!("LivePlayerStatus({:?})\n", status));
-            }
-            Message::ErrorCode(code) => {
-                output.push_str(&format!("ErrorCode({})\n", code));
-            }
-            Message::ErrorMessage(msg) => {
-                output.push_str(&format!("ErrorMessage({:?})\n", String::from_utf8_lossy(msg)));
             }
         }
     }
