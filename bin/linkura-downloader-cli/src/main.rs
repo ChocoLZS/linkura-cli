@@ -12,7 +12,7 @@ i18n::init!();
 
 use linkura_downloader::{AlsDownloader, BaseDownloader, MrsDownloader, R2Uploader};
 use linkura_common::log;
-use linkura_packet::als::proto;
+use linkura_packet::als::{proto, converter::AlsConverter};
 use url::Url;
 
 
@@ -106,12 +106,23 @@ pub struct ArgsSync {
     pub delete_after_done: bool,
 }
 
+#[derive(Debug, ClapArgs)]
+pub struct ArgsConvert {
+    #[clap(short('i'), long = "input", value_name = "INPUT_FILE", help = "Input mixed format file path")]
+    pub input_file: String,
+    #[clap(short('o'), long = "output", value_name = "OUTPUT_DIR", help = "Output directory for converted segments", default_value = "output")]
+    pub output_dir: String,
+    #[clap(short('d'), long = "duration", value_name = "SECONDS", help = "Segment duration in seconds", default_value = "10")]
+    pub segment_duration: u64,
+}
+
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     Download(ArgsDownload),
     Upload(ArgsUpload),
     Sync(ArgsSync),
     Analyze(ArgsAnalyze),
+    Convert(ArgsConvert),
 }
 
 #[tokio::main]
@@ -309,6 +320,32 @@ async fn main() -> Result<()> {
             }).await??;
             
             info!("✅ ALS packet analysis completed successfully!");
+        },
+        Some(Commands::Convert(ref convert_args)) => {
+            info!("🔄 Starting ALS conversion from mixed to standard format");
+            info!("📂 Input file: {}", convert_args.input_file);
+            info!("📁 Output directory: {}", convert_args.output_dir);
+            info!("⏱️ Segment duration: {} seconds", convert_args.segment_duration);
+
+            let input_path = std::path::Path::new(&convert_args.input_file);
+            if !input_path.exists() {
+                return Err(Error::msg(format!("Input file does not exist: {}", convert_args.input_file)));
+            }
+            
+            // Convert async context to sync for the conversion
+            let _result = tokio::task::spawn_blocking({
+                let input_file = convert_args.input_file.clone();
+                let output_dir = convert_args.output_dir.clone();
+                let segment_duration = convert_args.segment_duration;
+                
+                move || {
+                    let converter = AlsConverter::new(segment_duration);
+                    converter.convert_mixed_to_standard(&input_file, &output_dir)
+                }
+            }).await??;
+            
+            info!("✅ ALS conversion completed successfully!");
+            info!("📄 Output files written to: {}", convert_args.output_dir);
         },
         None => {},
     }
