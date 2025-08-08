@@ -4,7 +4,7 @@ use crate::als::proto::{
     }, MixedPacketInfo, MixedPacketReader, PacketInfo
 };
 use anyhow::{anyhow, Context, Result};
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::{DateTime, FixedOffset, TimeDelta, TimeZone, Utc};
 use p256::elliptic_curve::generic_array::sequence;
 use prost::Message;
 use std::{cell::Ref, fs::{DirEntry, File}, time::Duration};
@@ -62,13 +62,13 @@ impl AlsConverter {
             }
         }
         // calculate the last segment durations for first and last
-        let last_segment = segment_builder.segments.last_mut().unwrap();
+        let last_segment = context.segment_builder.segments.last_mut().unwrap();
         last_segment.duration = (|| {
             let last_timestamp = last_segment.packets.last().unwrap().timestamp;
             let first_timestamp = last_segment.packets.first().unwrap().timestamp;
             (last_timestamp - first_timestamp).num_microseconds().unwrap_or(0) as f64 / 1_000_000.0
         })();
-        segment_builder.write_to_file(output_dir)?;
+        context.segment_builder.write_to_file(output_dir, &context)?;
         Ok(())
     }
 
@@ -268,6 +268,7 @@ impl SegmentBuilder {
     pub fn write_to_file<P: AsRef<Path>>(
         &self,
         output_dir: P,
+        context: &ConversionContext,
     ) -> Result<()> {
         let output_dir = output_dir.as_ref();
         std::fs::create_dir_all(output_dir)?;
@@ -298,7 +299,24 @@ impl SegmentBuilder {
         writeln!(m3u8_file, "#EXT-X-ENDLIST")?;
 
         // metadata file
-        // let metadata_file_path = output_dir.join("index.md");
+        let metadata_file_path = output_dir.join("index.md");
+        let mut metadata_file = File::create(&metadata_file_path)
+            .with_context(|| format!("Failed to create metadata file: {:?}", metadata_file_path))?;
+        let jst_offset = FixedOffset::east_opt(9 * 3600).unwrap();
+        let live_started_at = chrono::DateTime::<Utc>::from_timestamp_micros(context.data_room.started_at)
+            .unwrap_or_else(|| Utc::now()).with_timezone(&jst_offset).to_rfc3339();
+        let joined_room_at = self.segments.first().unwrap()
+                                        .packets.first().unwrap()
+                                        .timestamp.with_timezone(&jst_offset).to_rfc3339();
+        let metadata = serde_json::json!({
+            "path": "/",
+            "room_id": std::str::from_utf8(&context.data_room.id)
+                .unwrap_or("unknown_room_id"),
+            "playlist_file": "index.m3u8",
+            "live_started_at": live_started_at,
+            "joined_room_at": joined_room_at,
+        });
+        writeln!(metadata_file, "{}", metadata.to_string())?;
 
         Ok(())
     }
@@ -374,6 +392,7 @@ impl<'a> ConversionContext<'a> {
             }
             data_frame::Message::Room(msg) => {
                 self.data_room.clone_from(&msg);
+                // self.data_room.id = "default-114514".as_bytes().to_vec();
             }
             _ => {}
         }
