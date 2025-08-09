@@ -12,7 +12,7 @@ on:
         required: true
         options:
           - linkura-cli
-          - linkura-downloader-cli
+          - linkura-motion-cli
         default: linkura-cli
       create_release:
         type: boolean

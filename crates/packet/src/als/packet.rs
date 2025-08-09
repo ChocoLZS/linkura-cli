@@ -1,6 +1,7 @@
 use anyhow::Result;
 use std::io::Write;
 use std::net::TcpStream;
+
 // protobuf format, but we do not use protobuf in this project.
 // instead we use a custom format
 static MAGIC_DELIMITER: [u8; 3] = [0x00, 0x82, 0x01];

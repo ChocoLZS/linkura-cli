@@ -12,21 +12,22 @@ i18n::init!();
 
 use linkura_downloader::{AlsDownloader, BaseDownloader, MrsDownloader, R2Uploader};
 use linkura_common::log;
+use linkura_packet::als::{proto, proto_diff, converter::AlsConverter};
 use url::Url;
 
 
 /** ARG PARSER **/
 #[derive(Parser, Debug)]
+#[clap(version)]
 #[command(
     name = "linkura-downloader-cli",
-    version = "0.0.3",
     author = "ChocoLZS, chocoielzs@outlook.com",
-    about = t!("downloader.cli.about").to_string(),
+    about = t!("motion.cli.about").to_string(),
     // long_about = None,
     bin_name = "linkura-downloader-cli",
 )]
 pub struct Args {
-    #[clap(short('q'), long = "quiet", help = t!("downloader.cli.args.quiet").to_string(), default_value = "false")]
+    #[clap(short('q'), long = "quiet", help = t!("motion.cli.args.quiet").to_string(), default_value = "false")]
     pub quiet: bool,
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -34,63 +35,87 @@ pub struct Args {
 
 #[derive(Debug, ClapArgs)]
 pub struct ArgsDownload {
-    #[clap(short('t'), long = "type", value_name = "TYPE", help = t!("downloader.cli.command.download.args.type").to_string())]
+    #[clap(short('t'), long = "type", value_name = "TYPE", help = t!("motion.cli.command.download.args.type").to_string())]
     pub download_type: Option<String>,
-    #[clap(short('d'),long = "directory",value_name = "DIRECTORY",help = t!("downloader.cli.command.download.args.directory").to_string())]
+    #[clap(short('d'),long = "directory",value_name = "DIRECTORY",help = t!("motion.cli.command.download.args.directory").to_string())]
     pub download_directory: Option<String>,
-    #[clap(value_name = "URL",help = t!("downloader.cli.command.download.args.url").to_string())]
+    #[clap(value_name = "URL",help = t!("motion.cli.command.download.args.url").to_string())]
     pub download_url: String,
-    #[clap(short('p'), long = "parallel", help = t!("downloader.cli.command.download.args.parallel").to_string(), default_value = "16")]
+    #[clap(short('p'), long = "parallel", help = t!("motion.cli.command.download.args.parallel").to_string(), default_value = "16")]
     pub parallel: usize,
 }
 
 #[derive(Debug, ClapArgs)]
 pub struct ArgsUpload {
-    #[clap(short('b'), long = "bucket", value_name = "BUCKET", help = t!("downloader.cli.command.upload.args.bucket").to_string())]
+    #[clap(short('b'), long = "bucket", value_name = "BUCKET", help = t!("motion.cli.command.upload.args.bucket").to_string())]
     pub bucket: Option<String>,
-    #[clap(short('a'), long = "account-id", value_name = "ACCOUNT_ID", help = t!("downloader.cli.command.upload.args.account_id").to_string())]
+    #[clap(short('a'), long = "account-id", value_name = "ACCOUNT_ID", help = t!("motion.cli.command.upload.args.account_id").to_string())]
     pub account_id: Option<String>,
-    #[clap(short('k'), long = "access-key", value_name = "ACCESS_KEY", help = t!("downloader.cli.command.upload.args.access_key").to_string())]
+    #[clap(short('k'), long = "access-key", value_name = "ACCESS_KEY", help = t!("motion.cli.command.upload.args.access_key").to_string())]
     pub access_key: Option<String>,
-    #[clap(short('s'), long = "secret-key", value_name = "SECRET_KEY", help = t!("downloader.cli.command.upload.args.secret_key").to_string())]
+    #[clap(short('s'), long = "secret-key", value_name = "SECRET_KEY", help = t!("motion.cli.command.upload.args.secret_key").to_string())]
     pub secret_key: Option<String>,
-    #[clap(short('f'), long = "path", value_name = "PATH", help = t!("downloader.cli.command.upload.args.path").to_string())]
+    #[clap(short('f'), long = "path", value_name = "PATH", help = t!("motion.cli.command.upload.args.path").to_string())]
     pub path: String,
-    #[clap(short('p'), long = "prefix", value_name = "PREFIX", help = t!("downloader.cli.command.upload.args.prefix").to_string())]
+    #[clap(short('p'), long = "prefix", value_name = "PREFIX", help = t!("motion.cli.command.upload.args.prefix").to_string())]
     pub prefix: Option<String>,
-    #[clap(short('c'), long = "concurrent", value_name = "CONCURRENT", help = t!("downloader.cli.command.upload.args.concurrent").to_string(), default_value = "4")]
+    #[clap(short('c'), long = "concurrent", value_name = "CONCURRENT", help = t!("motion.cli.command.upload.args.concurrent").to_string(), default_value = "4")]
     pub concurrent: usize,
+}
+
+#[derive(Debug, ClapArgs)]
+pub struct ArgsAnalyze {
+    #[clap(short('t'), long = "type", value_name = "TYPE", help = "Analysis type: 'standard', 'mixed', or 'diff'", default_value = "standard")]
+    pub analysis_type: String,
+    #[clap(short('o'), long = "output", value_name = "OUTPUT", help = "Output file path (optional)")]
+    pub output_path: Option<String>,
+    #[clap(short('c'), long = "count", value_name = "COUNT", help = "Number of packets to analyze", default_value = "8")]
+    pub packet_count: usize,
+    #[clap(value_name = "FILE", help = "Input binary file path (for diff: first file)")]
+    pub file_path: String,
+    #[clap(short('f'), long = "file2", value_name = "FILE2", help = "Second file path (required for diff mode)")]
+    pub file_path2: Option<String>,
 }
 
 #[derive(Debug, ClapArgs)]
 pub struct ArgsSync {
     // Download parameters
-    #[clap(short('t'), long = "type", value_name = "TYPE", help = t!("downloader.cli.command.download.args.type").to_string())]
+    #[clap(short('t'), long = "type", value_name = "TYPE", help = t!("motion.cli.command.download.args.type").to_string())]
     pub download_type: Option<String>,
-    #[clap(short('d'), long = "directory", value_name = "DIRECTORY", help = t!("downloader.cli.command.download.args.directory").to_string())]
+    #[clap(short('d'), long = "directory", value_name = "DIRECTORY", help = t!("motion.cli.command.download.args.directory").to_string())]
     pub download_directory: Option<String>,
-    #[clap(value_name = "URL", help = t!("downloader.cli.command.download.args.url").to_string())]
+    #[clap(value_name = "URL", help = t!("motion.cli.command.download.args.url").to_string())]
     pub download_url: String,
-    #[clap(long = "download-parallel", help = t!("downloader.cli.command.download.args.parallel").to_string(), default_value = "16")]
+    #[clap(long = "download-parallel", help = t!("motion.cli.command.download.args.parallel").to_string(), default_value = "16")]
     pub download_parallel: usize,
     
     // Upload parameters
-    #[clap(short('b'), long = "bucket", value_name = "BUCKET", help = t!("downloader.cli.command.upload.args.bucket").to_string())]
+    #[clap(short('b'), long = "bucket", value_name = "BUCKET", help = t!("motion.cli.command.upload.args.bucket").to_string())]
     pub bucket: Option<String>,
-    #[clap(short('a'), long = "account-id", value_name = "ACCOUNT_ID", help = t!("downloader.cli.command.upload.args.account_id").to_string())]
+    #[clap(short('a'), long = "account-id", value_name = "ACCOUNT_ID", help = t!("motion.cli.command.upload.args.account_id").to_string())]
     pub account_id: Option<String>,
-    #[clap(short('k'), long = "access-key", value_name = "ACCESS_KEY", help = t!("downloader.cli.command.upload.args.access_key").to_string())]
+    #[clap(short('k'), long = "access-key", value_name = "ACCESS_KEY", help = t!("motion.cli.command.upload.args.access_key").to_string())]
     pub access_key: Option<String>,
-    #[clap(short('s'), long = "secret-key", value_name = "SECRET_KEY", help = t!("downloader.cli.command.upload.args.secret_key").to_string())]
+    #[clap(short('s'), long = "secret-key", value_name = "SECRET_KEY", help = t!("motion.cli.command.upload.args.secret_key").to_string())]
     pub secret_key: Option<String>,
-    #[clap(short('p'), long = "prefix", value_name = "PREFIX", help = t!("downloader.cli.command.upload.args.prefix").to_string())]
+    #[clap(short('p'), long = "prefix", value_name = "PREFIX", help = t!("motion.cli.command.upload.args.prefix").to_string())]
     pub prefix: Option<String>,
-    #[clap(short('c'), long = "concurrent", value_name = "CONCURRENT", help = t!("downloader.cli.command.upload.args.concurrent").to_string(), default_value = "4")]
+    #[clap(short('c'), long = "concurrent", value_name = "CONCURRENT", help = t!("motion.cli.command.upload.args.concurrent").to_string(), default_value = "4")]
     pub upload_concurrent: usize,
     
     // Additional options
-    #[clap(long = "delete-after-done", help = t!("downloader.cli.command.sync.args.delete_after_done").to_string(), default_value = "true")]
+    #[clap(long = "delete-after-done", help = t!("motion.cli.command.sync.args.delete_after_done").to_string(), default_value = "true")]
     pub delete_after_done: bool,
+}
+
+#[derive(Debug, ClapArgs)]
+pub struct ArgsConvert {
+    #[clap(short('i'), long = "input", value_name = "INPUT_FILE", help = "Input mixed format file path")]
+    pub input_file: String,
+    #[clap(short('o'), long = "output", value_name = "OUTPUT_DIR", help = "Output directory for converted segments", default_value = "output")]
+    pub output_dir: String,
+    #[clap(short('d'), long = "duration", value_name = "SECONDS", help = "Segment duration in seconds", default_value = "10")]
+    pub segment_duration: u64,
 }
 
 #[derive(Subcommand, Debug)]
@@ -98,6 +123,8 @@ pub enum Commands {
     Download(ArgsDownload),
     Upload(ArgsUpload),
     Sync(ArgsSync),
+    Analyze(ArgsAnalyze),
+    Convert(ArgsConvert),
 }
 
 #[tokio::main]
@@ -255,6 +282,103 @@ async fn main() -> Result<()> {
 
             info!("✅ Sync operation completed successfully!");
             info!("🎉 Download + Upload finished!");
+        },
+        Some(Commands::Analyze(ref analyze_args)) => {
+            match analyze_args.analysis_type.as_str() {
+                "diff" => {
+                    // Handle diff analysis
+                    let file2_path = analyze_args.file_path2.as_ref()
+                        .ok_or_else(|| Error::msg("Second file path is required for diff analysis. Use --file2 option."))?;
+                    
+                    info!("🔍 Starting ALS diff analysis");
+                    info!("📂 File 1: {}", analyze_args.file_path);
+                    info!("📂 File 2: {}", file2_path);
+                    
+                    if let Some(ref output) = analyze_args.output_path {
+                        info!("📄 Output will be written to: {}", output);
+                    }
+                    
+                    // Convert async context to sync for the diff function
+                    let _result = tokio::task::spawn_blocking({
+                        let file1_path = analyze_args.file_path.clone();
+                        let file2_path = file2_path.clone();
+                        let output_path = analyze_args.output_path.clone();
+                        
+                        move || {
+                            proto_diff::diff_standard_files(&file1_path, &file2_path, output_path.as_deref())
+                        }
+                    }).await??;
+                    
+                    info!("✅ ALS diff analysis completed successfully!");
+                }
+                _ => {
+                    // Handle standard and mixed analysis
+                    info!("🔍 Starting ALS packet analysis for file: {}", analyze_args.file_path);
+                    info!("📊 Analysis type: {}, Packet count: {}", analyze_args.analysis_type, analyze_args.packet_count);
+                    
+                    if let Some(ref output) = analyze_args.output_path {
+                        info!("📄 Output will be written to: {}", output);
+                    }
+                    
+                    // Convert async context to sync for the analysis functions
+                    let _result = tokio::task::spawn_blocking({
+                        let file_path = analyze_args.file_path.clone();
+                        let output_path = analyze_args.output_path.clone();
+                        let packet_count = analyze_args.packet_count;
+                        let analysis_type = analyze_args.analysis_type.clone();
+                        
+                        move || {
+                            match analysis_type.as_str() {
+                                "standard" => {
+                                    if let Some(output) = output_path {
+                                        proto::analyze_binary_file_with_output_and_count(&file_path, Some(&output), packet_count)
+                                    } else {
+                                        proto::analyze_binary_file_with_count(&file_path, packet_count)
+                                    }
+                                }
+                                "mixed" => {
+                                    if let Some(output) = output_path {
+                                        proto::analyze_mixed_binary_file_with_output_and_count(&file_path, Some(&output), packet_count)
+                                    } else {
+                                        proto::analyze_mixed_binary_file_with_count(&file_path, packet_count)
+                                    }
+                                }
+                                _ => {
+                                    Err(anyhow::anyhow!("Unknown analysis type: {}. Use 'standard', 'mixed', or 'diff'", analysis_type))
+                                }
+                            }
+                        }
+                    }).await??;
+                    
+                    info!("✅ ALS packet analysis completed successfully!");
+                }
+            }
+        },
+        Some(Commands::Convert(ref convert_args)) => {
+            info!("🔄 Starting ALS conversion from mixed to standard format");
+            info!("📂 Input file: {}", convert_args.input_file);
+            info!("📁 Output directory: {}", convert_args.output_dir);
+            info!("⏱️ Segment duration: {} seconds", convert_args.segment_duration);
+
+            let input_path = std::path::Path::new(&convert_args.input_file);
+            if !input_path.exists() {
+                return Err(Error::msg(format!("Input file does not exist: {}", convert_args.input_file)));
+            }
+            
+            // Convert async context to sync for the conversion
+            let _result = tokio::task::spawn_blocking({
+                let input_file = convert_args.input_file.clone();
+                let output_dir = convert_args.output_dir.clone();
+                let segment_duration = convert_args.segment_duration;
+                
+                move || {
+                    let converter = AlsConverter::new(segment_duration);
+                    converter.convert_mixed_to_standard(&input_file, &output_dir)
+                }
+            }).await??;
+            
+            info!("✅ ALS conversion completed successfully!");
+            info!("📄 Output files written to: {}", convert_args.output_dir);
         },
         None => {},
     }
