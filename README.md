@@ -24,17 +24,3 @@
 
     - 他人基于本仓库内容进行的二次开发或商业行为产生的后果。
 
-## Workflow
-
-```mermaid
-flowchart TD
-    A[linkura-cli] --> B{Check config file exist}
-    B -->|Y| C[Prepare]
-    B -->|N| E[Prompt for username]
-    E --> F[Prompt for password]
-    F --> G[Login]
-    G --> H[Save token]
-    H --> C
-    C --> I{Run command}
-    I --> N[Return result]
-```
