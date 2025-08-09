@@ -86,11 +86,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      # - name: Setup | Protoc
-      #   uses: arduino/setup-protoc@v3
-      #   with:
-      #     repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup | Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup | Environment [musl]
         if: matrix.target == 'x86_64-unknown-linux-musl'
