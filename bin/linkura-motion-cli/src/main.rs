@@ -22,12 +22,12 @@ use url::Url;
 #[command(
     name = "linkura-downloader-cli",
     author = "ChocoLZS, chocoielzs@outlook.com",
-    about = t!("downloader.cli.about").to_string(),
+    about = t!("motion.cli.about").to_string(),
     // long_about = None,
     bin_name = "linkura-downloader-cli",
 )]
 pub struct Args {
-    #[clap(short('q'), long = "quiet", help = t!("downloader.cli.args.quiet").to_string(), default_value = "false")]
+    #[clap(short('q'), long = "quiet", help = t!("motion.cli.args.quiet").to_string(), default_value = "false")]
     pub quiet: bool,
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -35,31 +35,31 @@ pub struct Args {
 
 #[derive(Debug, ClapArgs)]
 pub struct ArgsDownload {
-    #[clap(short('t'), long = "type", value_name = "TYPE", help = t!("downloader.cli.command.download.args.type").to_string())]
+    #[clap(short('t'), long = "type", value_name = "TYPE", help = t!("motion.cli.command.download.args.type").to_string())]
     pub download_type: Option<String>,
-    #[clap(short('d'),long = "directory",value_name = "DIRECTORY",help = t!("downloader.cli.command.download.args.directory").to_string())]
+    #[clap(short('d'),long = "directory",value_name = "DIRECTORY",help = t!("motion.cli.command.download.args.directory").to_string())]
     pub download_directory: Option<String>,
-    #[clap(value_name = "URL",help = t!("downloader.cli.command.download.args.url").to_string())]
+    #[clap(value_name = "URL",help = t!("motion.cli.command.download.args.url").to_string())]
     pub download_url: String,
-    #[clap(short('p'), long = "parallel", help = t!("downloader.cli.command.download.args.parallel").to_string(), default_value = "16")]
+    #[clap(short('p'), long = "parallel", help = t!("motion.cli.command.download.args.parallel").to_string(), default_value = "16")]
     pub parallel: usize,
 }
 
 #[derive(Debug, ClapArgs)]
 pub struct ArgsUpload {
-    #[clap(short('b'), long = "bucket", value_name = "BUCKET", help = t!("downloader.cli.command.upload.args.bucket").to_string())]
+    #[clap(short('b'), long = "bucket", value_name = "BUCKET", help = t!("motion.cli.command.upload.args.bucket").to_string())]
     pub bucket: Option<String>,
-    #[clap(short('a'), long = "account-id", value_name = "ACCOUNT_ID", help = t!("downloader.cli.command.upload.args.account_id").to_string())]
+    #[clap(short('a'), long = "account-id", value_name = "ACCOUNT_ID", help = t!("motion.cli.command.upload.args.account_id").to_string())]
     pub account_id: Option<String>,
-    #[clap(short('k'), long = "access-key", value_name = "ACCESS_KEY", help = t!("downloader.cli.command.upload.args.access_key").to_string())]
+    #[clap(short('k'), long = "access-key", value_name = "ACCESS_KEY", help = t!("motion.cli.command.upload.args.access_key").to_string())]
     pub access_key: Option<String>,
-    #[clap(short('s'), long = "secret-key", value_name = "SECRET_KEY", help = t!("downloader.cli.command.upload.args.secret_key").to_string())]
+    #[clap(short('s'), long = "secret-key", value_name = "SECRET_KEY", help = t!("motion.cli.command.upload.args.secret_key").to_string())]
     pub secret_key: Option<String>,
-    #[clap(short('f'), long = "path", value_name = "PATH", help = t!("downloader.cli.command.upload.args.path").to_string())]
+    #[clap(short('f'), long = "path", value_name = "PATH", help = t!("motion.cli.command.upload.args.path").to_string())]
     pub path: String,
-    #[clap(short('p'), long = "prefix", value_name = "PREFIX", help = t!("downloader.cli.command.upload.args.prefix").to_string())]
+    #[clap(short('p'), long = "prefix", value_name = "PREFIX", help = t!("motion.cli.command.upload.args.prefix").to_string())]
     pub prefix: Option<String>,
-    #[clap(short('c'), long = "concurrent", value_name = "CONCURRENT", help = t!("downloader.cli.command.upload.args.concurrent").to_string(), default_value = "4")]
+    #[clap(short('c'), long = "concurrent", value_name = "CONCURRENT", help = t!("motion.cli.command.upload.args.concurrent").to_string(), default_value = "4")]
     pub concurrent: usize,
 }
 
@@ -80,31 +80,31 @@ pub struct ArgsAnalyze {
 #[derive(Debug, ClapArgs)]
 pub struct ArgsSync {
     // Download parameters
-    #[clap(short('t'), long = "type", value_name = "TYPE", help = t!("downloader.cli.command.download.args.type").to_string())]
+    #[clap(short('t'), long = "type", value_name = "TYPE", help = t!("motion.cli.command.download.args.type").to_string())]
     pub download_type: Option<String>,
-    #[clap(short('d'), long = "directory", value_name = "DIRECTORY", help = t!("downloader.cli.command.download.args.directory").to_string())]
+    #[clap(short('d'), long = "directory", value_name = "DIRECTORY", help = t!("motion.cli.command.download.args.directory").to_string())]
     pub download_directory: Option<String>,
-    #[clap(value_name = "URL", help = t!("downloader.cli.command.download.args.url").to_string())]
+    #[clap(value_name = "URL", help = t!("motion.cli.command.download.args.url").to_string())]
     pub download_url: String,
-    #[clap(long = "download-parallel", help = t!("downloader.cli.command.download.args.parallel").to_string(), default_value = "16")]
+    #[clap(long = "download-parallel", help = t!("motion.cli.command.download.args.parallel").to_string(), default_value = "16")]
     pub download_parallel: usize,
     
     // Upload parameters
-    #[clap(short('b'), long = "bucket", value_name = "BUCKET", help = t!("downloader.cli.command.upload.args.bucket").to_string())]
+    #[clap(short('b'), long = "bucket", value_name = "BUCKET", help = t!("motion.cli.command.upload.args.bucket").to_string())]
     pub bucket: Option<String>,
-    #[clap(short('a'), long = "account-id", value_name = "ACCOUNT_ID", help = t!("downloader.cli.command.upload.args.account_id").to_string())]
+    #[clap(short('a'), long = "account-id", value_name = "ACCOUNT_ID", help = t!("motion.cli.command.upload.args.account_id").to_string())]
     pub account_id: Option<String>,
-    #[clap(short('k'), long = "access-key", value_name = "ACCESS_KEY", help = t!("downloader.cli.command.upload.args.access_key").to_string())]
+    #[clap(short('k'), long = "access-key", value_name = "ACCESS_KEY", help = t!("motion.cli.command.upload.args.access_key").to_string())]
     pub access_key: Option<String>,
-    #[clap(short('s'), long = "secret-key", value_name = "SECRET_KEY", help = t!("downloader.cli.command.upload.args.secret_key").to_string())]
+    #[clap(short('s'), long = "secret-key", value_name = "SECRET_KEY", help = t!("motion.cli.command.upload.args.secret_key").to_string())]
     pub secret_key: Option<String>,
-    #[clap(short('p'), long = "prefix", value_name = "PREFIX", help = t!("downloader.cli.command.upload.args.prefix").to_string())]
+    #[clap(short('p'), long = "prefix", value_name = "PREFIX", help = t!("motion.cli.command.upload.args.prefix").to_string())]
     pub prefix: Option<String>,
-    #[clap(short('c'), long = "concurrent", value_name = "CONCURRENT", help = t!("downloader.cli.command.upload.args.concurrent").to_string(), default_value = "4")]
+    #[clap(short('c'), long = "concurrent", value_name = "CONCURRENT", help = t!("motion.cli.command.upload.args.concurrent").to_string(), default_value = "4")]
     pub upload_concurrent: usize,
     
     // Additional options
-    #[clap(long = "delete-after-done", help = t!("downloader.cli.command.sync.args.delete_after_done").to_string(), default_value = "true")]
+    #[clap(long = "delete-after-done", help = t!("motion.cli.command.sync.args.delete_after_done").to_string(), default_value = "true")]
     pub delete_after_done: bool,
 }
 

@@ -1,19 +1,19 @@
 # eng is trick for rust_i18n
 
 _version: 2
-downloader:
+motion:
   cli:
     about:
-      zh: "林库拉的动捕回放下载器"
-      ja: "リンクラの動捕再生ダウンローダー"
-      eng: "Linkura Motion Capture Playback Downloader"
+      zh: "林库拉的动捕回放处理工具"
+      ja: "リンクラの動捕再生処理ツール"
+      eng: "Linkura Motion Capture Playback Processing Tool"
     args:
       quiet:
         zh: '静默模式，默认是关闭'
         ja: 'サイレントモード、デフォルトはオフです'
         eng: 'Quiet mode, default is off'
 
-downloader.cli.command.download:
+motion.cli.command.download:
   args:
     type:
       zh: '下载类型：als, mrs。默认为自动检测'
@@ -32,7 +32,7 @@ downloader.cli.command.download:
       ja: '並行ダウンロード、デフォルトは16です'
       eng: 'Parallel downloads, default is 16'
 
-downloader.cli.command.upload:
+motion.cli.command.upload:
   args:
     bucket:
       zh: 'R2 存储桶名称（或设置 R2_BUCKET 环境变量）'
