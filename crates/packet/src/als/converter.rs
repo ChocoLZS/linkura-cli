@@ -517,6 +517,7 @@ impl<'a> ConversionContext<'a> {
                             obj.target = Some(update_object::Target::RoomAll(RoomAll {
                                 room_id: self.data_room.id.clone(),
                             }));
+                            self.update_initial_dataframes(frame.clone());
                             Some(frame)
                         }
                         _ => None,
@@ -526,6 +527,10 @@ impl<'a> ConversionContext<'a> {
                 }
             })
             .collect();
+        
+        if frames.is_empty() {
+            return Ok(());
+        }
 
         let update_packet = PacketInfo {
                 timestamp,
@@ -544,6 +549,24 @@ impl<'a> ConversionContext<'a> {
             data_pack.frames.first()
         } else {
             None
+        }
+    }
+
+    fn update_initial_dataframes(&mut self, dataframe: DataFrame) {
+        if let Some(existing_frame) = self.initial_dataframes.iter_mut().find(|f| {
+            // message都是UpdateObject
+            if let (Some(existing_message), Some(new_message)) = (f.message.as_ref(), dataframe.message.as_ref()) {
+                if let (data_frame::Message::UpdateObject(existing_obj), data_frame::Message::UpdateObject(new_obj)) =
+                    (existing_message, new_message) {
+                    existing_obj.object_id == new_obj.object_id
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        }) {
+            *existing_frame = dataframe;
         }
     }
 }
