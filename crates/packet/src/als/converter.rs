@@ -402,7 +402,7 @@ impl<'a> ConversionContext<'a> {
 
     /// data packet 应该是 DataFrames(InstantiateObject|UpdateObject)
     fn process_first_dataframes_state(&mut self, data_packet: MixedPacketInfo, time_packet: MixedPacketInfo) -> Result<()> {
-        let mut timestamp = time_packet.timestamp
+        let timestamp = time_packet.timestamp
             .ok_or_else(|| anyhow!("No timestamp in time packet"))?;
         // timestamp = timestamp - TimeDelta::microseconds(92559773);
         self.initial_timestamp = timestamp;
@@ -484,7 +484,7 @@ impl<'a> ConversionContext<'a> {
                 }
             }
         }
-        let mut timestamp = time_packet.timestamp
+        let timestamp = time_packet.timestamp
             .ok_or_else(|| anyhow!("No timestamp in time packet"))?;
         // timestamp = timestamp - TimeDelta::microseconds(92559773);
         // 判断时间戳
