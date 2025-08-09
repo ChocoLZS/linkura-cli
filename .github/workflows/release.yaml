@@ -120,6 +120,7 @@ jobs:
           archive: '$bin${{ inputs.archive_suffix }}$target'
           target: ${{ matrix.target }}
           # features: ${{ inputs.features || '' }}
-          tar: none
-          zip: none
+          tar: unix
+          zip: windows
+          # asset: target/release/${{ inputs.binary_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
