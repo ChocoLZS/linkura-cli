@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Utc};
 use prost::Message;
-use std::f32::INFINITY;
+use sha2::{Sha256, Digest};
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, Write};
 
@@ -16,6 +16,13 @@ use proto::als::DataPack;
 
 use crate::als::proto::proto::als::{data_frame, DataFrame, Room};
 
+/// Calculate SHA-256 digest for binary data and return as hex string
+pub fn calculate_digest(data: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    hex::encode(hasher.finalize())
+}
+
 #[derive(Debug)]
 pub struct PacketInfo {
     pub timestamp: DateTime<Utc>,
@@ -26,6 +33,21 @@ pub struct PacketInfo {
 impl PacketInfo {
     pub fn len(&self) -> u16 {
         (self.raw_data.len() + 9) as u16
+    }
+
+    /// Calculate SHA-256 digest for the protobuf segment
+    pub fn protobuf_digest(&self) -> String {
+        calculate_digest(&self.raw_data)
+    }
+
+    /// Calculate SHA-256 digest for each DataFrame
+    pub fn frame_digests(&self) -> Vec<(usize, String)> {
+        self.data_pack.frames.iter().enumerate()
+            .map(|(index, frame)| {
+                let frame_bytes = frame.encode_to_vec();
+                (index, calculate_digest(&frame_bytes))
+            })
+            .collect()
     }
 
     pub fn create_segment_started_packet(timestamp: DateTime<Utc>) -> Self {
@@ -587,6 +609,10 @@ pub fn format_packet_unified(
     // Show protobuf field analysis for all packets containing protobuf data
     if !raw_data.is_empty() {
         writer.writeln(&format!("  Raw data length: {} bytes", raw_data.len()))?;
+        
+        // Show protobuf digest
+        let protobuf_digest = calculate_digest(raw_data);
+        writer.writeln(&format!("  Protobuf SHA-256 digest: {}", protobuf_digest))?;
 
         // Show first 32 bytes in hex
         let debug_len = 32.min(raw_data.len());
@@ -662,6 +688,12 @@ fn print_data_pack_details_unified(writer: &mut OutputWriter, data_pack: &DataPa
         writer.writeln(&format!("  Frames ({}):", data_pack.frames.len()))?;
         for (i, frame) in data_pack.frames.iter().enumerate() {
             writer.writeln(&format!("    Frame #{}: ", i + 1))?;
+            
+            // Calculate and display frame digest
+            let frame_bytes = frame.encode_to_vec();
+            let frame_digest = calculate_digest(&frame_bytes);
+            writer.writeln(&format!("      DataFrame SHA-256 digest: {}", frame_digest))?;
+            
             if let Some(message) = &frame.message {
                 use proto::als::data_frame::Message;
                 match message {

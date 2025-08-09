@@ -21,6 +21,7 @@ serde_json.workspace = true
 p256 = { version = "0.13.2", features = ["ecdh"] }
 rand_core = { version = "0.6.4", features = ["getrandom"] }
 hex.workspace = true
+sha2 = "0.10"
 
 [build-dependencies]
 prost-build.workspace = true

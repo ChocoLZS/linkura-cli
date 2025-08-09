@@ -4,10 +4,8 @@ use crate::als::proto::{
     }, MixedPacketInfo, MixedPacketReader, PacketInfo
 };
 use anyhow::{anyhow, Context, Result};
-use chrono::{DateTime, FixedOffset, TimeDelta, TimeZone, Utc};
-use p256::elliptic_curve::generic_array::sequence;
-use prost::Message;
-use std::{cell::Ref, fs::{DirEntry, File}, time::Duration};
+use chrono::{DateTime, FixedOffset, TimeDelta, Utc};
+use std::{fs::{DirEntry, File}};
 use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::fmt;
@@ -393,6 +391,7 @@ impl<'a> ConversionContext<'a> {
             data_frame::Message::Room(msg) => {
                 self.data_room.clone_from(&msg);
                 // self.data_room.id = "default-114514".as_bytes().to_vec();
+                // self.data_room.id = "".as_bytes().to_vec();
             }
             _ => {}
         }
