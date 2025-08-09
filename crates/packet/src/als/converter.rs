@@ -21,6 +21,7 @@ enum AlsConverterStateMachine {
 }
 
 pub struct AlsConverter {
+    #[allow(unused)]
     segment_duration: u64, // microseconds, default 10 seconds
 }
 
@@ -401,9 +402,9 @@ impl<'a> ConversionContext<'a> {
 
     /// data packet 应该是 DataFrames(InstantiateObject|UpdateObject)
     fn process_first_dataframes_state(&mut self, data_packet: MixedPacketInfo, time_packet: MixedPacketInfo) -> Result<()> {
-        let timestamp = time_packet.timestamp
+        let mut timestamp = time_packet.timestamp
             .ok_or_else(|| anyhow!("No timestamp in time packet"))?;
-        
+        // timestamp = timestamp - TimeDelta::microseconds(92559773);
         self.initial_timestamp = timestamp;
 
         self.segment_builder
@@ -483,8 +484,9 @@ impl<'a> ConversionContext<'a> {
                 }
             }
         }
-        let timestamp = time_packet.timestamp
+        let mut timestamp = time_packet.timestamp
             .ok_or_else(|| anyhow!("No timestamp in time packet"))?;
+        // timestamp = timestamp - TimeDelta::microseconds(92559773);
         // 判断时间戳
         if timestamp - self.initial_timestamp > DURATION {
             self.initial_timestamp += DURATION;

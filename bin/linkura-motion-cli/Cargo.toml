@@ -1,6 +1,6 @@
 [package]
-name = "linkura-downloader-cli"
-version = "0.0.3"
+name = "linkura-motion-cli"
+version = "1.0.0"
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
@@ -25,5 +25,5 @@ url.workspace = true
 
 
 [[bin]]
-name = "linkura-downloader-cli"
+name = "linkura-motion-cli"
 path = "src/main.rs"

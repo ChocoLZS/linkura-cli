@@ -1,6 +1,7 @@
 use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Utc};
 use prost::Message;
+use prost::encoding::{encode_key, encode_varint, WireType};
 use sha2::{Sha256, Digest};
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, Write};
@@ -15,6 +16,50 @@ use prost::bytes::Buf;
 use proto::als::DataPack;
 
 use crate::als::proto::proto::als::{data_frame, DataFrame, Room};
+
+/// Custom DataPack encoder that puts frames before control messages
+/// This matches the expected order that the analyzer expects
+fn encode_data_pack_custom_order(data_pack: &DataPack) -> Vec<u8> {
+    let mut buf = Vec::new();
+    
+    // Encode frames first (field number 16)
+    if !data_pack.frames.is_empty() {
+        for frame in &data_pack.frames {
+            let frame_bytes = frame.encode_to_vec();
+            encode_key(16, WireType::LengthDelimited, &mut buf);
+            encode_varint(frame_bytes.len() as u64, &mut buf);
+            buf.extend_from_slice(&frame_bytes);
+        }
+    }
+    
+    // Then encode control messages in field number order
+    if let Some(control) = &data_pack.control {
+        match control {
+            proto::als::data_pack::Control::Data(value) => {
+                // Field number 2, wire type Varint
+                encode_key(2, WireType::Varint, &mut buf);
+                encode_varint(if *value { 1 } else { 0 }, &mut buf);
+            }
+            proto::als::data_pack::Control::Pong(value) => {
+                // Field number 10, wire type Varint
+                encode_key(10, WireType::Varint, &mut buf);
+                encode_varint(if *value { 1 } else { 0 }, &mut buf);
+            }
+            proto::als::data_pack::Control::SegmentStartedAt(value) => {
+                // Field number 14, wire type Varint
+                encode_key(14, WireType::Varint, &mut buf);
+                encode_varint(*value as u64, &mut buf);
+            }
+            proto::als::data_pack::Control::CacheEnded(value) => {
+                // Field number 15, wire type Varint
+                encode_key(15, WireType::Varint, &mut buf);
+                encode_varint(if *value { 1 } else { 0 }, &mut buf);
+            }
+        }
+    }
+    
+    buf
+}
 
 /// Calculate SHA-256 digest for binary data and return as hex string
 pub fn calculate_digest(data: &[u8]) -> String {
@@ -89,13 +134,18 @@ impl PacketInfo {
 
     pub fn to_vec(&self) -> Vec<u8> {
         let mut buf = Vec::new();
-        let data_pack_bytes = self.data_pack.encode_to_vec();
+        let data_pack_bytes = self.protobuf_to_vec(); // keep bytes order
+        // let data_pack_bytes = self.data_pack.encode_to_vec(); // do not keep the bytes order but workable for replay
         let len = 9 + data_pack_bytes.len() as u16;
         buf.extend_from_slice(&len.to_be_bytes());
         buf.push(0x01); // live mark
         buf.extend_from_slice(&self.timestamp.timestamp_micros().to_be_bytes());
         buf.extend_from_slice(&data_pack_bytes);
         buf
+    }
+
+    pub fn protobuf_to_vec(&self) -> Vec<u8> {
+        encode_data_pack_custom_order(&self.data_pack)
     }
 }
 
@@ -588,6 +638,7 @@ pub fn format_packet_unified(
     timestamp: Option<DateTime<Utc>>,
     data_pack: Option<&DataPack>,
     raw_data: &[u8],
+    protobuf_data: &[u8],
     format_type: &str,
 ) -> Result<()> {
     writer.writeln(&format!(
@@ -620,6 +671,15 @@ pub fn format_packet_unified(
             "  Raw data (first {} bytes): {}",
             debug_len,
             raw_data[..debug_len]
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<Vec<_>>()
+                .join(" ")
+        ))?;
+        writer.writeln(&format!(
+            "  Protobuf data (first {} bytes): {}",
+            protobuf_data.len(),
+            protobuf_data
                 .iter()
                 .map(|b| format!("{:02x}", b))
                 .collect::<Vec<_>>()
@@ -851,7 +911,8 @@ impl ProtoPacketReader {
                             packet.len(),
                             Some(packet.timestamp),
                             Some(&packet.data_pack),
-                            &packet.raw_data,
+                            &packet.to_vec(),
+                            &packet.protobuf_to_vec(),
                             "Standard protobuf format (int16 length + int8 unused + int64 timestamp + protobuf data)"
                         )?;
                     });
@@ -1087,6 +1148,7 @@ impl MixedPacketReader {
                             timestamp,
                             packet.data_pack.as_ref(),
                             &packet.raw_data,
+                            &vec![],
                             &format_desc
                         )?;
                     });
@@ -1278,24 +1340,6 @@ impl MixedPacketReader {
             data_pack,
             raw_data: data,
         })
-    }
-
-    fn read_u16_be(&mut self) -> Result<u16> {
-        let mut buf = [0u8; 2];
-        self.reader.read_exact(&mut buf)?;
-        Ok(u16::from_be_bytes(buf))
-    }
-
-    fn read_u8(&mut self) -> Result<u8> {
-        let mut buf = [0u8; 1];
-        self.reader.read_exact(&mut buf)?;
-        Ok(buf[0])
-    }
-
-    fn read_u64_be(&mut self) -> Result<u64> {
-        let mut buf = [0u8; 8];
-        self.reader.read_exact(&mut buf)?;
-        Ok(u64::from_be_bytes(buf))
     }
 }
 

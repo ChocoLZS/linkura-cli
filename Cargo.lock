@@ -1230,8 +1230,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "linkura-downloader-cli"
-version = "0.0.3"
+name = "linkura-motion-cli"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1260,6 +1260,9 @@ dependencies = [
  "prost-build",
  "prost-types",
  "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "sha2",
  "tracing",
 ]
 

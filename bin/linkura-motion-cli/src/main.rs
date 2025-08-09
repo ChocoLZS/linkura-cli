@@ -18,9 +18,9 @@ use url::Url;
 
 /** ARG PARSER **/
 #[derive(Parser, Debug)]
+#[clap(version)]
 #[command(
     name = "linkura-downloader-cli",
-    version = "0.0.3",
     author = "ChocoLZS, chocoielzs@outlook.com",
     about = t!("downloader.cli.about").to_string(),
     // long_about = None,
