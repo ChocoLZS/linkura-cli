@@ -35,7 +35,7 @@ fn main() {
                     room_id: args.room_id.clone(),
                     token: args.token.clone(),
                 },
-                args.watch,
+                args,
             )
             .map_err(|e| {
                 tracing::error!("Error running ALS command: {}", e);

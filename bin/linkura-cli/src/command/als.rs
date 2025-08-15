@@ -3,7 +3,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-use crate::{cli, config::Global};
+use crate::{cli, config::{self, Global}};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Local, TimeDelta, Utc};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -18,7 +18,7 @@ pub struct AlsConnectionInfo {
     pub token: Option<String>,
 }
 
-pub fn run(ctx: &Global, connection_info: AlsConnectionInfo, watch_mode: bool) -> Result<()> {
+pub fn run(ctx: &Global, connection_info: AlsConnectionInfo, args: &config::ArgsALS) -> Result<()> {
     let needs_fetch_connection_info = connection_info.address.is_none()
         || connection_info.port.is_none()
         || connection_info.room_id.is_none()
@@ -32,7 +32,7 @@ pub fn run(ctx: &Global, connection_info: AlsConnectionInfo, watch_mode: bool) -
         needs_fetch_connection_info
     );
     let connection_info = if needs_fetch_connection_info {
-        fetch_connection_info(ctx, connection_info, watch_mode)?
+        fetch_connection_info(ctx, connection_info, args.watch, args.retrieve_token_interval, args.retrieve_token_advance_offset)?
     } else {
         ConnectionInfo {
             host: connection_info.address.unwrap(),
@@ -54,6 +54,8 @@ fn fetch_connection_info(
     ctx: &Global,
     connection_info: AlsConnectionInfo,
     watch_mode: bool,
+    retrieve_token_interval: u64,
+    retrieve_token_advance_offset: i64,
 ) -> Result<ConnectionInfo> {
     let api_client = &ctx.api_client;
     let plan_list = api_client.high_level().get_plan_list()?;
@@ -78,7 +80,7 @@ fn fetch_connection_info(
     );
 
     // watch mode if setting
-    let start_time_offset: TimeDelta = Duration::minutes(10) - Duration::seconds(2);
+    let start_time_offset: TimeDelta = Duration::minutes(10) - Duration::seconds(retrieve_token_advance_offset);
     if now < live_start_time - start_time_offset {
         if !watch_mode {
             return Err(anyhow::anyhow!("The plan has not started yet"));
@@ -152,7 +154,7 @@ fn fetch_connection_info(
         if retry_count > max_retry {
             return Err(anyhow::anyhow!("Max retry limit reached"));
         }
-        std::thread::sleep(std::time::Duration::from_secs(3));
+        std::thread::sleep(std::time::Duration::from_secs(retrieve_token_interval));
     }
     let payload_json = extract_jwt_payload(token.as_str())?;
     Ok(ConnectionInfo {

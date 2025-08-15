@@ -84,6 +84,10 @@ pub struct ArgsALS {
         default_value_t = false
     )]
     pub watch: bool,
+    #[clap(long = "retrieve-token-interval", default_value_t = 3, help="seconds")]
+    pub retrieve_token_interval: u64,
+    #[clap(long = "retrieve-token-offset", default_value_t = 2, help="seconds, positive for delay")]
+    pub retrieve_token_advance_offset: i64,
 }
 #[derive(Debug, ClapArgs)]
 pub struct ArgsArchive {
