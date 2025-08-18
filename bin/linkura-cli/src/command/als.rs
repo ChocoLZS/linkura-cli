@@ -7,6 +7,7 @@ use crate::{cli, config::{self, Global}};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Local, TimeDelta, Utc};
 use indicatif::{ProgressBar, ProgressStyle};
+use linkura_api::ApiClient;
 use linkura_common::jwt::extract_jwt_payload;
 use linkura_packet::als::client::{Client, ConnectionInfo};
 use linkura_packet::als::proto;
@@ -32,7 +33,11 @@ pub fn run(ctx: &Global, connection_info: AlsConnectionInfo, args: &config::Args
         needs_fetch_connection_info
     );
     let connection_info = if needs_fetch_connection_info {
-        fetch_connection_info(ctx, connection_info, args.watch, args.retrieve_token_interval, args.retrieve_token_advance_offset)?
+        if args.immediate {
+            fetch_connection_info_immediate(ctx, connection_info)?
+        } else {
+            fetch_connection_info(ctx, connection_info, args.watch, args.retrieve_token_interval, args.retrieve_token_advance_offset)?
+        }
     } else {
         ConnectionInfo {
             host: connection_info.address.unwrap(),
@@ -48,6 +53,54 @@ pub fn run(ctx: &Global, connection_info: AlsConnectionInfo, args: &config::Args
         connection_info.room_id
     );
     run_client(ctx, connection_info)
+}
+
+fn get_token(api_client: &ApiClient, live_type: u64, live_id: &str) -> Result<String> {
+    if live_type == 2 {
+        return api_client
+            .high_level()
+            .get_with_meets_connect_token(&live_id);
+    }
+    if live_type == 1 {
+        return api_client.high_level().get_fes_live_connect_token(&live_id);
+    }
+    return Err(anyhow::anyhow!(
+        "Unsupported live type: {}. Only 1 (FES) and 2 (Meets) are supported.",
+        live_type
+    ));
+}
+
+fn get_connect_info(token: String, connection_info: AlsConnectionInfo) -> Result<ConnectionInfo> {
+    let payload_json = extract_jwt_payload(token.as_str())?;
+    Ok(ConnectionInfo {
+        host: connection_info
+            .address
+            .unwrap_or_else(|| payload_json["pod"]["address"].as_str().unwrap().to_string()),
+        port: connection_info
+            .port
+            .unwrap_or_else(|| payload_json["pod"]["port"].as_u64().unwrap_or(9201) as u16),
+        room_id: connection_info
+            .room_id
+            .unwrap_or_else(|| payload_json["room_id"].as_str().unwrap().to_string()),
+        token,
+    })
+}
+
+fn fetch_connection_info_immediate(
+    ctx: &Global,
+    connection_info: AlsConnectionInfo,
+) -> Result<ConnectionInfo> {
+    let api_client = &ctx.api_client;
+    let plan_list = api_client.high_level().get_plan_list()?;
+    let res: Option<&serde_json::Value> = plan_list.as_array().unwrap().first();
+    if res.is_none() {
+        return Err(anyhow::anyhow!("No plan found"));
+    }
+    let item = res.unwrap();
+    let live_id = item.get("live_id").unwrap().as_str().unwrap().to_string();
+    let live_type = item.get("live_type").unwrap().as_u64().unwrap();
+    let token = get_token(api_client, live_type, &live_id)?;
+    get_connect_info(token, connection_info)
 }
 
 fn fetch_connection_info(
@@ -121,30 +174,13 @@ fn fetch_connection_info(
     loop {
         let now = Utc::now();
         if now >= live_start_time - start_time_offset {
-            if live_type == 2 {
-                // 401 需要尝试重新登录
-                match api_client
-                    .high_level()
-                    .get_with_meets_connect_token(&live_id)
-                {
-                    Ok(t) => {
-                        token = t;
-                        break;
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to retrieve token: {}", e);
-                    }
+            match get_token(api_client, live_type, &live_id) {
+                Ok(t) => {
+                    token = t;
+                    break;
                 }
-            }
-            if live_type == 1 {
-                match api_client.high_level().get_fes_live_connect_token(&live_id) {
-                    Ok(t) => {
-                        token = t;
-                        break;
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to retrieve token: {}", e);
-                    }
+                Err(e) => {
+                    tracing::error!("Failed to retrieve token: {}", e);
                 }
             }
         }
@@ -156,19 +192,7 @@ fn fetch_connection_info(
         }
         std::thread::sleep(std::time::Duration::from_secs(retrieve_token_interval));
     }
-    let payload_json = extract_jwt_payload(token.as_str())?;
-    Ok(ConnectionInfo {
-        host: connection_info
-            .address
-            .unwrap_or_else(|| payload_json["pod"]["address"].as_str().unwrap().to_string()),
-        port: connection_info
-            .port
-            .unwrap_or_else(|| payload_json["pod"]["port"].as_u64().unwrap_or(9201) as u16),
-        room_id: connection_info
-            .room_id
-            .unwrap_or_else(|| payload_json["room_id"].as_str().unwrap().to_string()),
-        token,
-    })
+    get_connect_info(token, connection_info)
 }
 
 fn run_client(_ctx: &Global, connection_info: ConnectionInfo) -> Result<()> {

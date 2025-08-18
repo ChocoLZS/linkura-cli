@@ -178,7 +178,7 @@ pub enum MixedPacketFormat {
     },
     // Format 2: int8 length + int64 timestamp
     TimestampFormat {
-        length: u8,
+        length: u16,
         timestamp: DateTime<Utc>,
     },
 }
@@ -1083,14 +1083,21 @@ impl ProtoPacketReader {
     }
 }
 
+enum MixedPacketReaderState {
+    Packet,
+    Timestamp
+}
+
 pub struct MixedPacketReader {
     reader: BufReader<File>,
+    state: MixedPacketReaderState,
 }
 
 impl MixedPacketReader {
     pub fn new(file: File) -> Self {
         Self {
             reader: BufReader::new(file),
+            state: MixedPacketReaderState::Packet,
         }
     }
 
@@ -1264,49 +1271,37 @@ impl MixedPacketReader {
         self.reader
             .read_exact(&mut second_buf)
             .with_context(|| "Failed to read second byte")?;
-        let first_two_bytes = u16::from_be_bytes([peek_buf[0], second_buf[0]]);
-
-        // Heuristic: if the first two bytes as big-endian u16 form a reasonable length (> 3 and < 65536)
-        // and the next byte is 0x00, it's likely the protobuf format
-        let mut third_buf = [0u8; 1];
-        match self.reader.read_exact(&mut third_buf) {
-            Ok(_) => {
-                if third_buf[0] == 0x00 && first_two_bytes >= 3 && first_two_bytes < 32768 {
-                    // This looks like protobuf format: int16 length + int8 unused(0x00) + data
-                    self.read_protobuf_format_packet(first_two_bytes, third_buf[0])
-                } else {
-                    // This looks like timestamp format: int8 length + int64 timestamp
-                    // Reconstruct the data and read as timestamp format
-                    let length = peek_buf[0];
-
-                    // We've already read 3 bytes, need 5 more for the int64 timestamp
-                    let mut timestamp_buf = [0u8; 8];
-                    timestamp_buf[0] = second_buf[0];
-                    timestamp_buf[1] = third_buf[0];
-                    self.reader.read_exact(&mut timestamp_buf[2..])?;
-
-                    let timestamp_micros = u64::from_be_bytes(timestamp_buf);
-                    let timestamp = DateTime::from_timestamp_micros(timestamp_micros as i64)
-                        .ok_or_else(|| anyhow!("Invalid timestamp: {}", timestamp_micros))?;
-
-                    let mut raw_data = Vec::new();
-                    if length > 9 {
-                        let remaining_length = length as usize - 9; // 1 byte length + 8 bytes timestamp
-                        raw_data = vec![0u8; remaining_length];
-                        self.reader.read_exact(&mut raw_data)?;
-                    }
-
-                    Ok(MixedPacketInfo {
-                        format: MixedPacketFormat::TimestampFormat { length, timestamp },
-                        timestamp: Some(timestamp),
-                        data_pack: None,
-                        raw_data,
-                    })
+        let length = u16::from_be_bytes([peek_buf[0], second_buf[0]]);
+        match self.state {
+            MixedPacketReaderState::Packet => {
+                // If we are in packet state, we expect a protobuf format
+                if length < 3 {
+                    return Err(anyhow!(
+                        "Invalid mixed packet length: {}, must be at least 3",
+                        length
+                    ));
                 }
+                let mut unused_buf = [0u8; 1];
+                self.reader
+                    .read_exact(&mut unused_buf)
+                    .with_context(|| "Failed to read unused byte")?;
+                self.read_protobuf_format_packet(length, unused_buf[0])
             }
-            Err(_) => {
-                // Not enough data, probably end of file
-                Err(anyhow!("Unexpected end of file"))
+            MixedPacketReaderState::Timestamp => {
+                // If we are in timestamp state, we expect a timestamp format
+                let mut micro_timestamp_buf = [0u8; 8];
+                self.reader
+                    .read_exact(&mut micro_timestamp_buf)
+                    .with_context(|| "Failed to read micro timestamp")?;
+                let timestamp = chrono::DateTime::from_timestamp_micros(i64::from_be_bytes(micro_timestamp_buf))
+                    .with_context(|| "Failed to convert micro timestamp")?;
+                self.state = MixedPacketReaderState::Packet;
+                Ok(MixedPacketInfo {
+                    format: MixedPacketFormat::TimestampFormat { length, timestamp },
+                    timestamp: Some(timestamp),
+                    data_pack: None,
+                    raw_data: micro_timestamp_buf.to_vec(),
+                })
             }
         }
     }
@@ -1333,7 +1328,7 @@ impl MixedPacketReader {
                 None
             }
         };
-
+        self.state = MixedPacketReaderState::Timestamp;
         Ok(MixedPacketInfo {
             format: MixedPacketFormat::ProtobufFormat { length, unused },
             timestamp: None,
