@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
-use clap::{Args as ClapArgs, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
-use crate::cli::spinner::SpinnerManager;
+use crate::{cli::spinner::SpinnerManager, command::{api::ArgsAPI, mrs::ArgsMRS}};
 use std::{
     fs::{self},
     path::{Path, PathBuf},
@@ -9,6 +9,7 @@ use std::{
 
 use linkura_api::{self, ApiClient, Credential};
 use rust_i18n::t;
+use crate::command::als::ArgsALS;
 
 /** ARG PARSER **/
 #[derive(Parser, Debug)]
@@ -48,68 +49,14 @@ pub struct Args {
     pub command: Option<Commands>,
 }
 
-#[derive(Debug, ClapArgs)]
-pub struct ArgsMRS {
-    #[clap(short('a'), long = "address", value_name = "ADDRESS")]
-    pub addr: String,
-    #[clap(
-        short('p'),
-        long = "port",
-        value_name = "PORT",
-        default_value_t = 21011
-    )]
-    pub port: u16,
-    #[clap(short('r'), long = "room-id", value_name = "ROOM_ID")]
-    pub room_id: u32,
-    #[clap(short('i'), long = "player-id", value_name = "PLAYER_ID")]
-    pub player_id: u16,
-    #[clap(short('w'), long = "watch", value_name = "WATCH")]
-    pub watch: bool,
-}
-
-#[derive(Debug, ClapArgs)]
-pub struct ArgsALS {
-    #[clap(short('a'), long = "address", value_name = "ADDRESS")]
-    pub addr: Option<String>,
-    #[clap(short('p'), long = "port", value_name = "PORT")]
-    pub port: Option<u16>,
-    #[clap(short('l'), long = "room-id", value_name = "ROOM_ID")]
-    pub room_id: Option<String>,
-    #[clap(short('t'), long = "token", value_name = "TOKEN")]
-    pub token: Option<String>,
-    #[clap(
-        short('w'),
-        long = "watch",
-        value_name = "WATCH_MODE",
-        default_value_t = false
-    )]
-    pub watch: bool,
-    #[clap(long = "retrieve-token-interval", default_value_t = 3, help="seconds")]
-    pub retrieve_token_interval: u64,
-    #[clap(long = "retrieve-token-offset", default_value_t = 2, help="seconds, positive for delay")]
-    pub retrieve_token_advance_offset: i64,
-    #[clap(short('i'), long = "immediate", default_value_t = false, help="immediate mode, will not wait for token to be retrieved")]
-    pub immediate: bool,
-}
-#[derive(Debug, ClapArgs)]
-pub struct ArgsArchive {
-    #[clap(short('s'), long = "save-json", value_name = "SAVE_JSON")]
-    /// if provided, will save the archive to the file
-    /// with the given name, otherwise will just print the archive info
-    /// to the console.
-    pub save_json: Option<String>,
-    #[clap(short('l'), long = "limit", value_name = "LIMIT")]
-    /// limit the number of archives to fetch, default is 4
-    pub limit: Option<u32>,
-}
-
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// Get mrs data
+    /// (Not implemented) Get mrs data
     MRS(ArgsMRS),
     /// Get als data
     ALS(ArgsALS),
-    Archive(ArgsArchive),
+    /// Get api response data
+    API(ArgsAPI),
 }
 
 /** ARG PARSER END**/

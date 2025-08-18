@@ -2,15 +2,40 @@ use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
 };
+use clap::{Args as ClapArgs};
 
-use crate::{cli, config::{self, Global}};
+use crate::{cli, config::Global};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Local, TimeDelta, Utc};
 use indicatif::{ProgressBar, ProgressStyle};
 use linkura_api::ApiClient;
 use linkura_common::jwt::extract_jwt_payload;
 use linkura_packet::als::client::{Client, ConnectionInfo};
-use linkura_packet::als::proto;
+
+#[derive(Debug, ClapArgs)]
+pub struct ArgsALS {
+    #[clap(short('a'), long = "address", value_name = "ADDRESS")]
+    pub addr: Option<String>,
+    #[clap(short('p'), long = "port", value_name = "PORT")]
+    pub port: Option<u16>,
+    #[clap(short('l'), long = "room-id", value_name = "ROOM_ID")]
+    pub room_id: Option<String>,
+    #[clap(short('t'), long = "token", value_name = "TOKEN")]
+    pub token: Option<String>,
+    #[clap(
+        short('w'),
+        long = "watch",
+        value_name = "WATCH_MODE",
+        default_value_t = false
+    )]
+    pub watch: bool,
+    #[clap(long = "retrieve-token-interval", default_value_t = 3, help="seconds")]
+    pub retrieve_token_interval: u64,
+    #[clap(long = "retrieve-token-offset", default_value_t = 2, help="seconds, positive for delay")]
+    pub retrieve_token_advance_offset: i64,
+    #[clap(short('i'), long = "immediate", default_value_t = false, help="immediate mode, will not wait for token to be retrieved")]
+    pub immediate: bool,
+}
 
 pub struct AlsConnectionInfo {
     pub address: Option<String>,
@@ -19,7 +44,7 @@ pub struct AlsConnectionInfo {
     pub token: Option<String>,
 }
 
-pub fn run(ctx: &Global, connection_info: AlsConnectionInfo, args: &config::ArgsALS) -> Result<()> {
+pub fn run(ctx: &Global, connection_info: AlsConnectionInfo, args: &ArgsALS) -> Result<()> {
     let needs_fetch_connection_info = connection_info.address.is_none()
         || connection_info.port.is_none()
         || connection_info.room_id.is_none()
@@ -226,37 +251,5 @@ fn run_client(_ctx: &Global, connection_info: ConnectionInfo) -> Result<()> {
     let now = chrono::Local::now();
     tracing::info!("Program ended at: {}", now.format("%Y-%m-%d %H:%M:%S"));
 
-    Ok(())
-}
-
-pub fn analyze(file_path: &str, output_path: Option<&str>, packet_count: usize) -> Result<()> {
-    tracing::info!("Starting ALS packet analysis for file: {}", file_path);
-    tracing::info!("Analyzing first {} packets", packet_count);
-    
-    if let Some(output) = output_path {
-        tracing::info!("Output will be written to: {}", output);
-        proto::analyze_binary_file_with_output_and_count(file_path, Some(output), packet_count)
-            .context("Failed to analyze binary protobuf packet file with output")?;
-    } else {
-        proto::analyze_binary_file_with_count(file_path, packet_count)
-            .context("Failed to analyze binary protobuf packet file")?;
-    }
-    
-    Ok(())
-}
-
-pub fn analyze_mixed(file_path: &str, output_path: Option<&str>, packet_count: usize) -> Result<()> {
-    tracing::info!("Starting ALS mixed format packet analysis for file: {}", file_path);
-    tracing::info!("Analyzing first {} packets", packet_count);
-    
-    if let Some(output) = output_path {
-        tracing::info!("Output will be written to: {}", output);
-        proto::analyze_mixed_binary_file_with_output_and_count(file_path, Some(output), packet_count)
-            .context("Failed to analyze mixed format binary packet file with output")?;
-    } else {
-        proto::analyze_mixed_binary_file_with_count(file_path, packet_count)
-            .context("Failed to analyze mixed format binary packet file")?;
-    }
-    
     Ok(())
 }

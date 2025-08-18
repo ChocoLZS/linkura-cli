@@ -36,4 +36,32 @@ impl<'a> ArchiveApi<'a> {
             .send()?;
         Ok(res)
     }
+
+    pub fn get_fes_archive_data(&self, id: &str) -> Result<Response> {
+        let url = format!("{API_BASE}/archive/get_fes_archive_data");
+        let res = self
+            .client
+            .post(url)
+            .headers(self.runtime_header.clone())
+            .header("x-idempotency-key", gen_random_idempotency_key())
+            .json(&json!({
+                "archives_id": id
+            }))
+            .send()?;
+        Ok(res)
+    }
+
+    pub fn get_with_archive_data(&self, id: &str) -> Result<Response> {
+        let url = format!("{API_BASE}/archive/get_with_archive_data");
+        let res = self
+            .client
+            .post(url)
+            .headers(self.runtime_header.clone())
+            .header("x-idempotency-key", gen_random_idempotency_key())
+            .json(&json!({
+                "archives_id": id
+            }))
+            .send()?;
+        Ok(res)
+    }
 }

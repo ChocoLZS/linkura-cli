@@ -212,4 +212,24 @@ impl<'a> HighLevelApi<'a> {
             .ok_or_else(|| anyhow::anyhow!("Get connect token failed: {:?}", json))?;
         Ok(connect_token.to_string())
     }
+
+    pub fn get_archive_details(&self, id: &str, live_type: u8) -> Result<serde_json::Value> {
+        if live_type == 1 {
+            let res = self.raw().archive().get_fes_archive_data(id)?;
+            if res.status() != reqwest::StatusCode::OK {
+                return Err(anyhow::anyhow!("Get archive details failed: {:?}", res));
+            }
+            let json: serde_json::Value = res.json()?;
+            Ok(json)
+        } else if live_type == 2 {
+            let res = self.raw().archive().get_with_archive_data(id)?;
+            if res.status() != reqwest::StatusCode::OK {
+                return Err(anyhow::anyhow!("Get archive details failed: {:?}", res));
+            }
+            let json: serde_json::Value = res.json()?;
+            Ok(json)
+        } else {
+            Err(anyhow::anyhow!("Unsupported live type: {}", live_type))
+        }
+    }
 }

@@ -23,8 +23,8 @@ fn main() {
     let args = &global.args;
 
     match &args.command {
-        Some(Commands::MRS(_)) => {
-            todo!("Implement MRS client command handling");
+        Some(Commands::MRS(args)) => {
+            let _ = command::mrs::run(&global, args);
         }
         Some(Commands::ALS(args)) => {
             let _ = command::als::run(
@@ -42,9 +42,9 @@ fn main() {
                 std::process::exit(1);
             });
         }
-        Some(Commands::Archive(args)) => {
-            let _ = command::archive::run(&global, &args).map_err(|e| {
-                tracing::error!("Error running Archive command: {}", e);
+        Some(Commands::API(args)) => {
+            let _ = command::api::run(&global, &args).map_err(|e| {
+                tracing::error!("Error running API command: {}", e);
                 std::process::exit(1);
             });
         }
