@@ -44,6 +44,8 @@ impl AlsConverter {
         &self,
         input_dir: P,
         output_dir: P,
+        timeshift: i64,
+        custom_start_time: Option<String>,
     ) -> Result<()> {
         let input_dir = input_dir.as_ref();
         let output_dir = output_dir.as_ref();
@@ -51,7 +53,7 @@ impl AlsConverter {
         std::fs::create_dir_all(output_dir)?;
 
         let mut segment_builder = SegmentBuilder::new();
-        let mut context = ConversionContext::new(&mut segment_builder);
+        let mut context = ConversionContext::new(&mut segment_builder, timeshift, custom_start_time);
         let mut packet_buffer = PacketsBuffer::new(input_dir);
 
         while let Some((data_packet, time_packet)) = self.try_read_packet_pair(&mut packet_buffer)? {
@@ -331,10 +333,12 @@ struct ConversionContext<'a> {
     segment_builder: &'a mut SegmentBuilder,
     initial_timestamp: DateTime<Utc>,
     initial_dataframes: Vec<DataFrame>,
+    timeshift: i64,
+    custom_start_time: Option<String>,
 }
 
 impl<'a> ConversionContext<'a> {
-    fn new(segment_builder: &'a mut SegmentBuilder) -> Self {
+    fn new(segment_builder: &'a mut SegmentBuilder, timeshift: i64, custom_start_time: Option<String>) -> Self {
         Self {
             state: AlsConverterStateMachine::Initial,
             data_room: Room {
@@ -345,6 +349,8 @@ impl<'a> ConversionContext<'a> {
             initial_timestamp: DateTime::<Utc>::from_timestamp_micros(0).unwrap(),
             segment_builder,
             initial_dataframes: Vec::new(),
+            timeshift,
+            custom_start_time,
         }
     }
 
@@ -402,9 +408,9 @@ impl<'a> ConversionContext<'a> {
 
     /// data packet 应该是 DataFrames(InstantiateObject|UpdateObject)
     fn process_first_dataframes_state(&mut self, data_packet: MixedPacketInfo, time_packet: MixedPacketInfo) -> Result<()> {
-        let timestamp = time_packet.timestamp
+        let mut timestamp = time_packet.timestamp
             .ok_or_else(|| anyhow!("No timestamp in time packet"))?;
-        // timestamp = timestamp - TimeDelta::microseconds(92559773);
+        timestamp = timestamp + TimeDelta::microseconds(self.timeshift * 1_000_000);
         self.initial_timestamp = timestamp;
 
         self.segment_builder
@@ -484,9 +490,9 @@ impl<'a> ConversionContext<'a> {
                 }
             }
         }
-        let timestamp = time_packet.timestamp
+        let mut timestamp = time_packet.timestamp
             .ok_or_else(|| anyhow!("No timestamp in time packet"))?;
-        // timestamp = timestamp - TimeDelta::microseconds(92559773);
+        timestamp = timestamp + TimeDelta::microseconds(self.timeshift * 1_000_000);
         // 判断时间戳
         if timestamp - self.initial_timestamp > DURATION {
             self.initial_timestamp += DURATION;

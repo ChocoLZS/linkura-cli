@@ -116,6 +116,10 @@ pub struct ArgsConvert {
     pub output_dir: String,
     #[clap(short('d'), long = "duration", value_name = "SECONDS", help = "Segment duration in seconds", default_value = "10")]
     pub segment_duration: u64,
+    #[clap(long = "timeshift", value_name = "SECONDS", help = "Time shift in seconds, shift all packets' timestamps", default_value = "0")]
+    pub timeshift: i64,
+    #[clap(long = "custom-start-time", value_name = "TIME", help = "Custom start time in rfc3339 format (e.g., 2025-08-21T00:00:00Z, 2025-08-21T09:00:00+09:00)")]
+    pub custom_start_time: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -354,7 +358,7 @@ async fn main() -> Result<()> {
                 }
             }
         },
-        Some(Commands::Convert(ref convert_args)) => {
+        Some(Commands::Convert(convert_args)) => {
             info!("🔄 Starting ALS conversion from mixed to standard format");
             info!("📂 Input file: {}", convert_args.input_file);
             info!("📁 Output directory: {}", convert_args.output_dir);
@@ -373,7 +377,7 @@ async fn main() -> Result<()> {
                 
                 move || {
                     let converter = AlsConverter::new(segment_duration);
-                    converter.convert_mixed_to_standard(&input_file, &output_dir)
+                    converter.convert_mixed_to_standard(&input_file, &output_dir, convert_args.timeshift, convert_args.custom_start_time)
                 }
             }).await??;
             
