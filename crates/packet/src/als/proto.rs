@@ -474,6 +474,34 @@ impl PacketAnalysisStats {
     pub fn update_from_raw_data(&mut self, raw_data: &[u8]) {
         self.unknown_field_stats.update_from_raw_data(raw_data);
     }
+
+    pub fn merge_with(&mut self, other: PacketAnalysisStats) {
+        self.total_packets += other.total_packets;
+        self.packets_with_control += other.packets_with_control;
+        self.packets_with_frames += other.packets_with_frames;
+        self.total_frames += other.total_frames;
+        
+        // Merge control stats
+        self.control_stats.data_count += other.control_stats.data_count;
+        self.control_stats.pong_count += other.control_stats.pong_count;
+        self.control_stats.segment_started_at_count += other.control_stats.segment_started_at_count;
+        self.control_stats.cache_ended_count += other.control_stats.cache_ended_count;
+        self.control_stats.total_control_messages += other.control_stats.total_control_messages;
+        
+        // Merge frame stats
+        self.frame_stats.instantiate_object_count += other.frame_stats.instantiate_object_count;
+        self.frame_stats.update_object_count += other.frame_stats.update_object_count;
+        self.frame_stats.destroy_object_count += other.frame_stats.destroy_object_count;
+        self.frame_stats.room_count += other.frame_stats.room_count;
+        self.frame_stats.authorize_response_count += other.frame_stats.authorize_response_count;
+        self.frame_stats.join_room_response_count += other.frame_stats.join_room_response_count;
+        self.frame_stats.total_frame_messages += other.frame_stats.total_frame_messages;
+        
+        // Merge unknown field stats
+        for (field_num, count) in other.unknown_field_stats.unknown_fields {
+            *self.unknown_field_stats.unknown_fields.entry(field_num).or_insert(0) += count;
+        }
+    }
 }
 
 pub fn format_statistics(writer: &mut OutputWriter, stats: &PacketAnalysisStats) -> Result<()> {
@@ -1625,54 +1653,164 @@ pub fn analyze_binary_file_with_output_and_count(
     output_path: Option<&str>,
     packet_count: usize,
 ) -> Result<()> {
+    use std::path::Path;
+    use std::fs;
+    
+    let path = Path::new(file_path);
     let mut writer = OutputWriter::new(output_path)?;
-    let mut file =
-        File::open(file_path).with_context(|| format!("Failed to open file: {}", file_path))?;
-
-    let metadata = file
-        .metadata()
-        .with_context(|| format!("Failed to read file metadata: {}", file_path))?;
-
-    writer.writeln(&format!("Analyzing binary file: {}", file_path))?;
-    writer.writeln(&format!("File size: {} bytes", metadata.len()))?;
-    writer.writeln(&format!("Analyzing first {} packets", packet_count))?;
-
-    // Debug: show first 32 bytes of the file
-    let mut debug_buffer = vec![0u8; 32.min(metadata.len() as usize)];
-    file.read_exact(&mut debug_buffer)?;
-    writer.writeln(&format!(
-        "First {} bytes (hex): {}",
-        debug_buffer.len(),
-        debug_buffer
-            .iter()
-            .map(|b| format!("{:02x}", b))
-            .collect::<Vec<_>>()
-            .join(" ")
-    ))?;
-
-    // Reset file position
-    file.seek(std::io::SeekFrom::Start(0))?;
-
-    writer.writeln("===========================================")?;
-    writer.writeln("")?;
-
-    let mut reader = ProtoPacketReader::new(file);
-
-    let packets = match reader.read_packets_with_limit_and_writer(packet_count, Some(&mut writer)) {
-        Ok(packets) => packets,
-        Err(e) => {
-            return Err(anyhow!(
-                "Failed to read packets from file '{}': {}",
-                file_path,
-                e
-            ));
+    
+    if path.is_dir() {
+        // Directory processing: analyze all files sorted by creation time
+        let mut entries: Vec<_> = fs::read_dir(path)
+            .with_context(|| format!("Failed to read directory: {}", file_path))?
+            .filter_map(|entry| {
+                let entry = entry.ok()?;
+                let file_path = entry.path();
+                
+                // Only process files (not subdirectories)
+                if !file_path.is_file() {
+                    return None;
+                }
+                
+                // Get file metadata for creation time
+                let metadata = file_path.metadata().ok()?;
+                let created = metadata.created().or_else(|_| metadata.modified()).ok()?;
+                
+                Some((file_path, created))
+            })
+            .collect();
+        
+        // Sort by creation time (oldest first)
+        entries.sort_by_key(|(_, created)| *created);
+        
+        if entries.is_empty() {
+            return Err(anyhow!("No files found in directory: {}", file_path));
         }
-    };
+        
+        // Write header for directory processing
+        writer.writeln(&format!("=== ALS Standard Analysis Results ==="))?;
+        writer.writeln(&format!("Directory: {}", file_path))?;
+        writer.writeln(&format!("Packet Count per File: {}", packet_count))?;
+        writer.writeln(&format!("Total Files: {}", entries.len()))?;
+        writer.writeln(&format!("Started at: {}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")))?;
+        writer.writeln("=======================================")?;
+        writer.writeln("")?;
+        
+        // Combined statistics across all files
+        let mut combined_stats = PacketAnalysisStats::default();
+        let mut files_processed = 0;
+        let mut total_files_with_packets = 0;
+        
+        // Process each file
+        for (index, (file_path, _created_time)) in entries.iter().enumerate() {
+            let file_path_str = file_path.to_string_lossy();
+            
+            writer.writeln(&format!("--- File {}/{}: {} ---", index + 1, entries.len(), file_path_str))?;
+            writer.flush()?; // Ensure immediate output
+            
+            match analyze_single_standard_file(&file_path_str, packet_count, &mut writer) {
+                Ok(stats) => {
+                    combined_stats.merge_with(stats);
+                    total_files_with_packets += 1;
+                }
+                Err(e) => {
+                    writer.writeln(&format!("❌ Error analyzing file: {}", e))?;
+                }
+            }
+            
+            files_processed += 1;
+            writer.writeln("")?; // Separator between files
+            writer.flush()?; // Ensure immediate output
+        }
+        
+        // Write summary statistics
+        writer.writeln("=======================================")?;
+        writer.writeln("=== BATCH ANALYSIS SUMMARY ===")?;
+        writer.writeln(&format!("Files processed: {}", files_processed))?;
+        writer.writeln(&format!("Files with valid packets: {}", total_files_with_packets))?;
+        writer.writeln("")?;
+        
+        if combined_stats.total_packets > 0 {
+            format_statistics(&mut writer, &combined_stats)?;
+        } else {
+            writer.writeln("No valid packets found across all files.")?;
+        }
+        
+        writer.writeln(&format!("Completed at: {}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")))?;
+        writer.writeln("=======================================")?;
+        writer.flush()?;
+        
+    } else {
+        // Single file processing (original logic)
+        let mut file = File::open(file_path).with_context(|| format!("Failed to open file: {}", file_path))?;
+        let metadata = file.metadata().with_context(|| format!("Failed to read file metadata: {}", file_path))?;
 
-    writer.writeln(&format!("Total packets found: {}", packets.len()))?;
-    writer.flush()?;
+        writer.writeln(&format!("Analyzing binary file: {}", file_path))?;
+        writer.writeln(&format!("File size: {} bytes", metadata.len()))?;
+        writer.writeln(&format!("Analyzing first {} packets", packet_count))?;
+
+        // Debug: show first 32 bytes of the file
+        let mut debug_buffer = vec![0u8; 32.min(metadata.len() as usize)];
+        file.read_exact(&mut debug_buffer)?;
+        writer.writeln(&format!(
+            "First {} bytes (hex): {}",
+            debug_buffer.len(),
+            debug_buffer
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<Vec<_>>()
+                .join(" ")
+        ))?;
+
+        // Reset file position
+        file.seek(std::io::SeekFrom::Start(0))?;
+
+        writer.writeln("===========================================")?;
+        writer.writeln("")?;
+
+        let mut reader = ProtoPacketReader::new(file);
+
+        let packets = match reader.read_packets_with_limit_and_writer(packet_count, Some(&mut writer)) {
+            Ok(packets) => packets,
+            Err(e) => {
+                return Err(anyhow!(
+                    "Failed to read packets from file '{}': {}",
+                    file_path,
+                    e
+                ));
+            }
+        };
+
+        writer.writeln(&format!("Total packets found: {}", packets.len()))?;
+        writer.flush()?;
+    }
 
     Ok(())
+}
+
+fn analyze_single_standard_file(
+    file_path: &str,
+    packet_count: usize,
+    writer: &mut OutputWriter,
+) -> Result<PacketAnalysisStats> {
+    let file = File::open(file_path)
+        .with_context(|| format!("Failed to open file: {}", file_path))?;
+    
+    let metadata = file.metadata()
+        .with_context(|| format!("Failed to read file metadata: {}", file_path))?;
+    
+    writer.writeln(&format!("File size: {} bytes", metadata.len()))?;
+    
+    let mut reader = ProtoPacketReader::new(file);
+    let packets = reader.read_packets_with_limit_and_writer(packet_count, Some(writer))?;
+    
+    // Calculate statistics from standard packets
+    let mut stats = PacketAnalysisStats::default();
+    for packet in &packets {
+        stats.update_from_packet(&packet.data_pack);
+        stats.update_from_raw_data(&packet.raw_data);
+    }
+    Ok(stats)
 }
 
 pub fn analyze_mixed_binary_file_with_output(
@@ -1687,71 +1825,202 @@ pub fn analyze_mixed_binary_file_with_output_and_count(
     output_path: Option<&str>,
     packet_count: usize,
 ) -> Result<()> {
+    use std::path::Path;
+    use std::fs;
+    
+    let path = Path::new(file_path);
     let mut writer = OutputWriter::new(output_path)?;
-    let mut file =
-        File::open(file_path).with_context(|| format!("Failed to open file: {}", file_path))?;
-
-    let metadata = file
-        .metadata()
-        .with_context(|| format!("Failed to read file metadata: {}", file_path))?;
-
-    writer.writeln(&format!(
-        "Analyzing mixed format binary file: {}",
-        file_path
-    ))?;
-    writer.writeln(&format!("File size: {} bytes", metadata.len()))?;
-    writer.writeln(&format!("Analyzing first {} packets", packet_count))?;
-
-    // Debug: show first 32 bytes of the file
-    let mut debug_buffer = vec![0u8; 32.min(metadata.len() as usize)];
-    file.read_exact(&mut debug_buffer)?;
-    writer.writeln(&format!(
-        "First {} bytes (hex): {}",
-        debug_buffer.len(),
-        debug_buffer
-            .iter()
-            .map(|b| format!("{:02x}", b))
-            .collect::<Vec<_>>()
-            .join(" ")
-    ))?;
-
-    // Reset file position
-    file.seek(std::io::SeekFrom::Start(0))?;
-
-    writer.writeln("===========================================")?;
-    writer.writeln("")?;
-
-    let mut reader = MixedPacketReader::new(file);
-
-    let packets = match reader.read_mixed_packets_with_limit_and_writer(packet_count, Some(&mut writer)) {
-        Ok(packets) => packets,
-        Err(e) => {
-            return Err(anyhow!(
-                "Failed to read mixed packets from file '{}': {}",
-                file_path,
-                e
-            ));
+    
+    if path.is_dir() {
+        // Directory processing: analyze all files sorted by creation time
+        let mut entries: Vec<_> = fs::read_dir(path)
+            .with_context(|| format!("Failed to read directory: {}", file_path))?
+            .filter_map(|entry| {
+                let entry = entry.ok()?;
+                let file_path = entry.path();
+                
+                // Only process files (not subdirectories)
+                if !file_path.is_file() {
+                    return None;
+                }
+                
+                // Get file metadata for creation time
+                let metadata = file_path.metadata().ok()?;
+                let created = metadata.created().or_else(|_| metadata.modified()).ok()?;
+                
+                Some((file_path, created))
+            })
+            .collect();
+        
+        // Sort by creation time (oldest first)
+        entries.sort_by_key(|(_, created)| *created);
+        
+        if entries.is_empty() {
+            return Err(anyhow!("No files found in directory: {}", file_path));
         }
-    };
+        
+        // Write header for directory processing
+        writer.writeln(&format!("=== ALS Mixed Analysis Results ==="))?;
+        writer.writeln(&format!("Directory: {}", file_path))?;
+        writer.writeln(&format!("Packet Count per File: {}", packet_count))?;
+        writer.writeln(&format!("Total Files: {}", entries.len()))?;
+        writer.writeln(&format!("Started at: {}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")))?;
+        writer.writeln("=======================================")?;
+        writer.writeln("")?;
+        
+        // Combined statistics across all files
+        let mut combined_stats = PacketAnalysisStats::default();
+        let mut files_processed = 0;
+        let mut total_files_with_packets = 0;
+        let mut total_protobuf_count = 0;
+        let mut total_timestamp_count = 0;
+        
+        // Process each file
+        for (index, (file_path, _created_time)) in entries.iter().enumerate() {
+            let file_path_str = file_path.to_string_lossy();
+            
+            writer.writeln(&format!("--- File {}/{}: {} ---", index + 1, entries.len(), file_path_str))?;
+            writer.flush()?; // Ensure immediate output
+            
+            match analyze_single_mixed_file(&file_path_str, packet_count, &mut writer) {
+                Ok((stats, protobuf_count, timestamp_count)) => {
+                    combined_stats.merge_with(stats);
+                    total_protobuf_count += protobuf_count;
+                    total_timestamp_count += timestamp_count;
+                    total_files_with_packets += 1;
+                }
+                Err(e) => {
+                    writer.writeln(&format!("❌ Error analyzing file: {}", e))?;
+                }
+            }
+            
+            files_processed += 1;
+            writer.writeln("")?; // Separator between files
+            writer.flush()?; // Ensure immediate output
+        }
+        
+        // Write summary statistics
+        writer.writeln("=======================================")?;
+        writer.writeln("=== BATCH ANALYSIS SUMMARY ===")?;
+        writer.writeln(&format!("Files processed: {}", files_processed))?;
+        writer.writeln(&format!("Files with valid packets: {}", total_files_with_packets))?;
+        writer.writeln("")?;
+        
+        writer.writeln("Combined Format Breakdown:")?;
+        writer.writeln(&format!("  Total Protobuf format packets: {}", total_protobuf_count))?;
+        writer.writeln(&format!("  Total Timestamp format packets: {}", total_timestamp_count))?;
+        writer.writeln("")?;
+        
+        if combined_stats.total_packets > 0 {
+            format_statistics(&mut writer, &combined_stats)?;
+        } else {
+            writer.writeln("No valid packets found across all files.")?;
+        }
+        
+        writer.writeln(&format!("Completed at: {}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")))?;
+        writer.writeln("=======================================")?;
+        writer.flush()?;
+        
+    } else {
+        // Single file processing (original logic)
+        let mut file = File::open(file_path).with_context(|| format!("Failed to open file: {}", file_path))?;
+        let metadata = file.metadata().with_context(|| format!("Failed to read file metadata: {}", file_path))?;
 
-    writer.writeln(&format!("Total mixed packets found: {}", packets.len()))?;
+        writer.writeln(&format!(
+            "Analyzing mixed format binary file: {}",
+            file_path
+        ))?;
+        writer.writeln(&format!("File size: {} bytes", metadata.len()))?;
+        writer.writeln(&format!("Analyzing first {} packets", packet_count))?;
 
-    // Format breakdown summary
+        // Debug: show first 32 bytes of the file
+        let mut debug_buffer = vec![0u8; 32.min(metadata.len() as usize)];
+        file.read_exact(&mut debug_buffer)?;
+        writer.writeln(&format!(
+            "First {} bytes (hex): {}",
+            debug_buffer.len(),
+            debug_buffer
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<Vec<_>>()
+                .join(" ")
+        ))?;
+
+        // Reset file position
+        file.seek(std::io::SeekFrom::Start(0))?;
+
+        writer.writeln("===========================================")?;
+        writer.writeln("")?;
+
+        let mut reader = MixedPacketReader::new(file);
+
+        let packets = match reader.read_mixed_packets_with_limit_and_writer(packet_count, Some(&mut writer)) {
+            Ok(packets) => packets,
+            Err(e) => {
+                return Err(anyhow!(
+                    "Failed to read mixed packets from file '{}': {}",
+                    file_path,
+                    e
+                ));
+            }
+        };
+
+        writer.writeln(&format!("Total mixed packets found: {}", packets.len()))?;
+
+        // Format breakdown summary
+        let mut protobuf_count = 0;
+        let mut timestamp_count = 0;
+
+        for packet in &packets {
+            match packet.format {
+                MixedPacketFormat::ProtobufFormat { .. } => protobuf_count += 1,
+                MixedPacketFormat::TimestampFormat { .. } => timestamp_count += 1,
+            }
+        }
+
+        writer.writeln("")?;
+        writer.writeln("Format Breakdown:")?;
+        writer.writeln(&format!("  Protobuf format packets: {}", protobuf_count))?;
+        writer.writeln(&format!("  Timestamp format packets: {}", timestamp_count))?;
+        writer.flush()?;
+    }
+
+    Ok(())
+}
+
+fn analyze_single_mixed_file(
+    file_path: &str,
+    packet_count: usize,
+    writer: &mut OutputWriter,
+) -> Result<(PacketAnalysisStats, u32, u32)> {
+    let file = File::open(file_path)
+        .with_context(|| format!("Failed to open file: {}", file_path))?;
+    
+    let metadata = file.metadata()
+        .with_context(|| format!("Failed to read file metadata: {}", file_path))?;
+    
+    writer.writeln(&format!("File size: {} bytes", metadata.len()))?;
+    
+    let mut reader = MixedPacketReader::new(file);
+    let packets = reader.read_mixed_packets_with_limit_and_writer(packet_count, Some(writer))?;
+    
+    // Calculate statistics from mixed packets
+    let mut stats = PacketAnalysisStats::default();
     let mut protobuf_count = 0;
     let mut timestamp_count = 0;
-
+    
     for packet in &packets {
+        if let Some(data_pack) = &packet.data_pack {
+            stats.update_from_packet(data_pack);
+        }
+        stats.update_from_raw_data(&packet.raw_data);
+        
+        // Count format types
         match packet.format {
             MixedPacketFormat::ProtobufFormat { .. } => protobuf_count += 1,
             MixedPacketFormat::TimestampFormat { .. } => timestamp_count += 1,
         }
     }
-
-    writer.writeln("")?;
-    writer.writeln("Format Breakdown:")?;
-    writer.writeln(&format!("  Protobuf format packets: {}", protobuf_count))?;
-    writer.writeln(&format!("  Timestamp format packets: {}", timestamp_count))?;
-    writer.flush()?;
-
-    Ok(())
+    
+    Ok((stats, protobuf_count, timestamp_count))
 }
