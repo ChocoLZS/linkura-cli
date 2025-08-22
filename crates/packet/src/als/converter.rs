@@ -5,7 +5,7 @@ use crate::als::proto::{
 };
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, FixedOffset, TimeDelta, Utc};
-use std::{fs::{DirEntry, File}};
+use std::{cmp::Ordering, fs::{DirEntry, File}};
 use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::fmt;
@@ -408,6 +408,14 @@ impl<'a> ConversionContext<'a> {
 
     /// data packet 应该是 DataFrames(InstantiateObject|UpdateObject)
     fn process_first_dataframes_state(&mut self, data_packet: MixedPacketInfo, time_packet: MixedPacketInfo) -> Result<()> {
+        // control message 判断必须是Data
+        if !data_packet.data_pack.as_ref().map_or(false, |dp| dp.control.as_ref().map_or(false, |c| matches!(c, data_pack::Control::Data(true)))) {
+            return Ok(());
+        }
+        // 第一个 dataframe 必须是 InstantiateObject
+        if !data_packet.data_pack.as_ref().map_or(false, |dp| dp.frames.first().map_or(false, |f| matches!(f.message, Some(data_frame::Message::InstantiateObject(_))))) {
+            return Ok(());
+        }
         let mut timestamp = time_packet.timestamp
             .ok_or_else(|| anyhow!("No timestamp in time packet"))?;
         timestamp = timestamp + TimeDelta::microseconds(self.timeshift * 1_000_000);
@@ -528,6 +536,15 @@ impl<'a> ConversionContext<'a> {
                             self.update_initial_dataframes(frame.clone());
                             Some(frame)
                         }
+                        data_frame::Message::InstantiateObject(obj) => {
+                            obj.target = Some(instantiate_object::Target::RoomAll(RoomAll {
+                                room_id: self.data_room.id.clone(),
+                            })); // 修改 InstantiateObject 的目标为 RoomAll
+                            obj.owner_id = b"sys".to_vec(); // 设置 owner_id 为 "sys"
+                            let new_frame = frame.clone();
+                            self.insert_initial_dataframes(new_frame);
+                            Some(frame)
+                        }
                         _ => None,
                     }
                 } else {
@@ -560,7 +577,7 @@ impl<'a> ConversionContext<'a> {
         }
     }
 
-    fn update_initial_dataframes(&mut self, dataframe: DataFrame) {
+    fn update_initial_dataframes(&mut self, mut dataframe: DataFrame) {
         if let Some(existing_frame) = self.initial_dataframes.iter_mut().find(|f| {
             // message都是UpdateObject
             if let (Some(existing_message), Some(new_message)) = (f.message.as_ref(), dataframe.message.as_ref()) {
@@ -574,7 +591,41 @@ impl<'a> ConversionContext<'a> {
                 false
             }
         }) {
+            // change dataframe's target
+            if let Some(message) = &mut dataframe.message {
+                match message {
+                    data_frame::Message::UpdateObject(obj) => {
+                        obj.target = Some(update_object::Target::CurrentPlayer(CurrentPlayer {  }));
+                    }
+                    _ => {}
+                }
+            }
             *existing_frame = dataframe;
+        } else {
+            self.insert_initial_dataframes(dataframe);
         }
+    }
+    fn insert_initial_dataframes(&mut self, mut dataframe: DataFrame) {
+        if let Some(message) = &mut dataframe.message {
+            match message {
+                data_frame::Message::InstantiateObject(obj) => {
+                    obj.target = Some(instantiate_object::Target::CurrentPlayer(CurrentPlayer {  })); // 修改 InstantiateObject 的目标为 CurrentPlayer
+                }
+                data_frame::Message::UpdateObject(obj) => {
+                    obj.target = Some(update_object::Target::CurrentPlayer(CurrentPlayer {  }));  // 修改 UpdateObject 的目标为 CurrentPlayer
+                }
+                _ => {}
+            }
+        }
+        self.initial_dataframes.push(dataframe);
+        // sort InitialObject is first
+        self.initial_dataframes.sort_by(|a, b| {
+            match (a.message.as_ref(), b.message.as_ref()) {
+                (Some(data_frame::Message::InstantiateObject(_)), Some(data_frame::Message::InstantiateObject(_))) => Ordering::Equal,
+                (Some(data_frame::Message::InstantiateObject(_)), _) => Ordering::Less,
+                (_, Some(data_frame::Message::InstantiateObject(_))) => Ordering::Greater,
+                _ => Ordering::Equal,
+            }
+        });
     }
 }
