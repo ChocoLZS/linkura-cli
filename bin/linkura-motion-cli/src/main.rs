@@ -118,8 +118,8 @@ pub struct ArgsConvert {
     pub segment_duration: u64,
     #[clap(long = "timeshift", value_name = "MILLSECONDS", help = "Time shift in mill seconds, shift all packets' timestamps", default_value = "0")]
     pub timeshift: i64,
-    #[clap(long = "custom-start-time", value_name = "TIME", help = "Custom start time in rfc3339 format (e.g., 2025-08-21T00:00:00Z, 2025-08-21T09:00:00+09:00)")]
-    pub custom_start_time: Option<String>,
+    #[clap(long = "start-time", value_name = "TIME", help = "Custom start time in rfc3339 format (e.g., 2025-08-21T00:00:00Z, 2025-08-21T09:00:00+09:00)")]
+    pub start_time: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -377,7 +377,7 @@ async fn main() -> Result<()> {
                 
                 move || {
                     let converter = AlsConverter::new(segment_duration);
-                    converter.convert_mixed_to_standard(&input_file, &output_dir, convert_args.timeshift, convert_args.custom_start_time)
+                    converter.convert_mixed_to_standard(&input_file, &output_dir, convert_args.timeshift, convert_args.start_time)
                 }
             }).await??;
             
