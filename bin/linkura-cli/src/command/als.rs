@@ -64,7 +64,7 @@ pub fn run(ctx: &Global, connection_info: AlsConnectionInfo, args: &ArgsALS) -> 
             if let Ok(token) = r {
                 let payload_json = extract_jwt_payload(token.as_str())?;
                 tracing::info!(
-                    "Dry run mode: address: {}, port: {}, room_id: {}",
+                    "Test mode: address: {}, port: {}, room_id: {}",
                     payload_json["pod"]["address"].as_str().unwrap(),
                     payload_json["pod"]["port"].as_u64().unwrap(),
                     payload_json["room_id"].as_str().unwrap()

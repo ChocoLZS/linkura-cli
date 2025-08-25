@@ -418,7 +418,7 @@ impl<'a> ConversionContext<'a> {
         }
         let mut timestamp = time_packet.timestamp
             .ok_or_else(|| anyhow!("No timestamp in time packet"))?;
-        timestamp = timestamp + TimeDelta::microseconds(self.timeshift * 1_000_000);
+        timestamp = timestamp + TimeDelta::microseconds(self.timeshift * 1_000);
         self.initial_timestamp = timestamp;
 
         self.segment_builder
@@ -500,7 +500,7 @@ impl<'a> ConversionContext<'a> {
         }
         let mut timestamp = time_packet.timestamp
             .ok_or_else(|| anyhow!("No timestamp in time packet"))?;
-        timestamp = timestamp + TimeDelta::microseconds(self.timeshift * 1_000_000);
+        timestamp = timestamp + TimeDelta::microseconds(self.timeshift * 1_000);
         // 判断时间戳
         if timestamp - self.initial_timestamp > DURATION {
             self.initial_timestamp += DURATION;
