@@ -5,7 +5,7 @@ use crate::als::proto::{
 };
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, FixedOffset, TimeDelta, Utc};
-use std::{fs::{DirEntry, File}};
+use std::{cmp::Ordering, fs::{DirEntry, File}};
 use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::fmt;
@@ -44,6 +44,8 @@ impl AlsConverter {
         &self,
         input_dir: P,
         output_dir: P,
+        timeshift: i64,
+        start_time: Option<String>,
     ) -> Result<()> {
         let input_dir = input_dir.as_ref();
         let output_dir = output_dir.as_ref();
@@ -51,7 +53,7 @@ impl AlsConverter {
         std::fs::create_dir_all(output_dir)?;
 
         let mut segment_builder = SegmentBuilder::new();
-        let mut context = ConversionContext::new(&mut segment_builder);
+        let mut context = ConversionContext::new(&mut segment_builder, timeshift, start_time);
         let mut packet_buffer = PacketsBuffer::new(input_dir);
 
         while let Some((data_packet, time_packet)) = self.try_read_packet_pair(&mut packet_buffer)? {
@@ -331,10 +333,12 @@ struct ConversionContext<'a> {
     segment_builder: &'a mut SegmentBuilder,
     initial_timestamp: DateTime<Utc>,
     initial_dataframes: Vec<DataFrame>,
+    timeshift: i64,
+    start_time: Option<String>,
 }
 
 impl<'a> ConversionContext<'a> {
-    fn new(segment_builder: &'a mut SegmentBuilder) -> Self {
+    fn new(segment_builder: &'a mut SegmentBuilder, timeshift: i64, start_time: Option<String>) -> Self {
         Self {
             state: AlsConverterStateMachine::Initial,
             data_room: Room {
@@ -345,6 +349,8 @@ impl<'a> ConversionContext<'a> {
             initial_timestamp: DateTime::<Utc>::from_timestamp_micros(0).unwrap(),
             segment_builder,
             initial_dataframes: Vec::new(),
+            timeshift,
+            start_time,
         }
     }
 
@@ -402,9 +408,30 @@ impl<'a> ConversionContext<'a> {
 
     /// data packet 应该是 DataFrames(InstantiateObject|UpdateObject)
     fn process_first_dataframes_state(&mut self, data_packet: MixedPacketInfo, time_packet: MixedPacketInfo) -> Result<()> {
-        let timestamp = time_packet.timestamp
+        // control message 判断必须是Data
+        if !data_packet.data_pack.as_ref().map_or(false, |dp| dp.control.as_ref().map_or(false, |c| matches!(c, data_pack::Control::Data(true)))) {
+            return Ok(());
+        }
+        // 第一个 dataframe 必须是 InstantiateObject
+        if !data_packet.data_pack.as_ref().map_or(false, |dp| dp.frames.first().map_or(false, |f| matches!(f.message, Some(data_frame::Message::InstantiateObject(_))))) {
+            return Ok(());
+        }
+        if let Some(start_time) = &self.start_time {
+            if let Some(timestamp) = time_packet.timestamp {
+                let start_datetime = DateTime::parse_from_rfc3339(start_time)
+                    .with_context(|| format!("Failed to parse start_time: {}", start_time))?;
+                if timestamp < start_datetime {
+                    // skip this packet
+                    return Ok(());
+                } else {
+                    // only check once
+                    self.start_time = None;
+                }
+            }
+        }
+        let mut timestamp = time_packet.timestamp
             .ok_or_else(|| anyhow!("No timestamp in time packet"))?;
-        // timestamp = timestamp - TimeDelta::microseconds(92559773);
+        timestamp = timestamp + TimeDelta::microseconds(self.timeshift * 1_000);
         self.initial_timestamp = timestamp;
 
         self.segment_builder
@@ -484,9 +511,9 @@ impl<'a> ConversionContext<'a> {
                 }
             }
         }
-        let timestamp = time_packet.timestamp
+        let mut timestamp = time_packet.timestamp
             .ok_or_else(|| anyhow!("No timestamp in time packet"))?;
-        // timestamp = timestamp - TimeDelta::microseconds(92559773);
+        timestamp = timestamp + TimeDelta::microseconds(self.timeshift * 1_000);
         // 判断时间戳
         if timestamp - self.initial_timestamp > DURATION {
             self.initial_timestamp += DURATION;
@@ -522,6 +549,15 @@ impl<'a> ConversionContext<'a> {
                             self.update_initial_dataframes(frame.clone());
                             Some(frame)
                         }
+                        data_frame::Message::InstantiateObject(obj) => {
+                            obj.target = Some(instantiate_object::Target::RoomAll(RoomAll {
+                                room_id: self.data_room.id.clone(),
+                            })); // 修改 InstantiateObject 的目标为 RoomAll
+                            obj.owner_id = b"sys".to_vec(); // 设置 owner_id 为 "sys"
+                            let new_frame = frame.clone();
+                            self.insert_initial_dataframes(new_frame);
+                            Some(frame)
+                        }
                         _ => None,
                     }
                 } else {
@@ -554,7 +590,7 @@ impl<'a> ConversionContext<'a> {
         }
     }
 
-    fn update_initial_dataframes(&mut self, dataframe: DataFrame) {
+    fn update_initial_dataframes(&mut self, mut dataframe: DataFrame) {
         if let Some(existing_frame) = self.initial_dataframes.iter_mut().find(|f| {
             // message都是UpdateObject
             if let (Some(existing_message), Some(new_message)) = (f.message.as_ref(), dataframe.message.as_ref()) {
@@ -568,7 +604,41 @@ impl<'a> ConversionContext<'a> {
                 false
             }
         }) {
+            // change dataframe's target
+            if let Some(message) = &mut dataframe.message {
+                match message {
+                    data_frame::Message::UpdateObject(obj) => {
+                        obj.target = Some(update_object::Target::CurrentPlayer(CurrentPlayer {  }));
+                    }
+                    _ => {}
+                }
+            }
             *existing_frame = dataframe;
+        } else {
+            self.insert_initial_dataframes(dataframe);
         }
+    }
+    fn insert_initial_dataframes(&mut self, mut dataframe: DataFrame) {
+        if let Some(message) = &mut dataframe.message {
+            match message {
+                data_frame::Message::InstantiateObject(obj) => {
+                    obj.target = Some(instantiate_object::Target::CurrentPlayer(CurrentPlayer {  })); // 修改 InstantiateObject 的目标为 CurrentPlayer
+                }
+                data_frame::Message::UpdateObject(obj) => {
+                    obj.target = Some(update_object::Target::CurrentPlayer(CurrentPlayer {  }));  // 修改 UpdateObject 的目标为 CurrentPlayer
+                }
+                _ => {}
+            }
+        }
+        self.initial_dataframes.push(dataframe);
+        // sort InitialObject is first
+        self.initial_dataframes.sort_by(|a, b| {
+            match (a.message.as_ref(), b.message.as_ref()) {
+                (Some(data_frame::Message::InstantiateObject(_)), Some(data_frame::Message::InstantiateObject(_))) => Ordering::Equal,
+                (Some(data_frame::Message::InstantiateObject(_)), _) => Ordering::Less,
+                (_, Some(data_frame::Message::InstantiateObject(_))) => Ordering::Greater,
+                _ => Ordering::Equal,
+            }
+        });
     }
 }

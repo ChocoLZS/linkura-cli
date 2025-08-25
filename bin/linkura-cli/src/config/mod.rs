@@ -13,9 +13,9 @@ use crate::command::als::ArgsALS;
 
 /** ARG PARSER **/
 #[derive(Parser, Debug)]
+#[clap(version)]
 #[command(
     name = "linkura-cli",
-    version = "0.1.0",
     author = "ChocoLZS, chocoielzs@gmail.com",
     about = t!("linkura.cli.about").to_string(),
     long_about = None,

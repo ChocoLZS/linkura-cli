@@ -1,7 +1,6 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
+use std::{fs::File, sync::{
+    atomic::{AtomicBool, Ordering}, Arc
+}};
 use clap::{Args as ClapArgs};
 
 use crate::{cli, config::Global};
@@ -35,6 +34,10 @@ pub struct ArgsALS {
     pub retrieve_token_advance_offset: i64,
     #[clap(short('i'), long = "immediate", default_value_t = false, help="immediate mode, will not wait for token to be retrieved")]
     pub immediate: bool,
+    #[clap(long = "test", default_value_t = false, help="test mode, will not connect to server")]
+    pub test: bool,
+    #[clap(long = "test-result-file", value_name = "FILE")]
+    pub test_result_file: Option<String>,
 }
 
 pub struct AlsConnectionInfo {
@@ -45,6 +48,46 @@ pub struct AlsConnectionInfo {
 }
 
 pub fn run(ctx: &Global, connection_info: AlsConnectionInfo, args: &ArgsALS) -> Result<()> {
+    if args.test {
+        let api_client = &ctx.api_client;
+        let plan_list = api_client.high_level().get_plan_list()?;
+        let res = try_get_tokens(api_client, &plan_list)?;
+        if res.iter().all(|r| r.is_err()) {
+            return Err(anyhow::anyhow!("No valid tokens found"));
+        }
+        let mut test_results: Vec<serde_json::Value> = Vec::new();
+        for (i, r) in res.iter().enumerate() {
+            let item = plan_list.as_array().unwrap().get(i).unwrap();
+            let live_id = item["live_id"].as_str().unwrap();
+            let live_type = item["live_type"].as_u64().unwrap();
+            let name = item["name"].as_str().unwrap();
+            if let Ok(token) = r {
+                let payload_json = extract_jwt_payload(token.as_str())?;
+                tracing::info!(
+                    "Test mode: address: {}, port: {}, room_id: {}",
+                    payload_json["pod"]["address"].as_str().unwrap(),
+                    payload_json["pod"]["port"].as_u64().unwrap(),
+                    payload_json["room_id"].as_str().unwrap()
+                );
+                tracing::debug!("Token: {}", token);
+                test_results.push(serde_json::json!({
+                    "name": name,
+                    "live_id": live_id,
+                    "live_type": live_type,
+                    "address": payload_json["pod"]["address"].as_str().unwrap(),
+                    "port": payload_json["pod"]["port"].as_u64().unwrap(),
+                    "room_id": payload_json["room_id"].as_str().unwrap(),
+                }));
+            } else {
+                tracing::warn!("Failed to retrieve token for live:  name: {}, live_id: {}", name, live_id);
+            }
+        }
+        if let Some(test_result_file) = args.test_result_file.clone() {
+            let mut file = File::create(test_result_file)?;
+            serde_json::to_writer_pretty(&mut file, &test_results)?;
+        }
+        return Ok(());
+    }
     let needs_fetch_connection_info = connection_info.address.is_none()
         || connection_info.port.is_none()
         || connection_info.room_id.is_none()
@@ -80,7 +123,7 @@ pub fn run(ctx: &Global, connection_info: AlsConnectionInfo, args: &ArgsALS) -> 
     run_client(ctx, connection_info)
 }
 
-fn get_token(api_client: &ApiClient, live_type: u64, live_id: &str) -> Result<String> {
+fn fetch_token(api_client: &ApiClient, live_type: u64, live_id: &str) -> Result<String> {
     if live_type == 2 {
         return api_client
             .high_level()
@@ -111,20 +154,38 @@ fn get_connect_info(token: String, connection_info: AlsConnectionInfo) -> Result
     })
 }
 
-fn fetch_connection_info_immediate(
-    ctx: &Global,
-    connection_info: AlsConnectionInfo,
-) -> Result<ConnectionInfo> {
+fn try_get_tokens(api_client: &ApiClient, plan_list: &serde_json::Value) -> Result<Vec<Result<String>>> {
+    let mut tokens = Vec::new();
+    for item in plan_list.as_array().unwrap() {
+        tokens.push(get_token(api_client, item));
+    }
+    if tokens.is_empty() {
+        return Err(anyhow::anyhow!("No valid tokens found"));
+    }
+    Ok(tokens)
+}
+
+fn get_token(api_client: &ApiClient, item: &serde_json::Value) -> Result<String> {
+    let live_id = item.get("live_id").unwrap().as_str().unwrap().to_string();
+    let live_type = item.get("live_type").unwrap().as_u64().unwrap();
+    fetch_token(api_client, live_type, &live_id)
+}
+
+fn get_latest_token(ctx: &Global) -> Result<String> {
     let api_client = &ctx.api_client;
     let plan_list = api_client.high_level().get_plan_list()?;
     let res: Option<&serde_json::Value> = plan_list.as_array().unwrap().first();
     if res.is_none() {
         return Err(anyhow::anyhow!("No plan found"));
     }
-    let item = res.unwrap();
-    let live_id = item.get("live_id").unwrap().as_str().unwrap().to_string();
-    let live_type = item.get("live_type").unwrap().as_u64().unwrap();
-    let token = get_token(api_client, live_type, &live_id)?;
+    get_token(api_client, res.unwrap())
+}
+
+fn fetch_connection_info_immediate(
+    ctx: &Global,
+    connection_info: AlsConnectionInfo,
+) -> Result<ConnectionInfo> {
+    let token = get_latest_token(ctx)?;
     get_connect_info(token, connection_info)
 }
 
@@ -199,7 +260,7 @@ fn fetch_connection_info(
     loop {
         let now = Utc::now();
         if now >= live_start_time - start_time_offset {
-            match get_token(api_client, live_type, &live_id) {
+            match fetch_token(api_client, live_type, &live_id) {
                 Ok(t) => {
                     token = t;
                     break;
