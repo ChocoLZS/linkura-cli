@@ -1,0 +1,85 @@
+syntax = "proto3";
+package als;
+
+message DataPack
+{
+	oneof control
+{
+	bool data = 2;
+	bool pong = 10;
+	int64 segment_started_at = 14;
+	bool cache_ended = 15;
+}
+	repeated .als.DataFrame frames = 16;
+}
+message DataFrame
+{
+	oneof message
+{
+	.als.InstantiateObject instantiate_object = 128;
+	.als.UpdateObject update_object = 129;
+	.als.DestroyObject destroy_object = 130;
+	.als.Room room = 143;
+	.als.AuthorizeResponse authorize_response = 144;
+	.als.JoinRoomResponse join_room_response = 147;
+}
+}
+message CurrentPlayer
+{
+}
+message RoomAll
+{
+	bytes room_id = 1;
+}
+message Room
+{
+	bytes id = 1;
+	int64 started_at = 2;
+	int64 ended_at = 3;
+}
+message InstantiateObject
+{
+	oneof target
+{
+	.als.CurrentPlayer current_player = 3;
+	.als.RoomAll room_all = 4;
+	bytes player_id = 7;
+}
+	int32 object_id = 8;
+	bytes owner_id = 9;
+	bytes prefab_name = 10;
+	bytes init_data = 11;
+}
+message UpdateObject
+{
+	oneof target
+{
+	.als.CurrentPlayer current_player = 2;
+	.als.RoomAll room_all = 3;
+	bytes player_id = 6;
+}
+	int32 object_id = 8;
+	int32 method = 9;
+	bytes payload = 10;
+}
+message DestroyObject
+{
+	oneof target
+{
+	.als.CurrentPlayer current_player = 2;
+	.als.RoomAll room_all = 3;
+	bytes player_id = 6;
+}
+	int32 object_id = 8;
+}
+message AuthorizeResponse
+{
+	bytes player_id = 1;
+	int32 role = 2;
+	repeated bytes allowed_room_ids = 3;
+}
+message JoinRoomResponse
+{
+	.als.Room room = 1;
+	int64 joined_at = 2;
+}

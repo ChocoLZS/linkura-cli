@@ -1,0 +1,18 @@
+_version: 2
+linkura:
+  cli:
+    about:
+      zh: "林库拉的交互式 API 客户端"
+      ja: "リンクラのインタラクティブな API クライアント"
+      en: "Interactive cli api client for Linkura"
+  interactive:
+    prompt.account:
+      zh: "请输入你的账号id（app登陆界面左上角）"
+      ja: "アカウントIDを入力してください（アプリのログイン画面の左上）"
+      en: "Please enter your account ID (top left of the app login screen)"
+
+common:
+  config.initialize.failed:
+    zh: "初始化配置失败"
+    ja: "設定の初期化に失敗しました"
+    en: "Failed to initialize config"

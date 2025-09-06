@@ -1,0 +1,68 @@
+# eng is trick for rust_i18n
+
+_version: 2
+motion:
+  cli:
+    about:
+      zh: "林库拉的动捕回放处理工具"
+      ja: "リンクラの動捕再生処理ツール"
+      eng: "Linkura Motion Capture Playback Processing Tool"
+    args:
+      quiet:
+        zh: '静默模式，默认是关闭'
+        ja: 'サイレントモード、デフォルトはオフです'
+        eng: 'Quiet mode, default is off'
+
+motion.cli.command.download:
+  args:
+    type:
+      zh: '下载类型：als, mrs。默认为自动检测'
+      ja: 'ダウンロードタイプ：als、mrs。デフォルトは自動検出です'
+      eng: 'Download type: als, mrs. Default is auto-detect'
+    directory:
+      zh: '下载目录，默认是当前目录'
+      ja: 'ダウンロードディレクトリ、デフォルトはカレントディレクトリです'
+      eng: 'Download directory, default is current directory'
+    url:
+      zh: '动捕回放链接'
+      ja: 'モーションキャプチャ再生リンク'
+      eng: 'Motion capture playback link'
+    parallel:
+      zh: '并行下载，默认是 16'
+      ja: '並行ダウンロード、デフォルトは16です'
+      eng: 'Parallel downloads, default is 16'
+
+motion.cli.command.upload:
+  args:
+    bucket:
+      zh: 'R2 存储桶名称（或设置 R2_BUCKET 环境变量）'
+      ja: 'R2バケット名（またはR2_BUCKET環境変数を設定）'
+      eng: 'R2 bucket name (or set R2_BUCKET env var)'
+    account_id:
+      zh: 'Cloudflare 账户 ID（或设置 R2_ACCOUNT_ID 环境变量）'
+      ja: 'CloudflareアカウントID（またはR2_ACCOUNT_ID環境変数を設定）'
+      eng: 'Cloudflare account ID (or set R2_ACCOUNT_ID env var)'
+    access_key:
+      zh: 'R2 访问密钥 ID（或设置 R2_ACCESS_KEY_ID 环境变量）'
+      ja: 'R2アクセスキーID（またはR2_ACCESS_KEY_ID環境変数を設定）'
+      eng: 'R2 access key ID (or set R2_ACCESS_KEY_ID env var)'
+    secret_key:
+      zh: 'R2 秘密访问密钥（或设置 R2_SECRET_ACCESS_KEY 环境变量）'
+      ja: 'R2シークレットアクセスキー（またはR2_SECRET_ACCESS_KEY環境変数を設定）'
+      eng: 'R2 secret access key (or set R2_SECRET_ACCESS_KEY env var)'
+    path:
+      zh: '要上传的本地文件或文件夹'
+      ja: 'アップロードするローカルファイルまたはフォルダ'
+      eng: 'Local file or folder to upload'
+    prefix:
+      zh: '远程路径前缀（可选）'
+      ja: 'リモートパスプレフィックス（オプション）'
+      eng: 'Remote path prefix (optional)'
+    concurrent:
+      zh: '并发上传数量，默认是 4'
+      ja: '並行アップロード数、デフォルトは4です'
+      eng: 'Concurrent uploads, default is 4'
+    delete_after_done:
+      zh: '成功上传后删除下载的文件'
+      ja: 'アップロード成功後にダウンロードしたファイルを削除'
+      eng: 'Delete downloaded files after successful upload'

@@ -1,0 +1,29 @@
+[package]
+name = "linkura-motion-cli"
+version = "1.1.0"
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+metadata.workspace = true
+
+[dependencies]
+linkura-common.workspace = true
+linkura-downloader.workspace = true
+linkura-packet.workspace = true
+i18n.workspace = true
+
+anyhow.workspace = true
+clap.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+rust-i18n.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+url.workspace = true
+
+
+[[bin]]
+name = "linkura-motion-cli"
+path = "src/main.rs"

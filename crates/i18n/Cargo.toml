@@ -1,0 +1,12 @@
+[package]
+name = "i18n"
+version = "0.0.0"
+
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+rust-i18n.workspace = true
+sys-locale = "0.3"
