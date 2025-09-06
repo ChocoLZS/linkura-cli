@@ -1,0 +1,12 @@
+/target
+
+/.DS_Store
+
+*.exe
+*.json
+
+output-*
+
+*.txt
+data
+data_*

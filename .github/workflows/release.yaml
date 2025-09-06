@@ -1,0 +1,126 @@
+name: Release
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      binary_name:
+        type: choice
+        description: "Binary name for release"
+        required: true
+        options:
+          - linkura-cli
+          - linkura-motion-cli
+        default: linkura-cli
+      create_release:
+        type: boolean
+        description: "Create a release"
+        default: true
+      # features:
+      #   type: string
+      #   description: "Custom features to build"
+      archive_suffix:
+        type: choice
+        description: "Suffix for the archive bin filename."
+        options:
+          - '-'
+
+jobs:
+  create-release:
+    if: inputs.create_release == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get tag name
+        id: get_tag
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "tag_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag_name=v$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Prepare Release Body
+        id: prepare_release_body
+        run: |
+          tag_name="${{ steps.get_tag.outputs.tag_name }}"
+
+          # Read the template and replace placeholders
+          template_content=$(cat .github/release_template.md)
+          release_body="${template_content//VERSION/$tag_name}"
+          
+          # Save to output
+          echo "release_body<<EOF" >> $GITHUB_OUTPUT
+          echo "$release_body" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_tag.outputs.tag_name }}
+          name: Release ${{ steps.get_tag.outputs.tag_name }}
+          body: ${{ steps.prepare_release_body.outputs.release_body }}
+
+  upload-assets:
+    needs: [create-release]
+    if: |
+      always() &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
+    strategy:
+      matrix:
+        include:
+          # - target: x86_64-unknown-linux-gnu
+          #   os: ubuntu-latest
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-gnu
+            os: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup | Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup | Environment [musl]
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update -qq && sudo apt-get -y install \
+            pkg-config musl-tools musl-dev
+          echo PKG_CONFIG_ALLOW_CROSS=1 >> $GITHUB_ENV
+          echo CC_x86_64_unknown_linux_musl=musl-gcc >> $GITHUB_ENV
+          echo CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc >> $GITHUB_ENV
+
+      - name: Setup | Environment [-nix]
+        if: matrix.target != 'x86_64-pc-windows-gnu' && matrix.target != 'x86_64-unknown-linux-musl'
+        run: |
+          echo PKG_CONFIG_ALLOW_CROSS=1 >> $GITHUB_ENV
+  
+      - name: Setup | Environment [Windows]
+        if: matrix.target == 'x86_64-pc-windows-gnu'
+        run: |
+          sudo apt-get update -qq && sudo apt-get -y install \
+            mingw-w64
+          echo PKG_CONFIG_ALLOW_CROSS=1 >> $GITHUB_ENV
+
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          build-tool: cargo
+          bin: ${{ inputs.binary_name }}
+          archive: '$bin${{ inputs.archive_suffix }}$target'
+          target: ${{ matrix.target }}
+          # features: ${{ inputs.features || '' }}
+          tar: unix
+          zip: windows
+          # asset: target/release/${{ inputs.binary_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}

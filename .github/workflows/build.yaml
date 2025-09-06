@@ -1,0 +1,124 @@
+name: Build
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags-ignore:
+      - '**'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # - target: x86_64-unknown-linux-gnu
+          #   os: ubuntu-latest
+          #   name: linkura-x86_64-unknown-linux-gnu.tar.gz
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            name: linkura-x86_64-unknown-linux-musl.tar.gz
+          - target: x86_64-pc-windows-gnu
+            os: ubuntu-latest
+            name: linkura-x86_64-pc-windows-gnu.zip
+          - target: x86_64-apple-darwin
+            os: macOS-latest
+            name: linkura-x86_64-apple-darwin.tar.gz
+          - target: aarch64-apple-darwin
+            os: macOS-latest
+            name: linkura-aarch64-apple-darwin.tar.gz
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    steps:
+      - name: Setup | Checkout
+        uses: actions/checkout@v2.4.0
+
+      - name: Setup | Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup | Cache Cargo
+        uses: actions/cache@v4.2.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Setup | Cache Cargo Target
+        uses: actions/cache@v4.2.0
+        with:
+          path: target
+          key: ${{ matrix.target }}-cargo-target
+
+      - name: Setup | Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
+          target: ${{ matrix.target }}
+
+      # - name: Setup | Protoc
+      #   uses: arduino/setup-protoc@v3
+      #   with:
+      #     repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup | Environment [musl]
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update -qq && sudo apt-get -y install \
+            pkg-config musl-tools musl-dev
+          echo PKG_CONFIG_ALLOW_CROSS=1 >> $GITHUB_ENV
+          echo CC_x86_64_unknown_linux_musl=musl-gcc >> $GITHUB_ENV
+          echo CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc >> $GITHUB_ENV
+
+      - name: Setup | Environment [-nix]
+        if: matrix.target != 'x86_64-pc-windows-gnu' && matrix.target != 'x86_64-unknown-linux-musl'
+        run: |
+          echo PKG_CONFIG_ALLOW_CROSS=1 >> $GITHUB_ENV
+
+      - name: Setup | Environment [Windows]
+        if: matrix.target == 'x86_64-pc-windows-gnu'
+        run: |
+          sudo apt-get update -qq && sudo apt-get -y install \
+            mingw-w64
+          echo PKG_CONFIG_ALLOW_CROSS=1 >> $GITHUB_ENV
+      
+      - name: Setup tmate session
+        if: matrix.target == 'x86_64-pc-windows-gnu'
+        uses: mxschmitt/action-tmate@v3
+        with:
+          detached: true
+
+      - name: Build | Build
+        shell: bash
+        run: |
+          cargo build --release --locked --target ${{ matrix.target }} --workspace \
+             --exclude als-client --exclude mrs-client
+
+      - name: PostBuild | Prepare artifacts [Windows]
+        if: matrix.target == 'x86_64-pc-windows-gnu'
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          strip linkura-cli.exe
+          tar czvf ../../../${{ matrix.name }} linkura-cli.exe
+          cd -
+      - name: PostBuild | Prepare artifacts [-nix]
+        if: matrix.target != 'x86_64-pc-windows-gnu'
+        run: |
+          cd target/${{ matrix.target }}/release
+          strip linkura-cli || true
+          tar czvf ../../../${{ matrix.name }} linkura-cli
+          cd -
+
+      - name: Deploy | Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ matrix.name }}
