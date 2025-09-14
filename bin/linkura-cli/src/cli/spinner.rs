@@ -13,7 +13,7 @@ impl SpinnerManager {
     pub fn new(quiet: bool) -> Self {
         Self { quiet }
     }
-    
+
     pub fn create_spinner(&self, message: &str) -> ProgressBar {
         if self.quiet {
             // Create a hidden progress bar that doesn't output to console
@@ -31,7 +31,7 @@ impl SpinnerManager {
             pb
         }
     }
-    
+
     pub fn create_spinner_with_color(&self, message: &str, color: &str) -> ProgressBar {
         if self.quiet {
             let pb = ProgressBar::hidden();

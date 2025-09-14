@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use futures::future::join_all;
 use reqwest::Client;
@@ -8,7 +8,10 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use url::Url;
 
-use crate::progress_ui::{ProgressReporter, ProgressReporterFactory, SilentProgressReporterFactory, TreeProgressReporterFactory};
+use crate::progress_ui::{
+    ProgressReporter, ProgressReporterFactory, SilentProgressReporterFactory,
+    TreeProgressReporterFactory,
+};
 
 #[derive(Debug, Clone)]
 pub struct DownloadItem {
@@ -64,16 +67,15 @@ impl ProgressConfig for BaseDownloaderImpl {
 }
 
 impl BaseDownloaderImpl {
-
     pub fn client(&self) -> &Client {
         &self.client
     }
 
     pub fn extract_folder_name_from_url(&self, url_str: &str) -> Result<String> {
-        let url = Url::parse(url_str)
-            .map_err(|e| anyhow!("Invalid URL: {}", e))?;
-        
-        let path_segments: Vec<&str> = url.path_segments()
+        let url = Url::parse(url_str).map_err(|e| anyhow!("Invalid URL: {}", e))?;
+
+        let path_segments: Vec<&str> = url
+            .path_segments()
             .ok_or_else(|| anyhow!("URL has no path segments"))?
             .collect();
 
@@ -85,10 +87,10 @@ impl BaseDownloaderImpl {
     }
 
     pub fn extract_filename_from_url(&self, url_str: &str) -> Result<String> {
-        let url = Url::parse(url_str)
-            .map_err(|e| anyhow!("Invalid URL: {}", e))?;
-        
-        let path_segments: Vec<&str> = url.path_segments()
+        let url = Url::parse(url_str).map_err(|e| anyhow!("Invalid URL: {}", e))?;
+
+        let path_segments: Vec<&str> = url
+            .path_segments()
             .ok_or_else(|| anyhow!("URL has no path segments"))?
             .collect();
 
@@ -100,18 +102,19 @@ impl BaseDownloaderImpl {
     }
 
     pub fn get_base_url(&self, url_str: &str) -> Result<String> {
-        let url = Url::parse(url_str)
-            .map_err(|e| anyhow!("Invalid URL: {}", e))?;
-        
-        let mut path_segments: Vec<&str> = url.path_segments()
+        let url = Url::parse(url_str).map_err(|e| anyhow!("Invalid URL: {}", e))?;
+
+        let mut path_segments: Vec<&str> = url
+            .path_segments()
             .ok_or_else(|| anyhow!("URL has no path segments"))?
             .collect();
 
         path_segments.pop();
 
         let base_path = path_segments.join("/");
-        let base_url = format!("{}://{}/{}", 
-            url.scheme(), 
+        let base_url = format!(
+            "{}://{}/{}",
+            url.scheme(),
             url.host_str().ok_or_else(|| anyhow!("URL has no host"))?,
             base_path
         );
@@ -121,19 +124,17 @@ impl BaseDownloaderImpl {
 }
 
 impl BaseDownloaderImpl {
-    pub async fn download_files(
-        &self,
-        items: Vec<DownloadItem>,
-        output_dir: &Path,
-    ) -> Result<()> {
+    pub async fn download_files(&self, items: Vec<DownloadItem>, output_dir: &Path) -> Result<()> {
         fs::create_dir_all(output_dir).await?;
 
         let total_files = items.len() as u64;
-        let progress_reporter = self.progress_factory.create_reporter(total_files, self.concurrent_downloads);
+        let progress_reporter = self
+            .progress_factory
+            .create_reporter(total_files, self.concurrent_downloads);
 
         let semaphore = Arc::new(tokio::sync::Semaphore::new(self.concurrent_downloads));
         let active_threads = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        
+
         let tasks: Vec<_> = items
             .into_iter()
             .map(|item| {
@@ -143,32 +144,35 @@ impl BaseDownloaderImpl {
                 let progress_reporter = progress_reporter.as_ref();
                 let active_threads = active_threads.clone();
                 let concurrent_downloads = self.concurrent_downloads;
-                
+
                 async move {
                     let _permit = semaphore.acquire().await.unwrap();
-                    
-                    let thread_id = active_threads.fetch_add(1, std::sync::atomic::Ordering::SeqCst) % concurrent_downloads;
-                    
+
+                    let thread_id = active_threads
+                        .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                        % concurrent_downloads;
+
                     let result = Self::download_single_file_with_progress_reporter(
-                        &client, 
-                        &item.url, 
+                        &client,
+                        &item.url,
                         &output_path,
                         thread_id,
                         &item.filename,
-                        progress_reporter
-                    ).await;
-                    
+                        progress_reporter,
+                    )
+                    .await;
+
                     progress_reporter.finish_file(thread_id, &item.filename);
-                    
+
                     result
                 }
             })
             .collect();
 
         let results = join_all(tasks).await;
-        
+
         progress_reporter.finish_all();
-        
+
         for result in results {
             result?;
         }
@@ -191,15 +195,12 @@ impl BaseDownloaderImpl {
             .map_err(|e| anyhow!("Failed to fetch {}: {}", url, e))?;
 
         if !response.status().is_success() {
-            return Err(anyhow!(
-                "HTTP error {} for URL: {}",
-                response.status(),
-                url
-            ));
+            return Err(anyhow!("HTTP error {} for URL: {}", response.status(), url));
         }
 
         let total_size = response.content_length().unwrap_or(0);
-        let file_progress = progress_reporter.assign_file_to_thread(thread_id, filename, total_size);
+        let file_progress =
+            progress_reporter.assign_file_to_thread(thread_id, filename, total_size);
 
         let mut file = fs::File::create(output_path)
             .await

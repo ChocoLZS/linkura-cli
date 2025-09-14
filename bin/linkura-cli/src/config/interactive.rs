@@ -1,10 +1,15 @@
 use anyhow::Result;
 use inquire::{Password, Text};
 
-use linkura_api::{self, ApiClient, Credential};
 use crate::cli::spinner::SpinnerManager;
+use linkura_api::{self, ApiClient, Credential};
 
-pub fn get_credential_with_simple_prompt(client: &mut ApiClient, spinner_manager: &SpinnerManager, player_id: Option<String>, password: Option<String>) -> Result<Credential> {
+pub fn get_credential_with_simple_prompt(
+    client: &mut ApiClient,
+    spinner_manager: &SpinnerManager,
+    player_id: Option<String>,
+    password: Option<String>,
+) -> Result<Credential> {
     let player_id = match player_id {
         Some(id) => id,
         None => Text::new("请输入你的账号id（app登陆界面左上角）").prompt()?,
