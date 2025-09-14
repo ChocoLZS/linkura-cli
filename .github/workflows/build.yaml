@@ -10,14 +10,11 @@ on:
       - '**'
 
 jobs:
-  build:
+  setup:
     strategy:
       fail-fast: false
       matrix:
         include:
-          # - target: x86_64-unknown-linux-gnu
-          #   os: ubuntu-latest
-          #   name: linkura-x86_64-unknown-linux-gnu.tar.gz
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
             name: linkura-x86_64-unknown-linux-musl.tar.gz
@@ -63,11 +60,6 @@ jobs:
           profile: minimal
           target: ${{ matrix.target }}
 
-      # - name: Setup | Protoc
-      #   uses: arduino/setup-protoc@v3
-      #   with:
-      #     repo-token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Setup | Environment [musl]
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
@@ -95,11 +87,43 @@ jobs:
         with:
           detached: true
 
-      - name: Build | Build
+      - name: Setup | Upload workspace cache
+        uses: actions/cache/save@v4
+        with:
+          path: .
+          key: workspace-${{ github.sha }}-${{ matrix.target }}
+
+  standard-build:
+    needs: setup
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            name: linkura-x86_64-unknown-linux-musl.tar.gz
+          - target: x86_64-pc-windows-gnu
+            os: ubuntu-latest
+            name: linkura-x86_64-pc-windows-gnu.zip
+          - target: x86_64-apple-darwin
+            os: macOS-latest
+            name: linkura-x86_64-apple-darwin.tar.gz
+          - target: aarch64-apple-darwin
+            os: macOS-latest
+            name: linkura-aarch64-apple-darwin.tar.gz
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    steps:
+      - name: Setup | Restore workspace cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .
+          key: workspace-${{ github.sha }}-${{ matrix.target }}
+
+      - name: Build | Standard Build
         shell: bash
         run: |
-          cargo build --release --locked --target ${{ matrix.target }} --workspace \
-             --exclude als-client --exclude mrs-client
+          cargo build --release --locked --target ${{ matrix.target }} --workspace
 
       - name: PostBuild | Prepare artifacts [Windows]
         if: matrix.target == 'x86_64-pc-windows-gnu'
@@ -122,3 +146,37 @@ jobs:
         with:
           name: ${{ matrix.name }}
           path: ${{ matrix.name }}
+
+  features-build:
+    needs: setup
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            name: linkura-x86_64-unknown-linux-musl.tar.gz
+          - target: x86_64-pc-windows-gnu
+            os: ubuntu-latest
+            name: linkura-x86_64-pc-windows-gnu.zip
+          - target: x86_64-apple-darwin
+            os: macOS-latest
+            name: linkura-x86_64-apple-darwin.tar.gz
+          - target: aarch64-apple-darwin
+            os: macOS-latest
+            name: linkura-aarch64-apple-darwin.tar.gz
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    steps:
+      - name: Setup | Restore workspace cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .
+          key: workspace-${{ github.sha }}-${{ matrix.target }}
+
+      - name: Build | Build with features
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          cargo build --release --locked --target ${{ matrix.target }} --workspace --all-features
