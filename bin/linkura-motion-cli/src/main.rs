@@ -18,11 +18,11 @@ use url::Url;
 #[derive(Parser, Debug)]
 #[clap(version)]
 #[command(
-    name = "linkura-downloader-cli",
+    name = "linkura-motion-cli",
     author = "ChocoLZS, chocoielzs@outlook.com",
     about = t!("motion.cli.about").to_string(),
     // long_about = None,
-    bin_name = "linkura-downloader-cli",
+    bin_name = "linkura-motion-cli",
 )]
 pub struct Args {
     #[clap(short('q'), long = "quiet", help = t!("motion.cli.args.quiet").to_string(), default_value = "false")]
@@ -208,6 +208,16 @@ pub struct ArgsConvert {
     pub audio_only: bool,
 }
 
+#[cfg(feature = "audio")]
+#[derive(Debug, ClapArgs)]
+/// Extract archive audio from archive files
+pub struct ArgsAudio {
+    #[clap(short('i'), long = "input", value_name = "INPUT_FILE", help = "Input archive file path")]
+    pub input_file: String,
+    #[clap(short('o'), long = "output", value_name = "OUTPUT_DIR", help = "Output directory for extracted audio", default_value = "audio")]
+    pub output_dir: String,
+}
+
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     Download(ArgsDownload),
@@ -215,6 +225,8 @@ pub enum Commands {
     Sync(ArgsSync),
     Analyze(ArgsAnalyze),
     Convert(ArgsConvert),
+    #[cfg(feature = "audio")]
+    Audio(ArgsAudio),
 }
 
 #[tokio::main]
@@ -569,6 +581,31 @@ async fn main() -> Result<()> {
 
             info!("✅ ALS conversion completed successfully!");
             info!("📄 Output files written to: {}", convert_args.output_dir);
+        }
+        #[cfg(feature = "audio")]
+        Some(Commands::Audio(audio_args)) => {
+            info!("🔊 Starting audio extraction from archive file");
+            info!("📂 Input file: {}", audio_args.input_file);
+            info!("📁 Output directory: {}", audio_args.output_dir);
+            let input_path = std::path::Path::new(&audio_args.input_file);
+            if !input_path.exists() {
+                return Err(Error::msg(format!(
+                    "Input file does not exist: {}",
+                    audio_args.input_file
+                )));
+            }
+            // Convert async context to sync for the audio extraction
+            let _result = tokio::task::spawn_blocking({
+                let input_file = audio_args.input_file.clone();
+                let output_dir = audio_args.output_dir.clone();
+                move || {
+                    let converter = AlsConverter::new(10, true);
+                    converter.extract_audio_from_standard(&input_file, &output_dir)
+                }
+            })
+            .await??;
+            info!("✅ Audio extraction completed successfully!");
+            info!("📄 Output audio files written to: {}", audio_args.output_dir);
         }
         None => {}
     }

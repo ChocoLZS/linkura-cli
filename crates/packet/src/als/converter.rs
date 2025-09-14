@@ -1,12 +1,9 @@
-use crate::als::{
-    proto::{
-        MixedPacketInfo, MixedPacketReader, PacketInfo,
-        proto::als::{
+use crate::als::proto::{
+        MixedPacketInfo, MixedPacketReader, PacketInfo, ProtoPacketReader, proto::als::{
             CurrentPlayer, DataFrame, DataPack, Room, RoomAll, data_frame, data_pack,
             destroy_object, instantiate_object, update_object,
-        },
-    },
-};
+        }
+    };
 use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, FixedOffset, TimeDelta, Utc};
 use std::fmt;
@@ -19,7 +16,7 @@ use std::{
 };
 
 #[cfg(feature = "audio")]
-use super::audio::{AudioBuilder, AudioRawPacket};
+use super::audio::{AudioBuilder};
 
 #[derive(PartialEq, Eq, Debug)]
 enum AlsConverterStateMachine {
@@ -78,38 +75,39 @@ impl AlsConverter {
             output_dir.to_str().map(String::from),
             self.use_audio_processing,
         );
-        let mut packet_buffer = PacketsBuffer::new(input_dir);
+        let mut packet_buffer = MixedPacketsBuffer::new(input_dir);
 
         self.process_all_packets(&mut context, &mut packet_buffer)?;
         self.finalize_conversion(&mut context, output_dir)?;
         Ok(())
     }
 
-    /// 尝试读取一对数据包，如果没有更多文件则返回 None
-    fn try_read_packet_pair(
+    #[cfg(feature = "audio")]
+    pub fn extract_audio_from_standard<P: AsRef<Path>>(
         &self,
-        packet_buffer: &mut PacketsBuffer,
-    ) -> Result<Option<(MixedPacketInfo, MixedPacketInfo)>> {
-        match packet_buffer.read() {
-            Ok(packets) => Ok(Some(packets)),
-            Err(err) => {
-                if let Some(PacketsBufferError::NoMoreFileEntries) =
-                    err.downcast_ref::<PacketsBufferError>()
-                {
-                    Ok(None)
-                } else {
-                    Err(err)
-                }
-            }
+        input_dir: P,
+        output_dir: P,
+    ) -> Result<()> {
+        let input_dir = input_dir.as_ref();
+        let output_dir = output_dir.as_ref();
+        // Process each audio file in the input directory
+        let mut packet_buffer = StandardPacketsBuffer::new(input_dir);
+        let mut audio_builder = AudioBuilder::new(output_dir.to_str().map(String::from));
+        while let Some(packet) = packet_buffer.try_read_packet()? {
+            audio_builder.handle_audio_packet(&packet);
         }
+        audio_builder.write_to_file(output_dir).unwrap_or_else(|e| {
+            tracing::error!("Failed to write audio files: {:?}", e);
+        });
+        Ok(())
     }
 
     fn process_all_packets(
         &self,
         context: &mut ConversionContext,
-        packet_buffer: &mut PacketsBuffer,
+        packet_buffer: &mut MixedPacketsBuffer,
     ) -> Result<()> {
-        while let Some((data_packet, time_packet)) = self.try_read_packet_pair(packet_buffer)? {
+        while let Some((data_packet, time_packet)) = packet_buffer.try_read_packet_pair()? {
             let end = context.process_packet_pair(data_packet, time_packet)?;
             if end {
                 break;
@@ -138,6 +136,8 @@ impl AlsConverter {
         }
         Ok(())
     }
+
+
 }
 
 #[derive(Debug)]
@@ -161,15 +161,15 @@ impl fmt::Display for PacketsBufferError {
 
 impl std::error::Error for PacketsBufferError {}
 
-struct PacketsBuffer {
+struct MixedPacketsBuffer {
     // queue
     packets_buffer: std::collections::VecDeque<MixedPacketInfo>,
     file_entries: std::collections::VecDeque<DirEntry>,
 }
 
-impl PacketsBuffer {
+impl MixedPacketsBuffer {
     pub fn new(input_dir: &Path) -> Self {
-        PacketsBuffer {
+        MixedPacketsBuffer {
             packets_buffer: std::collections::VecDeque::new(),
             file_entries: Self::get_file_entries(input_dir).unwrap_or_default(),
         }
@@ -187,7 +187,7 @@ impl PacketsBuffer {
                 .pop_front()
                 .ok_or_else(|| anyhow!("No more file entries available"))?;
             let packets = self
-                .read_mixed_packets(Some(&file_entry))
+                .read_packets(Some(&file_entry))
                 .with_context(|| "Failed to read mixed packets from file entry")?;
             self.packets_buffer.extend(packets);
         }
@@ -202,7 +202,7 @@ impl PacketsBuffer {
         Ok((datapack_packet, timestamp_packet))
     }
 
-    fn read_mixed_packets(
+    fn read_packets(
         &self,
         file_entry: Option<&DirEntry>,
     ) -> Result<std::collections::VecDeque<MixedPacketInfo>> {
@@ -216,6 +216,24 @@ impl PacketsBuffer {
             .read_mixed_packets()
             .with_context(|| "Failed to read mixed packets")?;
         Ok(std::collections::VecDeque::from(packets))
+    }
+
+    /// 尝试读取一对数据包，如果没有更多文件则返回 None
+    fn try_read_packet_pair(
+        &mut self
+    ) -> Result<Option<(MixedPacketInfo, MixedPacketInfo)>> {
+        match self.read() {
+            Ok(packets) => Ok(Some(packets)),
+            Err(err) => {
+                if let Some(PacketsBufferError::NoMoreFileEntries) =
+                    err.downcast_ref::<PacketsBufferError>()
+                {
+                    Ok(None)
+                } else {
+                    Err(err)
+                }
+            }
+        }
     }
 
     fn get_file_entries(input_dir: &Path) -> Result<std::collections::VecDeque<DirEntry>> {
@@ -250,6 +268,82 @@ impl PacketsBuffer {
             let num_a = extract_number(a).unwrap_or(0);
             let num_b = extract_number(b).unwrap_or(0);
             num_a.cmp(&num_b)
+        });
+
+        if input_files.is_empty() {
+            return Err(anyhow!("No input files found"));
+        }
+        Ok(std::collections::VecDeque::from(input_files))
+    }
+}
+
+struct StandardPacketsBuffer {
+    // queue
+    packets_buffer: std::collections::VecDeque<PacketInfo>,
+    file_entries: std::collections::VecDeque<DirEntry>,
+}
+
+impl StandardPacketsBuffer {
+    fn new(input_dir: &Path) -> Self {
+        StandardPacketsBuffer {
+            packets_buffer: std::collections::VecDeque::new(),
+            file_entries: Self::get_file_entries(input_dir).unwrap_or_default(),
+        }
+    }
+    fn try_read_packet(
+        &mut self
+    ) -> Result<Option<PacketInfo>> {
+        if self.packets_buffer.is_empty() {
+            if self.file_entries.is_empty() {
+                return Ok(None);
+            }
+            // try reading from file entries
+            let file_entry = self
+                .file_entries
+                .pop_front()
+                .ok_or_else(|| anyhow!("No more file entries available"))?;
+            let packets = self
+                .read_packets(Some(&file_entry))
+                .with_context(|| "Failed to read mixed packets from file entry")?;
+            self.packets_buffer.extend(packets);
+        }
+        Ok(Some(self.packets_buffer.pop_front().ok_or_else(|| anyhow::Error::from(PacketsBufferError::NoPacketInBuffer))?))
+    }
+
+    fn read_packets(
+        &self,
+        file_entry: Option<&DirEntry>,
+    ) -> Result<std::collections::VecDeque<PacketInfo>> {
+        let Some(file_entry) = file_entry else {
+            return Err(anyhow!("No file entry provided"));
+        };
+        let file = File::open(file_entry.path())
+            .with_context(|| format!("Failed to open initial fragment: {:?}", file_entry))?;
+        let mut reader = ProtoPacketReader::new(file);
+        let packets = reader
+            .read_packets_with_limit(usize::MAX)
+            .with_context(|| "Failed to read mixed packets")?;
+        Ok(std::collections::VecDeque::from(packets))
+    }
+
+    fn get_file_entries(input_dir: &Path) -> Result<std::collections::VecDeque<DirEntry>> {
+        if !input_dir.is_dir() {
+            return Err(anyhow!("Input path is not a directory"));
+        }
+        // Read packets from input directory
+        let mut input_files = std::fs::read_dir(input_dir)?
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .path()
+                    .extension()
+                    .map(|ext| ext == "ts")
+                    .unwrap_or(false)
+            })
+            .collect::<Vec<_>>();
+
+        input_files.sort_by(|a, b| {
+            a.file_name().cmp(&b.file_name())
         });
 
         if input_files.is_empty() {

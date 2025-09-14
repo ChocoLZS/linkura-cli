@@ -37,12 +37,41 @@ impl AudioBuilder {
         self.channel_sets.insert(object_id);
     }
 
+    /// WARNING, BUG, TODO: Maybe bug for packets after convert commands.
+    pub fn handle_audio_packet(&mut self, packet: &PacketInfo) {
+        let data_pack = &packet.data_pack;
+        // 如果InstantiateObject 和 UpdateObject 同时出现，忽略当前包
+        if data_pack.frames.iter().any(|f| f.message.is_some()) {
+            let has_instantiate = data_pack.frames.iter().any(|f| {
+                matches!(f.message, Some(data_frame::Message::InstantiateObject(_)))
+            });
+            let has_update = data_pack.frames.iter().any(|f| {
+                matches!(f.message, Some(data_frame::Message::UpdateObject(_)))
+            });
+            if has_instantiate && has_update {
+                tracing::trace!("Packet contains both InstantiateObject and UpdateObject messages, skipping packet at timestamp: {}", packet.timestamp);
+                if has_instantiate {
+                    for frame in &data_pack.frames {
+                        if let Some(message) = &frame.message {
+                            if let data_frame::Message::InstantiateObject(_) = message {
+                                self.handle_instantiate_audio(message);
+                            }
+                        }
+                    }
+                }
+                return;
+            }
+        }
+        self.handle_update_audio(&packet);
+    }
+
     pub fn handle_instantiate_audio(&mut self, obj: &data_frame::Message) {
         if let data_frame::Message::InstantiateObject(obj) = obj {
             let name = String::from_utf8_lossy(&obj.prefab_name);
             if name.contains("Voice") {
                 let object_id = obj.object_id;
                 self.add_source(object_id);
+                tracing::trace!("Found audio source with object id: {} and prefab name: {}", object_id, name);
             }
         } else {
             return;
@@ -82,7 +111,7 @@ impl AudioBuilder {
             let mut dec = opus::Decoder::new(48000, opus::Channels::Stereo)?;
             tracing::debug!("Writing audio for object id: {} with {} packets", object_id, packets.len());
             let spec = WavSpec {
-                channels: 2,
+                channels: opus::Channels::Stereo as u16,
                 sample_rate: 48000,
                 bits_per_sample: 16,
                 sample_format: hound::SampleFormat::Int,
