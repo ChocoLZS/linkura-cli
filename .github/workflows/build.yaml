@@ -10,7 +10,7 @@ on:
       - '**'
 
 jobs:
-  setup:
+  standard-build:
     strategy:
       fail-fast: false
       matrix:
@@ -87,39 +87,6 @@ jobs:
       #   with:
       #     detached: true
 
-      - name: Setup | Upload workspace cache
-        uses: actions/cache/save@v4
-        with:
-          path: .
-          key: workspace-${{ github.sha }}-${{ matrix.target }}
-
-  standard-build:
-    needs: setup
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-            name: linkura-x86_64-unknown-linux-musl.tar.gz
-          - target: x86_64-pc-windows-gnu
-            os: ubuntu-latest
-            name: linkura-x86_64-pc-windows-gnu.zip
-          - target: x86_64-apple-darwin
-            os: macOS-latest
-            name: linkura-x86_64-apple-darwin.tar.gz
-          - target: aarch64-apple-darwin
-            os: macOS-latest
-            name: linkura-aarch64-apple-darwin.tar.gz
-    runs-on: ${{ matrix.os }}
-    continue-on-error: true
-    steps:
-      - name: Setup | Restore workspace cache
-        uses: actions/cache/restore@v4
-        with:
-          path: .
-          key: workspace-${{ github.sha }}-${{ matrix.target }}
-
       - name: Build | Standard Build
         shell: bash
         run: |
@@ -131,14 +98,16 @@ jobs:
         run: |
           cd target/${{ matrix.target }}/release
           strip linkura-cli.exe
-          tar czvf ../../../${{ matrix.name }} linkura-cli.exe
+          strip linkura-motion-cli.exe
+          tar czvf ../../../${{ matrix.name }} linkura-cli.exe linkura-motion-cli.exe
           cd -
       - name: PostBuild | Prepare artifacts [-nix]
         if: matrix.target != 'x86_64-pc-windows-gnu'
         run: |
           cd target/${{ matrix.target }}/release
           strip linkura-cli || true
-          tar czvf ../../../${{ matrix.name }} linkura-cli
+          strip linkura-motion-cli || true
+          tar czvf ../../../${{ matrix.name }} linkura-cli linkura-motion-cli
           cd -
 
       - name: Deploy | Upload artifacts
@@ -148,7 +117,6 @@ jobs:
           path: ${{ matrix.name }}
 
   features-build:
-    needs: setup
     strategy:
       fail-fast: false
       matrix:
@@ -168,11 +136,56 @@ jobs:
     runs-on: ${{ matrix.os }}
     continue-on-error: true
     steps:
-      - name: Setup | Restore workspace cache
-        uses: actions/cache/restore@v4
+      - name: Setup | Checkout
+        uses: actions/checkout@v2.4.0
+
+      - name: Setup | Protoc
+        uses: arduino/setup-protoc@v3
         with:
-          path: .
-          key: workspace-${{ github.sha }}-${{ matrix.target }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup | Cache Cargo
+        uses: actions/cache@v4.2.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Setup | Cache Cargo Target
+        uses: actions/cache@v4.2.0
+        with:
+          path: target
+          key: ${{ matrix.target }}-cargo-target
+
+      - name: Setup | Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
+          target: ${{ matrix.target }}
+
+      - name: Setup | Environment [musl]
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update -qq && sudo apt-get -y install \
+            pkg-config musl-tools musl-dev
+          echo PKG_CONFIG_ALLOW_CROSS=1 >> $GITHUB_ENV
+          echo CC_x86_64_unknown_linux_musl=musl-gcc >> $GITHUB_ENV
+          echo CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc >> $GITHUB_ENV
+
+      - name: Setup | Environment [-nix]
+        if: matrix.target != 'x86_64-pc-windows-gnu' && matrix.target != 'x86_64-unknown-linux-musl'
+        run: |
+          echo PKG_CONFIG_ALLOW_CROSS=1 >> $GITHUB_ENV
+
+      - name: Setup | Environment [Windows]
+        if: matrix.target == 'x86_64-pc-windows-gnu'
+        run: |
+          sudo apt-get update -qq && sudo apt-get -y install \
+            mingw-w64
+          echo PKG_CONFIG_ALLOW_CROSS=1 >> $GITHUB_ENV
 
       - name: Build | Build with features
         shell: bash
@@ -180,3 +193,38 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           cargo build --release --locked --target ${{ matrix.target }} --workspace --all-features
+          
+      - name: PostBuild | Prepare artifacts [Windows]
+        if: matrix.target == 'x86_64-pc-windows-gnu'
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          strip linkura-cli.exe
+          strip linkura-motion-cli.exe
+
+          cp linkura-cli.exe linkura-cli-full-features.exe
+          cp linkura-motion-cli.exe linkura-motion-cli-full-features.exe
+
+          FEATURES_NAME=$(echo "${{ matrix.name }}" | sed 's/\.zip$/-full-features.zip/')
+          tar czvf ../../../$FEATURES_NAME linkura-cli-full-features.exe linkura-motion-cli-full-features.exe
+          cd -
+          
+      - name: PostBuild | Prepare artifacts [-nix]
+        if: matrix.target != 'x86_64-pc-windows-gnu'
+        run: |
+          cd target/${{ matrix.target }}/release
+          strip linkura-cli || true
+          strip linkura-motion-cli || true
+
+          cp linkura-cli linkura-cli-full-features
+          cp linkura-motion-cli linkura-motion-cli-full-features
+
+          FEATURES_NAME=$(echo "${{ matrix.name }}" | sed 's/\.tar\.gz$/-full-features.tar.gz/')
+          tar czvf ../../../$FEATURES_NAME linkura-cli-full-features linkura-motion-cli-full-features
+          cd -
+
+      - name: Deploy | Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-full-features
+          path: ${{ matrix.name }}-full-features
