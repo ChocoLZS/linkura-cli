@@ -1,7 +1,7 @@
+use crate::{cli::spinner::SpinnerManager, command::api::ArgsAPI};
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
-use crate::{cli::spinner::SpinnerManager, command::{api::ArgsAPI}};
 use std::{
     fs::{self},
     path::{Path, PathBuf},
@@ -31,9 +31,9 @@ pub struct Args {
     pub quiet: bool,
     #[clap(short('l'), long = "loglevel", value_name = "LOG_LEVEL")]
     /// Sets the log level for the application.
-    /// 
+    ///
     /// Valid values are, in order of verbosity:
-    /// 
+    ///
     /// `off`, `error`, `warn`, `info`, `debug`, `trace`
     ///
     /// Default is "info".
@@ -43,7 +43,7 @@ pub struct Args {
     pub player_id: Option<String>,
     #[clap(long = "password", value_name = "PASSWORD")]
     pub password: Option<String>,
-    
+
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
@@ -214,7 +214,12 @@ impl Global {
 
                     config
                 }
-                None => Self::initialize_config(&args, &config_manager, &mut api_client, &spinner_manager),
+                None => Self::initialize_config(
+                    &args,
+                    &config_manager,
+                    &mut api_client,
+                    &spinner_manager,
+                ),
             }
         };
 
@@ -228,14 +233,24 @@ impl Global {
         }
     }
 
-    fn initialize_config(args: &Args, config_manager: &ConfigManager, api_client: &mut ApiClient, spinner_manager: &SpinnerManager) -> Config {
+    fn initialize_config(
+        args: &Args,
+        config_manager: &ConfigManager,
+        api_client: &mut ApiClient,
+        spinner_manager: &SpinnerManager,
+    ) -> Config {
         tracing::warn!(
             "No config found, creating a new one to path: {}",
             config_manager.get_config_path().display()
         );
         // first time to init interactive
-        let credential = interactive::get_credential_with_simple_prompt(api_client, spinner_manager, args.player_id.clone(), args.password.clone())
-            .expect("Failed to get credential");
+        let credential = interactive::get_credential_with_simple_prompt(
+            api_client,
+            spinner_manager,
+            args.player_id.clone(),
+            args.password.clone(),
+        )
+        .expect("Failed to get credential");
         Config { credential }
     }
 }
@@ -247,7 +262,9 @@ pub fn init(args: Args) -> Result<Global> {
     let mut global = Global::new(args);
     tracing::info!("Config initialized!");
 
-    let sp = global.spinner_manager.create_spinner_with_color("登陆中...", "blue");
+    let sp = global
+        .spinner_manager
+        .create_spinner_with_color("登陆中...", "blue");
     let session_token = if global.config.credential.session_token.is_none() {
         let session_token = global.api_client.high_level().device_id_login(
             &global.config.credential.player_id,

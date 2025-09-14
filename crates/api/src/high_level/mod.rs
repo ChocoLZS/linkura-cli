@@ -2,7 +2,7 @@ use crate::macros::{define_api_struct, use_common_crate};
 use reqwest::header;
 use serde_json::json;
 
-use crate::{LINKURA_APP_STORE_URL, WEB_UA, UA_PREFIX};
+use crate::{LINKURA_APP_STORE_URL, UA_PREFIX, WEB_UA};
 
 use_common_crate!();
 define_api_struct!(AssetsApi);
@@ -48,15 +48,19 @@ impl<'a> HighLevelApi<'a> {
         let app_version = captures
             .and_then(|cap| cap.get(1))
             .map(|m| m.as_str().to_string());
-        
+
         // empty id login check
         let url = format!("{API_BASE}/user/login");
-        let res = self.client
+        let res = self
+            .client
             .post(url)
             .headers(self.runtime_header.clone())
             .header("x-idempotency-key", gen_random_idempotency_key())
             .header("x-client-version", app_version.clone().unwrap_or_default())
-            .header(header::USER_AGENT, format!("{UA_PREFIX}/{}", app_version.clone().unwrap_or_default() ))
+            .header(
+                header::USER_AGENT,
+                format!("{UA_PREFIX}/{}", app_version.clone().unwrap_or_default()),
+            )
             .json(&json!({
                 "player_id": "",
                 "device_specific_id": "",
@@ -72,7 +76,6 @@ impl<'a> HighLevelApi<'a> {
             let version = v.to_str().unwrap_or_default();
             version.split('@').next().unwrap_or_default().to_string()
         });
-        
 
         Ok((res_version, app_version))
     }

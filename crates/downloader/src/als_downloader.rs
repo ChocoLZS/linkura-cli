@@ -1,5 +1,5 @@
 use crate::downloader::{BaseDownloader, BaseDownloaderImpl, DownloadItem, ProgressConfig};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -38,9 +38,12 @@ impl AlsDownloader {
 
     async fn fetch_metadata(&self, url: &str) -> Result<AlsMetadata> {
         let response = self.base.client().get(url).send().await?;
-        
+
         if !response.status().is_success() {
-            return Err(anyhow!("Failed to fetch metadata: HTTP {}", response.status()));
+            return Err(anyhow!(
+                "Failed to fetch metadata: HTTP {}",
+                response.status()
+            ));
         }
 
         let text = response.text().await?;
@@ -52,9 +55,12 @@ impl AlsDownloader {
 
     async fn fetch_m3u8_content(&self, url: &str) -> Result<String> {
         let response = self.base.client().get(url).send().await?;
-        
+
         if !response.status().is_success() {
-            return Err(anyhow!("Failed to fetch m3u8 file: HTTP {}", response.status()));
+            return Err(anyhow!(
+                "Failed to fetch m3u8 file: HTTP {}",
+                response.status()
+            ));
         }
 
         Ok(response.text().await?)
@@ -62,7 +68,7 @@ impl AlsDownloader {
 
     pub fn parse_m3u8_segments(&self, content: &str) -> Result<Vec<String>> {
         let mut segments = Vec::new();
-        
+
         for line in content.lines() {
             let line = line.trim();
             if !line.is_empty() && !line.starts_with('#') {
@@ -115,7 +121,9 @@ impl BaseDownloader for AlsDownloader {
                 filename: ts_file,
             });
         }
-        self.base.download_files(download_items, &target_dir).await?;
+        self.base
+            .download_files(download_items, &target_dir)
+            .await?;
 
         Ok(())
     }
@@ -123,10 +131,10 @@ impl BaseDownloader for AlsDownloader {
     // TODO: maybe use self.fetch_metadata in the future
     fn extract_folder_name(&self, url: &str) -> Result<String> {
         use url::Url;
-        let url_obj = Url::parse(url)
-            .map_err(|e| anyhow!("Invalid URL: {}", e))?;
-        
-        let path_segments: Vec<&str> = url_obj.path_segments()
+        let url_obj = Url::parse(url).map_err(|e| anyhow!("Invalid URL: {}", e))?;
+
+        let path_segments: Vec<&str> = url_obj
+            .path_segments()
             .ok_or_else(|| anyhow!("URL has no path segments"))?
             .collect();
 

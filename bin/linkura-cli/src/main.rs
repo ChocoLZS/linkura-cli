@@ -6,9 +6,9 @@ use linkura_common::log;
 
 rust_i18n::i18n!("../../locales", fallback = "en");
 
+mod cli;
 mod command;
 mod config;
-mod cli;
 
 use rust_i18n::t;
 

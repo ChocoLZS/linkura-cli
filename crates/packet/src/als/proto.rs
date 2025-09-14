@@ -1,8 +1,8 @@
 use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Utc};
 use prost::Message;
-use prost::encoding::{encode_key, encode_varint, WireType};
-use sha2::{Sha256, Digest};
+use prost::encoding::{WireType, encode_key, encode_varint};
+use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, Write};
 use std::usize;
@@ -16,7 +16,7 @@ pub mod proto {
 use prost::bytes::Buf;
 use proto::als::DataPack;
 
-use crate::als::proto::proto::als::{data_frame, DataFrame, Room};
+use crate::als::proto::proto::als::{DataFrame, Room, data_frame};
 
 fn encode_frame(frame: &DataFrame, buf: &mut Vec<u8>) {
     let frame_bytes = frame.encode_to_vec();
@@ -29,14 +29,14 @@ fn encode_frame(frame: &DataFrame, buf: &mut Vec<u8>) {
 /// This matches the expected order that the analyzer expects
 fn encode_data_pack_custom_order(data_pack: &DataPack) -> Vec<u8> {
     let mut buf = Vec::new();
-    
+
     // Encode frames first (field number 16)
     if !data_pack.frames.is_empty() {
         for frame in &data_pack.frames {
             encode_frame(frame, &mut buf);
         }
     }
-    
+
     // Then encode control messages in field number order
     if let Some(control) = &data_pack.control {
         match control {
@@ -62,7 +62,7 @@ fn encode_data_pack_custom_order(data_pack: &DataPack) -> Vec<u8> {
             }
         }
     }
-    
+
     buf
 }
 
@@ -92,7 +92,10 @@ impl PacketInfo {
 
     /// Calculate SHA-256 digest for each DataFrame
     pub fn frame_digests(&self) -> Vec<(usize, String)> {
-        self.data_pack.frames.iter().enumerate()
+        self.data_pack
+            .frames
+            .iter()
+            .enumerate()
             .map(|(index, frame)| {
                 let frame_bytes = frame.encode_to_vec();
                 (index, calculate_digest(&frame_bytes))
@@ -104,7 +107,9 @@ impl PacketInfo {
         Self {
             timestamp: timestamp,
             data_pack: DataPack {
-                control: Some(proto::als::data_pack::Control::SegmentStartedAt(timestamp.timestamp_micros())),
+                control: Some(proto::als::data_pack::Control::SegmentStartedAt(
+                    timestamp.timestamp_micros(),
+                )),
                 frames: vec![],
             },
             raw_data: vec![],
@@ -116,11 +121,9 @@ impl PacketInfo {
             timestamp,
             data_pack: DataPack {
                 control: Some(proto::als::data_pack::Control::Data(true)),
-                frames: vec![
-                    DataFrame {
-                        message: Some(data_frame::Message::Room(room)),
-                    },
-                ],
+                frames: vec![DataFrame {
+                    message: Some(data_frame::Message::Room(room)),
+                }],
             },
             raw_data: vec![],
         }
@@ -163,7 +166,9 @@ impl PacketInfo {
 impl TryFrom<MixedPacketInfo> for PacketInfo {
     type Error = anyhow::Error;
     fn try_from(mixed_packet: MixedPacketInfo) -> Result<Self> {
-        let data_pack = mixed_packet.data_pack.ok_or_else(|| anyhow!("Missing data pack"))?;
+        let data_pack = mixed_packet
+            .data_pack
+            .ok_or_else(|| anyhow!("Missing data pack"))?;
         Ok(Self {
             timestamp: mixed_packet.timestamp.unwrap_or_else(|| Utc::now()),
             data_pack,
@@ -491,14 +496,14 @@ impl PacketAnalysisStats {
         self.packets_with_control += other.packets_with_control;
         self.packets_with_frames += other.packets_with_frames;
         self.total_frames += other.total_frames;
-        
+
         // Merge control stats
         self.control_stats.data_count += other.control_stats.data_count;
         self.control_stats.pong_count += other.control_stats.pong_count;
         self.control_stats.segment_started_at_count += other.control_stats.segment_started_at_count;
         self.control_stats.cache_ended_count += other.control_stats.cache_ended_count;
         self.control_stats.total_control_messages += other.control_stats.total_control_messages;
-        
+
         // Merge frame stats
         self.frame_stats.instantiate_object_count += other.frame_stats.instantiate_object_count;
         self.frame_stats.update_object_count += other.frame_stats.update_object_count;
@@ -507,10 +512,14 @@ impl PacketAnalysisStats {
         self.frame_stats.authorize_response_count += other.frame_stats.authorize_response_count;
         self.frame_stats.join_room_response_count += other.frame_stats.join_room_response_count;
         self.frame_stats.total_frame_messages += other.frame_stats.total_frame_messages;
-        
+
         // Merge unknown field stats
         for (field_num, count) in other.unknown_field_stats.unknown_fields {
-            *self.unknown_field_stats.unknown_fields.entry(field_num).or_insert(0) += count;
+            *self
+                .unknown_field_stats
+                .unknown_fields
+                .entry(field_num)
+                .or_insert(0) += count;
         }
     }
 }
@@ -699,7 +708,7 @@ pub fn format_packet_unified(
     // Show protobuf field analysis for all packets containing protobuf data
     if !raw_data.is_empty() {
         writer.writeln(&format!("  Raw data length: {} bytes", raw_data.len()))?;
-        
+
         // Show protobuf digest
         let protobuf_digest = calculate_digest(raw_data);
         writer.writeln(&format!("  Protobuf SHA-256 digest: {}", protobuf_digest))?;
@@ -787,12 +796,12 @@ fn print_data_pack_details_unified(writer: &mut OutputWriter, data_pack: &DataPa
         writer.writeln(&format!("  Frames ({}):", data_pack.frames.len()))?;
         for (i, frame) in data_pack.frames.iter().enumerate() {
             writer.writeln(&format!("    Frame #{}: ", i + 1))?;
-            
+
             // Calculate and display frame digest
             let frame_bytes = frame.encode_to_vec();
             let frame_digest = calculate_digest(&frame_bytes);
             writer.writeln(&format!("      DataFrame SHA-256 digest: {}", frame_digest))?;
-            
+
             if let Some(message) = &frame.message {
                 use proto::als::data_frame::Message;
                 match message {
@@ -1130,7 +1139,7 @@ impl ProtoPacketReader {
 
 enum MixedPacketReaderState {
     Packet,
-    Timestamp
+    Timestamp,
 }
 
 pub struct MixedPacketReader {
@@ -1151,7 +1160,8 @@ impl MixedPacketReader {
     }
 
     pub fn read_mixed_packets_with_limit(&mut self, limit: usize) -> Result<Vec<MixedPacketInfo>> {
-        self.read_mixed_packets_with_limit_and_writer(limit, None, None, None).map(|(packets, _)| packets)
+        self.read_mixed_packets_with_limit_and_writer(limit, None, None, None)
+            .map(|(packets, _)| packets)
     }
 
     pub fn read_mixed_packets_with_limit_and_writer(
@@ -1165,8 +1175,16 @@ impl MixedPacketReader {
         let mut packet_count = 0;
         let mut stats = PacketAnalysisStats::default();
         let mut end_flag = false;
-        let start_time = data_start_time.map_or(None, |f| chrono::DateTime::parse_from_rfc3339(&f).ok().map(|dt| dt.with_timezone(&chrono::Utc)));
-        let end_time = data_end_time.map_or(None, |f| chrono::DateTime::parse_from_rfc3339(&f).ok().map(|dt| dt.with_timezone(&chrono::Utc)));
+        let start_time = data_start_time.map_or(None, |f| {
+            chrono::DateTime::parse_from_rfc3339(&f)
+                .ok()
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+        });
+        let end_time = data_end_time.map_or(None, |f| {
+            chrono::DateTime::parse_from_rfc3339(&f)
+                .ok()
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+        });
         loop {
             match self.read_two_mixed_packets() {
                 // treat second_packet as timestamp packet
@@ -1361,8 +1379,10 @@ impl MixedPacketReader {
                 self.reader
                     .read_exact(&mut micro_timestamp_buf)
                     .with_context(|| "Failed to read micro timestamp")?;
-                let timestamp = chrono::DateTime::from_timestamp_micros(i64::from_be_bytes(micro_timestamp_buf))
-                    .with_context(|| "Failed to convert micro timestamp")?;
+                let timestamp = chrono::DateTime::from_timestamp_micros(i64::from_be_bytes(
+                    micro_timestamp_buf,
+                ))
+                .with_context(|| "Failed to convert micro timestamp")?;
                 self.state = MixedPacketReaderState::Packet;
                 Ok(MixedPacketInfo {
                     format: MixedPacketFormat::TimestampFormat { length, timestamp },
@@ -1570,12 +1590,12 @@ pub fn analyze_binary_file_with_output_and_count(
     data_start_time: Option<String>,
     data_end_time: Option<String>,
 ) -> Result<()> {
-    use std::path::Path;
     use std::fs;
-    
+    use std::path::Path;
+
     let path = Path::new(file_path);
     let mut writer = OutputWriter::new(output_path)?;
-    
+
     if path.is_dir() {
         // Directory processing: analyze all files sorted by creation time
         let mut entries: Vec<_> = fs::read_dir(path)
@@ -1583,23 +1603,23 @@ pub fn analyze_binary_file_with_output_and_count(
             .filter_map(|entry| {
                 let entry = entry.ok()?;
                 let file_path = entry.path();
-                
+
                 // Only process files (not subdirectories)
                 if !file_path.is_file() {
                     return None;
                 }
-                
+
                 // Get file metadata for creation time
                 let metadata = file_path.metadata().ok()?;
                 let created = metadata.created().or_else(|_| metadata.modified()).ok()?;
-                
+
                 Some((file_path, created))
             })
             .collect();
-        
+
         // Sort by creation time (oldest first)
         entries.sort_by_key(|(_, created)| *created);
-        
+
         if entries.is_empty() {
             return Err(anyhow!("No files found in directory: {}", file_path));
         }
@@ -1613,29 +1633,43 @@ pub fn analyze_binary_file_with_output_and_count(
             ))?;
             entries.truncate(file_count_limit);
         }
-        
+
         // Write header for directory processing
         writer.writeln(&format!("=== ALS Standard Analysis Results ==="))?;
         writer.writeln(&format!("Directory: {}", file_path))?;
         writer.writeln(&format!("Packet Count per File: {}", packet_count))?;
         writer.writeln(&format!("Total Files: {}", entries.len()))?;
-        writer.writeln(&format!("Started at: {}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")))?;
+        writer.writeln(&format!(
+            "Started at: {}",
+            chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")
+        ))?;
         writer.writeln("=======================================")?;
         writer.writeln("")?;
-        
+
         // Combined statistics across all files
         let mut combined_stats = PacketAnalysisStats::default();
         let mut files_processed = 0;
         let mut total_files_with_packets = 0;
-        
+
         // Process each file
         for (index, (file_path, _created_time)) in entries.iter().enumerate() {
             let file_path_str = file_path.to_string_lossy();
-            
-            writer.writeln(&format!("--- File {}/{}: {} ---", index + 1, entries.len(), file_path_str))?;
+
+            writer.writeln(&format!(
+                "--- File {}/{}: {} ---",
+                index + 1,
+                entries.len(),
+                file_path_str
+            ))?;
             writer.flush()?; // Ensure immediate output
-            
-            match analyze_single_standard_file(&file_path_str, packet_count, &mut writer, data_start_time.clone(), data_end_time.clone()) {
+
+            match analyze_single_standard_file(
+                &file_path_str,
+                packet_count,
+                &mut writer,
+                data_start_time.clone(),
+                data_end_time.clone(),
+            ) {
                 Ok((stats, end_flag)) => {
                     combined_stats.merge_with(stats);
                     total_files_with_packets += 1;
@@ -1648,13 +1682,15 @@ pub fn analyze_binary_file_with_output_and_count(
                     writer.writeln(&format!("❌ Error analyzing file: {}", e))?;
                 }
             }
-            
+
             files_processed += 1;
             writer.writeln("")?; // Separator between files
             writer.flush()?; // Ensure immediate output
 
             // Check file size limit
-            let metadata = file_path.metadata().with_context(|| format!("Failed to read metadata for file: {}", file_path_str))?;
+            let metadata = file_path
+                .metadata()
+                .with_context(|| format!("Failed to read metadata for file: {}", file_path_str))?;
             if metadata.len() as usize > file_size_limit {
                 writer.writeln(&format!(
                     "Warning: File size {} bytes exceeds the limit of {} bytes. Stopping further processing.",
@@ -1664,28 +1700,36 @@ pub fn analyze_binary_file_with_output_and_count(
                 break;
             }
         }
-        
+
         // Write summary statistics
         writer.writeln("=======================================")?;
         writer.writeln("=== BATCH ANALYSIS SUMMARY ===")?;
         writer.writeln(&format!("Files processed: {}", files_processed))?;
-        writer.writeln(&format!("Files with valid packets: {}", total_files_with_packets))?;
+        writer.writeln(&format!(
+            "Files with valid packets: {}",
+            total_files_with_packets
+        ))?;
         writer.writeln("")?;
-        
+
         if combined_stats.total_packets > 0 {
             format_statistics(&mut writer, &combined_stats)?;
         } else {
             writer.writeln("No valid packets found across all files.")?;
         }
-        
-        writer.writeln(&format!("Completed at: {}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")))?;
+
+        writer.writeln(&format!(
+            "Completed at: {}",
+            chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")
+        ))?;
         writer.writeln("=======================================")?;
         writer.flush()?;
-        
     } else {
         // Single file processing (original logic)
-        let mut file = File::open(file_path).with_context(|| format!("Failed to open file: {}", file_path))?;
-        let metadata = file.metadata().with_context(|| format!("Failed to read file metadata: {}", file_path))?;
+        let mut file =
+            File::open(file_path).with_context(|| format!("Failed to open file: {}", file_path))?;
+        let metadata = file
+            .metadata()
+            .with_context(|| format!("Failed to read file metadata: {}", file_path))?;
 
         writer.writeln(&format!("Analyzing binary file: {}", file_path))?;
         writer.writeln(&format!("File size: {} bytes", metadata.len()))?;
@@ -1712,16 +1756,17 @@ pub fn analyze_binary_file_with_output_and_count(
 
         let mut reader = ProtoPacketReader::new(file);
 
-        let packets = match reader.read_packets_with_limit_and_writer(packet_count, Some(&mut writer)) {
-            Ok(packets) => packets,
-            Err(e) => {
-                return Err(anyhow!(
-                    "Failed to read packets from file '{}': {}",
-                    file_path,
-                    e
-                ));
-            }
-        };
+        let packets =
+            match reader.read_packets_with_limit_and_writer(packet_count, Some(&mut writer)) {
+                Ok(packets) => packets,
+                Err(e) => {
+                    return Err(anyhow!(
+                        "Failed to read packets from file '{}': {}",
+                        file_path,
+                        e
+                    ));
+                }
+            };
 
         writer.writeln(&format!("Total packets found: {}", packets.len()))?;
         writer.flush()?;
@@ -1738,24 +1783,29 @@ fn analyze_single_standard_file(
     data_end_time: Option<String>,
 ) -> Result<(PacketAnalysisStats, bool)> {
     let mut end_flag = false;
-    let file = File::open(file_path)
-        .with_context(|| format!("Failed to open file: {}", file_path))?;
-    
-    let metadata = file.metadata()
+    let file =
+        File::open(file_path).with_context(|| format!("Failed to open file: {}", file_path))?;
+
+    let metadata = file
+        .metadata()
         .with_context(|| format!("Failed to read file metadata: {}", file_path))?;
-    
+
     writer.writeln(&format!("File size: {} bytes", metadata.len()))?;
-    
+
     let mut reader = ProtoPacketReader::new(file);
     let packets = reader.read_packets_with_limit_and_writer(packet_count, Some(writer))?;
-    
+
     // Calculate statistics from standard packets
     let mut stats = PacketAnalysisStats::default();
     let start_time = data_start_time.map_or(None, |t| {
-        DateTime::parse_from_rfc3339(&t).ok().map(|dt| dt.with_timezone(&chrono::Utc))
+        DateTime::parse_from_rfc3339(&t)
+            .ok()
+            .map(|dt| dt.with_timezone(&chrono::Utc))
     });
     let end_time = data_end_time.map_or(None, |t| {
-        DateTime::parse_from_rfc3339(&t).ok().map(|dt| dt.with_timezone(&chrono::Utc))
+        DateTime::parse_from_rfc3339(&t)
+            .ok()
+            .map(|dt| dt.with_timezone(&chrono::Utc))
     });
     for packet in &packets {
         // Check time range filtering
@@ -1785,12 +1835,12 @@ pub fn analyze_mixed_binary_file_with_output_and_count(
     data_start_time: Option<String>,
     data_end_time: Option<String>,
 ) -> Result<()> {
-    use std::path::Path;
     use std::fs;
-    
+    use std::path::Path;
+
     let path = Path::new(file_path);
     let mut writer = OutputWriter::new(output_path)?;
-    
+
     if path.is_dir() {
         // Directory processing: analyze all files sorted by creation time
         let mut entries: Vec<_> = fs::read_dir(path)
@@ -1798,23 +1848,23 @@ pub fn analyze_mixed_binary_file_with_output_and_count(
             .filter_map(|entry| {
                 let entry = entry.ok()?;
                 let file_path = entry.path();
-                
+
                 // Only process files (not subdirectories)
                 if !file_path.is_file() {
                     return None;
                 }
-                
+
                 // Get file metadata for creation time
                 let metadata = file_path.metadata().ok()?;
                 let created = metadata.created().or_else(|_| metadata.modified()).ok()?;
-                
+
                 Some((file_path, created))
             })
             .collect();
-        
+
         // Sort by creation time (oldest first)
         entries.sort_by_key(|(_, created)| *created);
-        
+
         if entries.is_empty() {
             return Err(anyhow!("No files found in directory: {}", file_path));
         }
@@ -1828,31 +1878,45 @@ pub fn analyze_mixed_binary_file_with_output_and_count(
             ))?;
             entries.truncate(file_count_limit);
         }
-        
+
         // Write header for directory processing
         writer.writeln(&format!("=== ALS Mixed Analysis Results ==="))?;
         writer.writeln(&format!("Directory: {}", file_path))?;
         writer.writeln(&format!("Packet Count per File: {}", packet_count))?;
         writer.writeln(&format!("Total Files: {}", entries.len()))?;
-        writer.writeln(&format!("Started at: {}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")))?;
+        writer.writeln(&format!(
+            "Started at: {}",
+            chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")
+        ))?;
         writer.writeln("=======================================")?;
         writer.writeln("")?;
-        
+
         // Combined statistics across all files
         let mut combined_stats = PacketAnalysisStats::default();
         let mut files_processed = 0;
         let mut total_files_with_packets = 0;
         let mut total_protobuf_count = 0;
         let mut total_timestamp_count = 0;
-        
+
         // Process each file
         for (index, (file_path, _created_time)) in entries.iter().enumerate() {
             let file_path_str = file_path.to_string_lossy();
-            
-            writer.writeln(&format!("--- File {}/{}: {} ---", index + 1, entries.len(), file_path_str))?;
+
+            writer.writeln(&format!(
+                "--- File {}/{}: {} ---",
+                index + 1,
+                entries.len(),
+                file_path_str
+            ))?;
             writer.flush()?; // Ensure immediate output
 
-            match analyze_single_mixed_file(&file_path_str, packet_count, &mut writer, data_start_time.clone(), data_end_time.clone()) {
+            match analyze_single_mixed_file(
+                &file_path_str,
+                packet_count,
+                &mut writer,
+                data_start_time.clone(),
+                data_end_time.clone(),
+            ) {
                 Ok((stats, protobuf_count, timestamp_count, end_flag)) => {
                     combined_stats.merge_with(stats);
                     total_protobuf_count += protobuf_count;
@@ -1868,13 +1932,15 @@ pub fn analyze_mixed_binary_file_with_output_and_count(
                     writer.writeln(&format!("❌ Error analyzing file: {}", e))?;
                 }
             }
-            
+
             files_processed += 1;
             writer.writeln("")?; // Separator between files
             writer.flush()?; // Ensure immediate output
 
             // Check file size limit
-            let metadata = file_path.metadata().with_context(|| format!("Failed to read metadata for file: {}", file_path_str))?;
+            let metadata = file_path
+                .metadata()
+                .with_context(|| format!("Failed to read metadata for file: {}", file_path_str))?;
             if metadata.len() as usize > file_size_limit {
                 writer.writeln(&format!(
                     "Warning: File size {} bytes exceeds the limit of {} bytes. Stopping further processing.",
@@ -1884,33 +1950,47 @@ pub fn analyze_mixed_binary_file_with_output_and_count(
                 break;
             }
         }
-        
+
         // Write summary statistics
         writer.writeln("=======================================")?;
         writer.writeln("=== BATCH ANALYSIS SUMMARY ===")?;
         writer.writeln(&format!("Files processed: {}", files_processed))?;
-        writer.writeln(&format!("Files with valid packets: {}", total_files_with_packets))?;
+        writer.writeln(&format!(
+            "Files with valid packets: {}",
+            total_files_with_packets
+        ))?;
         writer.writeln("")?;
-        
+
         writer.writeln("Combined Format Breakdown:")?;
-        writer.writeln(&format!("  Total Protobuf format packets: {}", total_protobuf_count))?;
-        writer.writeln(&format!("  Total Timestamp format packets: {}", total_timestamp_count))?;
+        writer.writeln(&format!(
+            "  Total Protobuf format packets: {}",
+            total_protobuf_count
+        ))?;
+        writer.writeln(&format!(
+            "  Total Timestamp format packets: {}",
+            total_timestamp_count
+        ))?;
         writer.writeln("")?;
-        
+
         if combined_stats.total_packets > 0 {
             format_statistics(&mut writer, &combined_stats)?;
         } else {
             writer.writeln("No valid packets found across all files.")?;
         }
-        
-        writer.writeln(&format!("Completed at: {}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")))?;
+
+        writer.writeln(&format!(
+            "Completed at: {}",
+            chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")
+        ))?;
         writer.writeln("=======================================")?;
         writer.flush()?;
-        
     } else {
         // Single file processing (original logic)
-        let mut file = File::open(file_path).with_context(|| format!("Failed to open file: {}", file_path))?;
-        let metadata = file.metadata().with_context(|| format!("Failed to read file metadata: {}", file_path))?;
+        let mut file =
+            File::open(file_path).with_context(|| format!("Failed to open file: {}", file_path))?;
+        let metadata = file
+            .metadata()
+            .with_context(|| format!("Failed to read file metadata: {}", file_path))?;
 
         writer.writeln(&format!(
             "Analyzing mixed format binary file: {}",
@@ -1940,7 +2020,12 @@ pub fn analyze_mixed_binary_file_with_output_and_count(
 
         let mut reader = MixedPacketReader::new(file);
 
-        let (packets, _end_flag) = match reader.read_mixed_packets_with_limit_and_writer(packet_count, Some(&mut writer), data_start_time, data_end_time) {
+        let (packets, _end_flag) = match reader.read_mixed_packets_with_limit_and_writer(
+            packet_count,
+            Some(&mut writer),
+            data_start_time,
+            data_end_time,
+        ) {
             Ok(packets) => packets,
             Err(e) => {
                 return Err(anyhow!(
@@ -1981,17 +2066,23 @@ fn analyze_single_mixed_file(
     data_start_time: Option<String>,
     data_end_time: Option<String>,
 ) -> Result<(PacketAnalysisStats, u32, u32, bool)> {
-    let file = File::open(file_path)
-        .with_context(|| format!("Failed to open file: {}", file_path))?;
-    
-    let metadata = file.metadata()
+    let file =
+        File::open(file_path).with_context(|| format!("Failed to open file: {}", file_path))?;
+
+    let metadata = file
+        .metadata()
         .with_context(|| format!("Failed to read file metadata: {}", file_path))?;
-    
+
     writer.writeln(&format!("File size: {} bytes", metadata.len()))?;
-    
+
     let mut reader = MixedPacketReader::new(file);
-    let (packets, end_flag) = reader.read_mixed_packets_with_limit_and_writer(packet_count, Some(writer), data_start_time, data_end_time)?;
-    
+    let (packets, end_flag) = reader.read_mixed_packets_with_limit_and_writer(
+        packet_count,
+        Some(writer),
+        data_start_time,
+        data_end_time,
+    )?;
+
     // Calculate statistics from mixed packets
     let mut stats = PacketAnalysisStats::default();
     let mut protobuf_count = 0;
@@ -2001,13 +2092,13 @@ fn analyze_single_mixed_file(
             stats.update_from_packet(data_pack);
         }
         stats.update_from_raw_data(&packet.raw_data);
-        
+
         // Count format types
         match packet.format {
             MixedPacketFormat::ProtobufFormat { .. } => protobuf_count += 1,
             MixedPacketFormat::TimestampFormat { .. } => timestamp_count += 1,
         }
     }
-    
+
     Ok((stats, protobuf_count, timestamp_count, end_flag))
 }

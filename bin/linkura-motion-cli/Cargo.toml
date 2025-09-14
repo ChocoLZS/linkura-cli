@@ -1,6 +1,6 @@
 [package]
 name = "linkura-motion-cli"
-version = "1.1.0"
+version = "1.2.0"
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
@@ -22,6 +22,10 @@ rust-i18n.workspace = true
 tokio.workspace = true
 async-trait.workspace = true
 url.workspace = true
+
+[features]
+default = []
+audio = ["linkura-packet/audio"]
 
 
 [[bin]]
