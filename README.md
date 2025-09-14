@@ -24,3 +24,20 @@
 
     - 他人基于本仓库内容进行的二次开发或商业行为产生的后果。
 
+## 开发依赖
+
+- protoc
+
+### linkura-cli
+
+无
+
+### linkura-motion-cli
+
+#### features audio
+
+> 默认不启用
+
+- libopus
+
+- 具体编译依赖可以查看 [opusic-sys](https://github.com/DoumanAsh/opusic-sys/)
