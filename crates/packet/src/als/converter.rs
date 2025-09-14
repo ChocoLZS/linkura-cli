@@ -1,15 +1,25 @@
-use crate::als::proto::{
-    MixedPacketInfo, MixedPacketReader, PacketInfo, proto::als::{
-        CurrentPlayer, DataFrame, DataPack, Room, RoomAll, data_frame, data_pack, destroy_object, instantiate_object, update_object
-    }
+use crate::als::{
+    proto::{
+        MixedPacketInfo, MixedPacketReader, PacketInfo,
+        proto::als::{
+            CurrentPlayer, DataFrame, DataPack, Room, RoomAll, data_frame, data_pack,
+            destroy_object, instantiate_object, update_object,
+        },
+    },
 };
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, FixedOffset, TimeDelta, Utc};
-use std::{cmp::Ordering, fs::{DirEntry, File}, path::PathBuf};
+use std::fmt;
 use std::io::{BufWriter, Write};
 use std::path::Path;
-use std::fmt;
+use std::{
+    cmp::Ordering,
+    fs::{DirEntry, File},
+    path::PathBuf,
+};
 
+#[cfg(feature = "audio")]
+use super::audio::{AudioBuilder, AudioRawPacket};
 
 #[derive(PartialEq, Eq, Debug)]
 enum AlsConverterStateMachine {
@@ -24,20 +34,23 @@ enum AlsConverterStateMachine {
 pub struct AlsConverter {
     #[allow(unused)]
     segment_duration: u64, // microseconds, default 10 seconds
+    use_audio_processing: bool, // 是否启用音频处理
 }
 
 impl Default for AlsConverter {
     fn default() -> Self {
         Self {
             segment_duration: 10_000_000, // 10 seconds in microseconds
+            use_audio_processing: false,
         }
     }
 }
 
 impl AlsConverter {
-    pub fn new(segment_duration_seconds: u64) -> Self {
+    pub fn new(segment_duration_seconds: u64, use_audio_processing: bool) -> Self {
         Self {
             segment_duration: segment_duration_seconds * 1_000_000,
+            use_audio_processing,
         }
     }
 
@@ -55,20 +68,20 @@ impl AlsConverter {
     ) -> Result<()> {
         let input_dir = input_dir.as_ref();
         let output_dir = output_dir.as_ref();
-
-        let mut segment_builder = SegmentBuilder::new(metadata_path, Some(output_dir.to_string_lossy().to_string()));
-        let mut context = ConversionContext::new(&mut segment_builder, timeshift, split, start_time, data_start_time, data_end_time);
+        let mut context = ConversionContext::new(
+            timeshift,
+            split,
+            start_time,
+            data_start_time,
+            data_end_time,
+            metadata_path,
+            output_dir.to_str().map(String::from),
+            self.use_audio_processing,
+        );
         let mut packet_buffer = PacketsBuffer::new(input_dir);
 
-        while let Some((data_packet, time_packet)) = self.try_read_packet_pair(&mut packet_buffer)? {
-            let end = context.process_packet_pair(data_packet, time_packet)?;
-            if end {
-                break;
-            }
-        }
-        tracing::debug!("All packets processed, writing final segment if exists.");
-        let ConversionContext { segment_builder, data_room, .. } = &mut context;
-        segment_builder.write_to_file(output_dir, data_room.started_at, &data_room.id)?;
+        self.process_all_packets(&mut context, &mut packet_buffer)?;
+        self.finalize_conversion(&mut context, output_dir)?;
         Ok(())
     }
 
@@ -80,13 +93,50 @@ impl AlsConverter {
         match packet_buffer.read() {
             Ok(packets) => Ok(Some(packets)),
             Err(err) => {
-                if let Some(PacketsBufferError::NoMoreFileEntries) = err.downcast_ref::<PacketsBufferError>() {
-                    Ok(None) // 正常结束
+                if let Some(PacketsBufferError::NoMoreFileEntries) =
+                    err.downcast_ref::<PacketsBufferError>()
+                {
+                    Ok(None)
                 } else {
-                    Err(err) // 其他错误向上传播
+                    Err(err)
                 }
             }
         }
+    }
+
+    fn process_all_packets(
+        &self,
+        context: &mut ConversionContext,
+        packet_buffer: &mut PacketsBuffer,
+    ) -> Result<()> {
+        while let Some((data_packet, time_packet)) = self.try_read_packet_pair(packet_buffer)? {
+            let end = context.process_packet_pair(data_packet, time_packet)?;
+            if end {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    fn finalize_conversion(
+        &self,
+        context: &mut ConversionContext,
+        output_dir: &Path,
+    ) -> Result<()> {
+        tracing::debug!("All packets processed, writing final segment if exists.");
+        if self.use_audio_processing {
+            #[cfg(feature = "audio")]
+            context.audio_builder.write_to_file(output_dir)?;
+            #[cfg(not(feature = "audio"))]
+            unreachable!("Audio feature is not enabled");
+        } else {
+            context.segment_builder.write_to_file(
+                output_dir,
+                context.data_room.started_at,
+                &context.data_room.id,
+            )?;
+        }
+        Ok(())
     }
 }
 
@@ -102,7 +152,9 @@ impl fmt::Display for PacketsBufferError {
         match self {
             PacketsBufferError::NoMoreFileEntries => write!(f, "No more file entries available"),
             PacketsBufferError::NoPacketInBuffer => write!(f, "No packet available in buffer"),
-            PacketsBufferError::NotEnoughPacketInBuffer => write!(f, "Not enough packets available in buffer"),
+            PacketsBufferError::NotEnoughPacketInBuffer => {
+                write!(f, "Not enough packets available in buffer")
+            }
         }
     }
 }
@@ -130,34 +182,40 @@ impl PacketsBuffer {
                 return Err(anyhow::Error::from(PacketsBufferError::NoMoreFileEntries));
             }
             // try reading from file entries
-            let file_entry = self.file_entries.pop_front().ok_or_else(|| {
-                anyhow!("No more file entries available")
-            })?;
-            let packets = self.read_mixed_packets(Some(&file_entry))
-                    .with_context(|| "Failed to read mixed packets from file entry")?;
+            let file_entry = self
+                .file_entries
+                .pop_front()
+                .ok_or_else(|| anyhow!("No more file entries available"))?;
+            let packets = self
+                .read_mixed_packets(Some(&file_entry))
+                .with_context(|| "Failed to read mixed packets from file entry")?;
             self.packets_buffer.extend(packets);
-
         }
-        let datapack_packet = self.packets_buffer.pop_front().ok_or_else(|| {
-            anyhow::Error::from(PacketsBufferError::NoPacketInBuffer)
-        })?;
-        let timestamp_packet = self.packets_buffer.pop_front().ok_or_else(|| {
-            anyhow::Error::from(PacketsBufferError::NotEnoughPacketInBuffer)
-        })?;
+        let datapack_packet = self
+            .packets_buffer
+            .pop_front()
+            .ok_or_else(|| anyhow::Error::from(PacketsBufferError::NoPacketInBuffer))?;
+        let timestamp_packet = self
+            .packets_buffer
+            .pop_front()
+            .ok_or_else(|| anyhow::Error::from(PacketsBufferError::NotEnoughPacketInBuffer))?;
         Ok((datapack_packet, timestamp_packet))
     }
 
-    fn read_mixed_packets(&self, file_entry: Option<&DirEntry>) -> Result<std::collections::VecDeque<MixedPacketInfo>> {
+    fn read_mixed_packets(
+        &self,
+        file_entry: Option<&DirEntry>,
+    ) -> Result<std::collections::VecDeque<MixedPacketInfo>> {
         let Some(file_entry) = file_entry else {
             return Err(anyhow!("No file entry provided"));
         };
         let file = File::open(file_entry.path())
             .with_context(|| format!("Failed to open initial fragment: {:?}", file_entry))?;
         let mut reader = MixedPacketReader::new(file);
-        let packets = reader.read_mixed_packets()
+        let packets = reader
+            .read_mixed_packets()
             .with_context(|| "Failed to read mixed packets")?;
         Ok(std::collections::VecDeque::from(packets))
-
     }
 
     fn get_file_entries(input_dir: &Path) -> Result<std::collections::VecDeque<DirEntry>> {
@@ -199,8 +257,6 @@ impl PacketsBuffer {
         }
         Ok(std::collections::VecDeque::from(input_files))
     }
-
-    
 }
 
 #[derive(Debug, Default)]
@@ -335,12 +391,16 @@ impl SegmentBuilder {
         last_segment.duration = (|| {
             let last_timestamp = last_segment.packets.last().unwrap().timestamp;
             let first_timestamp = last_segment.packets.first().unwrap().timestamp;
-            (last_timestamp - first_timestamp).num_microseconds().unwrap_or(0) as f64 / 1_000_000.0
+            (last_timestamp - first_timestamp)
+                .num_microseconds()
+                .unwrap_or(0) as f64
+                / 1_000_000.0
         })();
         for segment in &self.segments {
             let segment_file_path = output_dir.join(format!("segment_{:05}.ts", segment.number));
-            let file = File::create(&segment_file_path)
-                .with_context(|| format!("Failed to create segment file: {:?}", segment_file_path))?;
+            let file = File::create(&segment_file_path).with_context(|| {
+                format!("Failed to create segment file: {:?}", segment_file_path)
+            })?;
             let mut writer = BufWriter::new(file);
 
             for packet in &segment.packets {
@@ -359,7 +419,11 @@ impl SegmentBuilder {
         writeln!(m3u8_file, "#EXT-X-MEDIA-SEQUENCE:0")?;
         writeln!(m3u8_file, "#EXT-X-TARGETDURATION:10")?;
         for segment in &self.segments {
-            writeln!(m3u8_file, "#EXTINF:{:.3},\nsegment_{:05}.ts", segment.duration, segment.number)?;
+            writeln!(
+                m3u8_file,
+                "#EXTINF:{:.3},\nsegment_{:05}.ts",
+                segment.duration, segment.number
+            )?;
         }
         writeln!(m3u8_file, "#EXT-X-ENDLIST")?;
 
@@ -369,10 +433,19 @@ impl SegmentBuilder {
             .with_context(|| format!("Failed to create metadata file: {:?}", metadata_file_path))?;
         let jst_offset = FixedOffset::east_opt(9 * 3600).unwrap();
         let live_started_at = chrono::DateTime::<Utc>::from_timestamp_micros(started_at)
-            .unwrap_or_else(|| Utc::now()).with_timezone(&jst_offset).to_rfc3339();
-        let joined_room_at = self.segments.first().unwrap()
-                                        .packets.first().unwrap()
-                                        .timestamp.with_timezone(&jst_offset).to_rfc3339();
+            .unwrap_or_else(|| Utc::now())
+            .with_timezone(&jst_offset)
+            .to_rfc3339();
+        let joined_room_at = self
+            .segments
+            .first()
+            .unwrap()
+            .packets
+            .first()
+            .unwrap()
+            .timestamp
+            .with_timezone(&jst_offset)
+            .to_rfc3339();
         let metadata = serde_json::json!({
             "path": self.metadata_path.as_deref().unwrap_or("/"),
             "room_id": std::str::from_utf8(&data_room_id)
@@ -385,16 +458,13 @@ impl SegmentBuilder {
 
         Ok(())
     }
-
 }
-
 
 static DURATION: TimeDelta = TimeDelta::seconds(10);
 // 创建一个上下文结构体来管理状态
-struct ConversionContext<'a> {
+struct ConversionContext {
     state: AlsConverterStateMachine,
     data_room: Room,
-    segment_builder: &'a mut SegmentBuilder,
     initial_timestamp: DateTime<Utc>,
     initial_dataframes: Vec<DataFrame>,
     timeshift: i64,
@@ -402,13 +472,48 @@ struct ConversionContext<'a> {
     start_time: Option<String>,
     data_start_time: Option<String>,
     data_end_time: Option<String>,
+    use_audio_processing: bool,
+    segment_builder: SegmentBuilder,
+    #[cfg(feature = "audio")]
+    audio_builder: AudioBuilder,
 }
 
-impl<'a> ConversionContext<'a> {
+impl ConversionContext {
+    fn new(
+        timeshift: i64,
+        split_write_mode: bool,
+        start_time: Option<String>,
+        data_start_time: Option<String>,
+        data_end_time: Option<String>,
+        metadata_path: Option<String>,
+        output_dir: Option<String>,
+        use_audio_processing: bool,
+    ) -> Self {
+        Self {
+            state: AlsConverterStateMachine::Initial,
+            data_room: Room {
+                id: vec![0],
+                started_at: 0,
+                ended_at: 0,
+            },
+            initial_timestamp: DateTime::<Utc>::from_timestamp_micros(0).unwrap(),
+            segment_builder: SegmentBuilder::new(metadata_path, output_dir.clone()),
+            initial_dataframes: Vec::new(),
+            timeshift,
+            split_write_mode,
+            start_time,
+            data_start_time,
+            data_end_time,
+            use_audio_processing,
+            #[cfg(feature = "audio")]
+            audio_builder: AudioBuilder::new(output_dir),
+        }
+    }
+
     fn swap_order(dataframes: &mut Vec<DataFrame>) {
         let mut fixed_camera_index = None;
         let mut cameraman_index = None;
-        
+
         // Find the indices of FixedCamera and Cameraman
         for (i, frame) in dataframes.iter().enumerate() {
             if let Some(data_frame::Message::InstantiateObject(obj)) = &frame.message {
@@ -420,7 +525,7 @@ impl<'a> ConversionContext<'a> {
                 }
             }
         }
-        
+
         // If both are found and FixedCamera comes before Cameraman, swap them
         if let (Some(fixed_idx), Some(cameraman_idx)) = (fixed_camera_index, cameraman_index) {
             if fixed_idx > cameraman_idx {
@@ -431,57 +536,45 @@ impl<'a> ConversionContext<'a> {
 
     fn compare_dataframes(a: &DataFrame, b: &DataFrame) -> Ordering {
         match (a.message.as_ref(), b.message.as_ref()) {
-            (Some(data_frame::Message::InstantiateObject(_)), Some(data_frame::Message::InstantiateObject(_))) => {
-                Ordering::Equal
-            },
+            (
+                Some(data_frame::Message::InstantiateObject(_)),
+                Some(data_frame::Message::InstantiateObject(_)),
+            ) => Ordering::Equal,
             (Some(data_frame::Message::InstantiateObject(_)), _) => Ordering::Less,
             (_, Some(data_frame::Message::InstantiateObject(_))) => Ordering::Greater,
             _ => Ordering::Equal,
         }
     }
 
-    fn new(segment_builder: &'a mut SegmentBuilder, timeshift: i64, split_write_mode: bool, start_time: Option<String>, data_start_time: Option<String>, data_end_time: Option<String>) -> Self {
-        Self {
-            state: AlsConverterStateMachine::Initial,
-            data_room: Room {
-                id: vec![0],
-                started_at: 0,
-                ended_at: 0,
-            },
-            initial_timestamp: DateTime::<Utc>::from_timestamp_micros(0).unwrap(),
-            segment_builder,
-            initial_dataframes: Vec::new(),
-            timeshift,
-            split_write_mode,
-            start_time,
-            data_start_time,
-            data_end_time
-        }
-    }
-
     fn process_packet_pair(
         &mut self,
         data_packet: MixedPacketInfo,
-        time_packet: MixedPacketInfo
+        time_packet: MixedPacketInfo,
     ) -> Result<bool> {
         // check if data end time reached
         let timeshift = TimeDelta::microseconds(self.timeshift * 1_000);
-        let timestamp= time_packet.timestamp
-            .ok_or_else(|| anyhow!("No timestamp in time packet"))? + timeshift;
+        let timestamp = time_packet
+            .timestamp
+            .ok_or_else(|| anyhow!("No timestamp in time packet"))?
+            + timeshift;
         if let Some(data_end_time) = &self.data_end_time {
             if let Some(end_datetime) = DateTime::parse_from_rfc3339(data_end_time)
                 .with_context(|| format!("Failed to parse data_end_time: {}", data_end_time))?
                 .with_timezone(&Utc)
-                .checked_add_signed(timeshift) {
+                .checked_add_signed(timeshift)
+            {
                 if timestamp > end_datetime {
-                    tracing::info!("Data end time reached: {}, current timestamp: {}, no longer to process remain packets.", end_datetime, timestamp);
+                    tracing::info!(
+                        "Data end time reached: {}, current timestamp: {}, no longer to process remain packets.",
+                        end_datetime,
+                        timestamp
+                    );
                     // end processing
                     self.state = AlsConverterStateMachine::End;
                     return Ok(true);
                 }
             }
         }
-
 
         match self.state {
             AlsConverterStateMachine::Initial => {
@@ -490,13 +583,20 @@ impl<'a> ConversionContext<'a> {
             AlsConverterStateMachine::FirstDataframes => {
                 self.process_first_dataframes_state(data_packet, time_packet)?;
             }
-            AlsConverterStateMachine::Pong |
-            AlsConverterStateMachine::UpdateObjects => {
+            AlsConverterStateMachine::Pong | AlsConverterStateMachine::UpdateObjects => {
                 self.process_update_objects_state(data_packet, time_packet)?;
             }
             AlsConverterStateMachine::Split => {
                 tracing::debug!("Segment ended, writing to file and starting new segment.");
-                self.segment_builder.write(self.data_room.started_at, &self.data_room.id)?;
+                if self.use_audio_processing {
+                    #[cfg(feature = "audio")]
+                    self.audio_builder.write()?;
+                    #[cfg(not(feature = "audio"))]
+                    unreachable!("Audio feature is not enabled");
+                } else {
+                    self.segment_builder
+                        .write(self.data_room.started_at, &self.data_room.id)?;
+                }
                 self.state = AlsConverterStateMachine::FirstDataframes;
             }
             AlsConverterStateMachine::End => {
@@ -506,14 +606,14 @@ impl<'a> ConversionContext<'a> {
         Ok(false)
     }
 
-    fn process_initial_state(
-        &mut self,
-        data_packet: MixedPacketInfo
-    ) -> Result<()> {
-        let frame = self.get_first_dataframe(&data_packet)
+    fn process_initial_state(&mut self, data_packet: MixedPacketInfo) -> Result<()> {
+        let frame = self
+            .get_first_dataframe(&data_packet)
             .ok_or_else(|| anyhow!("No DataFrame found in initial fragment"))?;
 
-        let message = frame.message.as_ref()
+        let message = frame
+            .message
+            .as_ref()
             .ok_or_else(|| anyhow!("No message in DataFrame"))?;
 
         match message {
@@ -531,18 +631,30 @@ impl<'a> ConversionContext<'a> {
             }
             _ => {}
         }
-        
+
         Ok(())
     }
 
     /// data packet 应该是 DataFrames(InstantiateObject|UpdateObject)
-    fn process_first_dataframes_state(&mut self, data_packet: MixedPacketInfo, time_packet: MixedPacketInfo) -> Result<()> {
+    fn process_first_dataframes_state(
+        &mut self,
+        data_packet: MixedPacketInfo,
+        time_packet: MixedPacketInfo,
+    ) -> Result<()> {
         // control message 判断必须是Data
-        if !data_packet.data_pack.as_ref().map_or(false, |dp| dp.control.as_ref().map_or(false, |c| matches!(c, data_pack::Control::Data(true)))) {
+        if !data_packet.data_pack.as_ref().map_or(false, |dp| {
+            dp.control
+                .as_ref()
+                .map_or(false, |c| matches!(c, data_pack::Control::Data(true)))
+        }) {
             return Ok(());
         }
         // 第一个 dataframe 必须是 InstantiateObject
-        if !data_packet.data_pack.as_ref().map_or(false, |dp| dp.frames.first().map_or(false, |f| matches!(f.message, Some(data_frame::Message::InstantiateObject(_))))) {
+        if !data_packet.data_pack.as_ref().map_or(false, |dp| {
+            dp.frames.first().map_or(false, |f| {
+                matches!(f.message, Some(data_frame::Message::InstantiateObject(_)))
+            })
+        }) {
             return Ok(());
         }
         if let Some(start_time) = &self.start_time {
@@ -558,7 +670,8 @@ impl<'a> ConversionContext<'a> {
                 }
             }
         }
-        let mut timestamp = time_packet.timestamp
+        let mut timestamp = time_packet
+            .timestamp
             .ok_or_else(|| anyhow!("No timestamp in time packet"))?;
         timestamp = timestamp + TimeDelta::microseconds(self.timeshift * 1_000);
         self.initial_timestamp = timestamp;
@@ -566,14 +679,20 @@ impl<'a> ConversionContext<'a> {
         self.segment_builder
             .start()
             .add(PacketInfo::create_segment_started_packet(timestamp))
-            .add(PacketInfo::create_room_frame(timestamp, self.data_room.clone()))
+            .add(PacketInfo::create_room_frame(
+                timestamp,
+                self.data_room.clone(),
+            ))
             .add(PacketInfo::create_cache_end(timestamp));
-        tracing::debug!("Started new segment with initial timestamp: {}", self.initial_timestamp);
-        
+        tracing::debug!(
+            "Started new segment with initial timestamp: {}",
+            self.initial_timestamp
+        );
+
         let mut data_info = PacketInfo::try_from(data_packet)
             .context("Failed to convert MixedPacketInfo to PacketInfo")?;
         data_info.timestamp = timestamp;
-        
+
         let mut frames = std::mem::take(&mut data_info.data_pack.frames);
         for frame in &mut frames {
             if let Some(message) = &mut frame.message {
@@ -583,35 +702,31 @@ impl<'a> ConversionContext<'a> {
                             room_id: self.data_room.id.clone(),
                         })); // 修改 InstantiateObject 的目标为 RoomAll
                         obj.owner_id = b"sys".to_vec(); // 设置 owner_id 为 "sys"
-                        tracing::trace!("New object instantiated in initial dataframes: {:?} with id {:?} at timestamp: {}", String::from_utf8_lossy(&obj.prefab_name), obj.object_id, timestamp);
+                        tracing::trace!(
+                            "New object instantiated in initial dataframes: {:?} with id {:?} at timestamp: {}",
+                            String::from_utf8_lossy(&obj.prefab_name),
+                            obj.object_id,
+                            timestamp
+                        );
                     }
                     data_frame::Message::UpdateObject(obj) => {
                         obj.target = Some(update_object::Target::RoomAll(RoomAll {
                             room_id: self.data_room.id.clone(),
-                        }));  // 修改 UpdateObject 的目标为 RoomAll
+                        })); // 修改 UpdateObject 的目标为 RoomAll
                     }
                     _ => {}
                 }
             }
         }
-        let mut data_frames_packet = PacketInfo::create_room_frame(timestamp, self.data_room.clone());
+        let mut data_frames_packet =
+            PacketInfo::create_room_frame(timestamp, self.data_room.clone());
         data_frames_packet.data_pack.frames.extend(frames.clone());
+        #[cfg(not(feature = "audio"))]
         self.segment_builder.add(data_frames_packet);
         // save initial_dataframes
-        for frame in &mut frames {
-            if let Some(message) = &mut frame.message {
-                match message {
-                    data_frame::Message::InstantiateObject(obj) => {
-                        obj.target = Some(instantiate_object::Target::CurrentPlayer(CurrentPlayer {  })); // 修改 InstantiateObject 的目标为 CurrentPlayer
-                    }
-                    data_frame::Message::UpdateObject(obj) => {
-                        obj.target = Some(update_object::Target::CurrentPlayer(CurrentPlayer {  }));  // 修改 UpdateObject 的目标为 CurrentPlayer
-                    }
-                    _ => {}
-                }
-            }
+        for frame in frames {
+            self.insert_initial_dataframes(frame);
         }
-        self.initial_dataframes = frames;
         self.state = AlsConverterStateMachine::UpdateObjects;
         Ok(())
     }
@@ -642,7 +757,8 @@ impl<'a> ConversionContext<'a> {
                 }
             }
         }
-        let mut timestamp = time_packet.timestamp
+        let mut timestamp = time_packet
+            .timestamp
             .ok_or_else(|| anyhow!("No timestamp in time packet"))?;
         timestamp = timestamp + TimeDelta::microseconds(self.timeshift * 1_000);
 
@@ -652,7 +768,8 @@ impl<'a> ConversionContext<'a> {
             if let Some(start_datetime) = DateTime::parse_from_rfc3339(data_start_time)
                 .with_context(|| format!("Failed to parse data_start_time: {}", data_start_time))?
                 .with_timezone(&Utc)
-                .checked_add_signed(TimeDelta::microseconds(self.timeshift * 1_000)) {
+                .checked_add_signed(TimeDelta::microseconds(self.timeshift * 1_000))
+            {
                 if timestamp < start_datetime {
                     // skip and keep checking
                     use_custom_data_start_time = true;
@@ -661,15 +778,24 @@ impl<'a> ConversionContext<'a> {
                     self.data_start_time = None;
                     // and update the initial timestamp in the segment builder
                     self.initial_timestamp = timestamp;
-                    self.segment_builder.segments[0].packets.iter_mut().for_each(|packet|{
-                        packet.timestamp = timestamp;
-                    });
+                    self.segment_builder.segments[0]
+                        .packets
+                        .iter_mut()
+                        .for_each(|packet| {
+                            packet.timestamp = timestamp;
+                        });
                     // update initial dataframes for segment builder,
                     // remove last and inset new one
                     if let Some(_last_packet) = self.segment_builder.segments[0].packets.pop() {
-                        let mut new_initial_packet = PacketInfo::create_room_frame(timestamp, self.data_room.clone());
-                        new_initial_packet.data_pack.frames.extend(self.initial_dataframes.clone());
-                        self.segment_builder.segments[0].packets.push(new_initial_packet);
+                        let mut new_initial_packet =
+                            PacketInfo::create_room_frame(timestamp, self.data_room.clone());
+                        new_initial_packet
+                            .data_pack
+                            .frames
+                            .extend(self.initial_dataframes.clone());
+                        self.segment_builder.segments[0]
+                            .packets
+                            .push(new_initial_packet);
                     }
                 }
             }
@@ -682,8 +808,13 @@ impl<'a> ConversionContext<'a> {
                 self.segment_builder
                     .set_current_segment_duration(DURATION.as_seconds_f64())
                     .next()
-                    .add(PacketInfo::create_segment_started_packet(self.initial_timestamp))
-                    .add(PacketInfo::create_room_frame(timestamp, self.data_room.clone()))
+                    .add(PacketInfo::create_segment_started_packet(
+                        self.initial_timestamp,
+                    ))
+                    .add(PacketInfo::create_room_frame(
+                        timestamp,
+                        self.data_room.clone(),
+                    ))
                     .add(PacketInfo {
                         timestamp,
                         data_pack: DataPack {
@@ -756,14 +887,20 @@ impl<'a> ConversionContext<'a> {
                 }
             })
             .collect();
-        if !frames.is_empty() && frames.iter().any(|f| {
-            if let Some(data_frame::Message::DestroyObject(_)) = &f.message {
-                true
-            } else {
-                false
-            }
-        }) {
-            tracing::debug!("Processing DestroyObject frames at timestamp: {} with initial timestamp segment: {}", timestamp, self.initial_timestamp);
+        if !frames.is_empty()
+            && frames.iter().any(|f| {
+                if let Some(data_frame::Message::DestroyObject(_)) = &f.message {
+                    true
+                } else {
+                    false
+                }
+            })
+        {
+            tracing::debug!(
+                "Processing DestroyObject frames at timestamp: {} with initial timestamp segment: {}",
+                timestamp,
+                self.initial_timestamp
+            );
         }
         if frames.is_empty() || use_custom_data_start_time {
             return Ok(());
@@ -789,14 +926,21 @@ impl<'a> ConversionContext<'a> {
         }
 
         let update_packet = PacketInfo {
-                timestamp,
-                data_pack: DataPack {
-                    control: Some(data_pack::Control::Data(true)),
-                    frames,
-                },
-                raw_data: Vec::new(),
-            };
-        self.segment_builder.add(update_packet);
+            timestamp,
+            data_pack: DataPack {
+                control: Some(data_pack::Control::Data(true)),
+                frames,
+            },
+            raw_data: Vec::new(),
+        };
+        if self.use_audio_processing {
+            #[cfg(feature = "audio")]
+            self.audio_builder.handle_update_audio(&update_packet);
+            #[cfg(not(feature = "audio"))]
+            unreachable!("Audio feature is not enabled");
+        } else {
+            self.segment_builder.add(update_packet);
+        }
         Ok(())
     }
 
@@ -811,9 +955,14 @@ impl<'a> ConversionContext<'a> {
     fn update_initial_dataframes(&mut self, mut dataframe: DataFrame) {
         if let Some(existing_frame) = self.initial_dataframes.iter_mut().find(|f| {
             // message都是UpdateObject
-            if let (Some(existing_message), Some(new_message)) = (f.message.as_ref(), dataframe.message.as_ref()) {
-                if let (data_frame::Message::UpdateObject(existing_obj), data_frame::Message::UpdateObject(new_obj)) =
-                    (existing_message, new_message) {
+            if let (Some(existing_message), Some(new_message)) =
+                (f.message.as_ref(), dataframe.message.as_ref())
+            {
+                if let (
+                    data_frame::Message::UpdateObject(existing_obj),
+                    data_frame::Message::UpdateObject(new_obj),
+                ) = (existing_message, new_message)
+                {
                     existing_obj.object_id == new_obj.object_id
                 } else {
                     false
@@ -826,7 +975,7 @@ impl<'a> ConversionContext<'a> {
             if let Some(message) = &mut dataframe.message {
                 match message {
                     data_frame::Message::UpdateObject(obj) => {
-                        obj.target = Some(update_object::Target::CurrentPlayer(CurrentPlayer {  }));
+                        obj.target = Some(update_object::Target::CurrentPlayer(CurrentPlayer {}));
                     }
                     _ => {}
                 }
@@ -840,10 +989,18 @@ impl<'a> ConversionContext<'a> {
         if let Some(message) = &mut dataframe.message {
             match message {
                 data_frame::Message::InstantiateObject(obj) => {
-                    obj.target = Some(instantiate_object::Target::CurrentPlayer(CurrentPlayer {  })); // 修改 InstantiateObject 的目标为 CurrentPlayer
+                    if self.use_audio_processing {
+                        #[cfg(feature = "audio")]
+                        self.audio_builder.handle_instantiate_audio(message);
+                        #[cfg(not(feature = "audio"))]
+                        unreachable!("Audio feature is not enabled");
+                    } else {
+                        obj.target =
+                            Some(instantiate_object::Target::CurrentPlayer(CurrentPlayer {})); // 修改 InstantiateObject 的目标为 CurrentPlayer
+                    }
                 }
                 data_frame::Message::UpdateObject(obj) => {
-                    obj.target = Some(update_object::Target::CurrentPlayer(CurrentPlayer {  }));  // 修改 UpdateObject 的目标为 CurrentPlayer
+                    obj.target = Some(update_object::Target::CurrentPlayer(CurrentPlayer {})); // 修改 UpdateObject 的目标为 CurrentPlayer
                 }
                 _ => {}
             }

@@ -8,8 +8,11 @@ authors.workspace = true
 repository.workspace = true
 license.workspace = true
 
-[dependencies]
+[features]
+default = []
+audio = ["opus", "hound"]
 
+[dependencies]
 anyhow.workspace = true
 tracing.workspace = true
 chrono.workspace = true
@@ -22,6 +25,10 @@ p256 = { version = "0.13.2", features = ["ecdh"] }
 rand_core = { version = "0.6.4", features = ["getrandom"] }
 hex.workspace = true
 sha2 = "0.10"
+
+# extract audio feature
+opus = { git = "https://github.com/112batman/opus-rs", rev = "54d2f841b1c44394ca2822bc49e9cf3f0aa63db6", optional = true } # lock to opusic-sys 0.5.7 for opus 1.5.2
+hound = { version = "3.5.1", optional = true}
 
 [build-dependencies]
 prost-build.workspace = true

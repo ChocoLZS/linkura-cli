@@ -23,6 +23,10 @@ tokio.workspace = true
 async-trait.workspace = true
 url.workspace = true
 
+[features]
+default = []
+audio = ["linkura-packet/audio"]
+
 
 [[bin]]
 name = "linkura-motion-cli"
