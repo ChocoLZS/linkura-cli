@@ -207,6 +207,8 @@ jobs:
 
           FEATURES_NAME=$(echo "${{ matrix.name }}" | sed 's/\.zip$/-full-features.zip/')
           tar czvf ../../../$FEATURES_NAME linkura-cli-full-features.exe linkura-motion-cli-full-features.exe
+
+          echo "FEATURES_ARCHIVE_NAME=$FEATURES_NAME" >> $GITHUB_ENV
           cd -
           
       - name: PostBuild | Prepare artifacts [-nix]
@@ -221,10 +223,12 @@ jobs:
 
           FEATURES_NAME=$(echo "${{ matrix.name }}" | sed 's/\.tar\.gz$/-full-features.tar.gz/')
           tar czvf ../../../$FEATURES_NAME linkura-cli-full-features linkura-motion-cli-full-features
+
+          echo "FEATURES_ARCHIVE_NAME=$FEATURES_NAME" >> $GITHUB_ENV
           cd -
 
       - name: Deploy | Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.name }}-full-features
-          path: ${{ matrix.name }}-full-features
+          name: ${{ env.FEATURES_ARCHIVE_NAME }}
+          path: ${{ env.FEATURES_ARCHIVE_NAME }}
