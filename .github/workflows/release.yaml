@@ -18,9 +18,9 @@ on:
         type: boolean
         description: "Create a release"
         default: true
-      # features:
-      #   type: string
-      #   description: "Custom features to build"
+      features:
+        type: string
+        description: "Custom features to build"
       archive_suffix:
         type: choice
         description: "Suffix for the archive bin filename."
@@ -119,7 +119,7 @@ jobs:
           bin: ${{ inputs.binary_name }}
           archive: '$bin${{ inputs.archive_suffix }}$target'
           target: ${{ matrix.target }}
-          # features: ${{ inputs.features || '' }}
+          features: ${{ inputs.features || '' }}
           tar: unix
           zip: windows
           # asset: target/release/${{ inputs.binary_name }}
