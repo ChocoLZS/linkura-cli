@@ -815,8 +815,14 @@ impl ConversionContext {
         let mut data_frames_packet =
             PacketInfo::create_room_frame(timestamp, self.data_room.clone());
         data_frames_packet.data_pack.frames.extend(frames.clone());
-        #[cfg(not(feature = "audio"))]
-        self.segment_builder.add(data_frames_packet);
+        if self.use_audio_processing {
+            #[cfg(feature = "audio")]
+            // do nothing
+            #[cfg(not(feature = "audio"))]
+            unreachable!("Audio processing is disabled");
+        } else {
+            self.segment_builder.add(data_frames_packet);
+        }
         // save initial_dataframes
         for frame in frames {
             self.insert_initial_dataframes(frame);
