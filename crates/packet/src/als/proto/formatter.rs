@@ -6,11 +6,13 @@ use prost::Message;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 
 use super::analyzer::PacketStats;
 use super::define::{DataPack, data_frame, data_pack, instantiate_object, update_object};
 use crate::als::proto::PacketInfo;
+use crate::als::proto::define::UpdateObject;
+use crate::als::proto::extension::UpdateObjectExt;
 
 
 impl Display for instantiate_object::Target {
@@ -184,13 +186,20 @@ impl<'a> PacketFormatter<'a> {
             }
             Message::UpdateObject(obj) => {
                 let object_id = obj.object_id;
-                let prefab_name = self.objects_map.get(&object_id).cloned().unwrap_or_else(|| "<unknown>".to_string());
                 writer.writeln("      Type: UpdateObject")?;
                 writer.writeln(&format!("        Object ID: {}", object_id))?;
-                writer.writeln(&format!("        Prefab: {}", prefab_name))?;
                 writer.writeln(&format!("        Method: {}", obj.method))?;
                 if let Some(target) = &obj.target {
                     writer.writeln(&format!("        Target: {}", target))?;
+                }
+                // Try to parse specific payload with prefab_name
+                // with struture or router
+                if let Some(prefab_name) = self.objects_map.get(&object_id) {
+                    let analyzer = UpdateObjectPayloadAnalyzer::new(prefab_name, obj);
+                    writer.writeln(&format!("        Prefab: {}", prefab_name))?;
+                    writer.writeln(&format!("        Parsed Payload: {}", analyzer))?;
+                } else {
+                    writer.writeln("        <unknown prefab>")?;
                 }
                 writer.writeln(&format!("        Payload size: {} bytes", obj.payload.len()))?;
                 let debug_len = 32.min(obj.payload.len());
@@ -342,6 +351,31 @@ impl StatsFormatter {
         Ok(())
     }
 }
+
+struct UpdateObjectPayloadAnalyzer<'a> {
+    prefab_name: &'a str,
+    object: &'a UpdateObject,
+}
+
+impl<'a> UpdateObjectPayloadAnalyzer<'a> {
+    pub fn new(prefab_name: &'a str, object: &'a UpdateObject) -> Self {
+        Self { prefab_name, object }
+    }
+}
+
+impl Display for UpdateObjectPayloadAnalyzer<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // endwith
+        if self.prefab_name.ends_with("DateTimeReceiver") {
+            write!(f, "{}", self.object.try_parse_date_time().unwrap_or_default())
+        }
+        // do not parse
+        else {
+            write!(f, "<unparsed payload, length: {} bytes>", self.object.payload.len())
+        }
+    }
+}
+
 
 // Helper functions
 fn percentage(count: u32, total: u32) -> f64 {
