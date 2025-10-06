@@ -1,8 +1,8 @@
 use crate::als::proto::{
-        MixedPacketInfo, MixedPacketReader, PacketInfo, ProtoPacketReader, proto::als::{
+        MixedPacketInfo, PacketInfo, ProtoPacketReader, proto::als::{
             CurrentPlayer, DataFrame, DataPack, Room, RoomAll, data_frame, data_pack,
             destroy_object, instantiate_object, update_object,
-        }
+        }, reader::PacketReaderTrait
     };
 use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, FixedOffset, TimeDelta, Utc};
@@ -14,6 +14,7 @@ use std::{
     fs::{DirEntry, File},
     path::PathBuf,
 };
+use crate::als::proto::reader::{PacketsBufferReader, MixedPacketReader};
 
 #[cfg(feature = "audio")]
 use super::audio::{AudioBuilder};
@@ -51,6 +52,46 @@ impl AlsConverter {
         }
     }
 
+    fn get_file_entries(input_dir: &Path) -> Result<std::collections::VecDeque<DirEntry>> {
+        if !input_dir.is_dir() {
+            return Err(anyhow!("Input path is not a directory"));
+        }
+        // Read mixed packets from input directory
+        let mut input_files = std::fs::read_dir(input_dir)?
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .path()
+                    .extension()
+                    .map(|ext| ext == "bin")
+                    .unwrap_or(false)
+            })
+            .collect::<Vec<_>>();
+
+        input_files.sort_by(|a, b| {
+            let extract_number = |entry: &std::fs::DirEntry| -> Option<u64> {
+                entry
+                    .file_name()
+                    .to_str()?
+                    .rsplit('_')
+                    .next()?
+                    .split('.')
+                    .next()?
+                    .parse::<u64>()
+                    .ok()
+            };
+
+            let num_a = extract_number(a).unwrap_or(0);
+            let num_b = extract_number(b).unwrap_or(0);
+            num_a.cmp(&num_b)
+        });
+
+        if input_files.is_empty() {
+            return Err(anyhow!("No input files found"));
+        }
+        Ok(std::collections::VecDeque::from(input_files))
+    }
+
     pub fn convert_mixed_to_standard<P: AsRef<Path>>(
         &self,
         input_dir: P,
@@ -75,7 +116,8 @@ impl AlsConverter {
             output_dir.to_str().map(String::from),
             self.use_audio_processing,
         );
-        let mut packet_buffer = MixedPacketsBuffer::new(input_dir);
+        let file_entries = Self::get_file_entries(input_dir)?;
+        let mut packet_buffer = PacketsBufferReader::new(file_entries, |file| MixedPacketReader::boxed(file));
 
         self.process_all_packets(&mut context, &mut packet_buffer)?;
         self.finalize_conversion(&mut context, output_dir)?;
@@ -105,10 +147,10 @@ impl AlsConverter {
     fn process_all_packets(
         &self,
         context: &mut ConversionContext,
-        packet_buffer: &mut MixedPacketsBuffer,
+        packet_buffer: &mut PacketsBufferReader,
     ) -> Result<()> {
-        while let Some((data_packet, time_packet)) = packet_buffer.try_read_packet_pair()? {
-            let end = context.process_packet_pair(data_packet, time_packet)?;
+        while let Some(packet_info) = packet_buffer.read_packet()? {
+            let end = context.process_packet(packet_info)?;
             if end {
                 break;
             }
@@ -160,122 +202,6 @@ impl fmt::Display for PacketsBufferError {
 }
 
 impl std::error::Error for PacketsBufferError {}
-
-struct MixedPacketsBuffer {
-    // queue
-    packets_buffer: std::collections::VecDeque<MixedPacketInfo>,
-    file_entries: std::collections::VecDeque<DirEntry>,
-}
-
-impl MixedPacketsBuffer {
-    pub fn new(input_dir: &Path) -> Self {
-        MixedPacketsBuffer {
-            packets_buffer: std::collections::VecDeque::new(),
-            file_entries: Self::get_file_entries(input_dir).unwrap_or_default(),
-        }
-    }
-
-    // 一次读两个
-    fn read(&mut self) -> Result<(MixedPacketInfo, MixedPacketInfo)> {
-        if self.packets_buffer.is_empty() {
-            if self.file_entries.is_empty() {
-                return Err(anyhow::Error::from(PacketsBufferError::NoMoreFileEntries));
-            }
-            // try reading from file entries
-            let file_entry = self
-                .file_entries
-                .pop_front()
-                .ok_or_else(|| anyhow!("No more file entries available"))?;
-            let packets = self
-                .read_packets(Some(&file_entry))
-                .with_context(|| "Failed to read mixed packets from file entry")?;
-            self.packets_buffer.extend(packets);
-        }
-        let datapack_packet = self
-            .packets_buffer
-            .pop_front()
-            .ok_or_else(|| anyhow::Error::from(PacketsBufferError::NoPacketInBuffer))?;
-        let timestamp_packet = self
-            .packets_buffer
-            .pop_front()
-            .ok_or_else(|| anyhow::Error::from(PacketsBufferError::NotEnoughPacketInBuffer))?;
-        Ok((datapack_packet, timestamp_packet))
-    }
-
-    fn read_packets(
-        &self,
-        file_entry: Option<&DirEntry>,
-    ) -> Result<std::collections::VecDeque<MixedPacketInfo>> {
-        let Some(file_entry) = file_entry else {
-            return Err(anyhow!("No file entry provided"));
-        };
-        let file = File::open(file_entry.path())
-            .with_context(|| format!("Failed to open initial fragment: {:?}", file_entry))?;
-        let mut reader = MixedPacketReader::new(file);
-        let packets = reader
-            .read_mixed_packets()
-            .with_context(|| "Failed to read mixed packets")?;
-        Ok(std::collections::VecDeque::from(packets))
-    }
-
-    /// 尝试读取一对数据包，如果没有更多文件则返回 None
-    fn try_read_packet_pair(
-        &mut self
-    ) -> Result<Option<(MixedPacketInfo, MixedPacketInfo)>> {
-        match self.read() {
-            Ok(packets) => Ok(Some(packets)),
-            Err(err) => {
-                if let Some(PacketsBufferError::NoMoreFileEntries) =
-                    err.downcast_ref::<PacketsBufferError>()
-                {
-                    Ok(None)
-                } else {
-                    Err(err)
-                }
-            }
-        }
-    }
-
-    fn get_file_entries(input_dir: &Path) -> Result<std::collections::VecDeque<DirEntry>> {
-        if !input_dir.is_dir() {
-            return Err(anyhow!("Input path is not a directory"));
-        }
-        // Read mixed packets from input directory
-        let mut input_files = std::fs::read_dir(input_dir)?
-            .filter_map(Result::ok)
-            .filter(|entry| {
-                entry
-                    .path()
-                    .extension()
-                    .map(|ext| ext == "bin")
-                    .unwrap_or(false)
-            })
-            .collect::<Vec<_>>();
-
-        input_files.sort_by(|a, b| {
-            let extract_number = |entry: &std::fs::DirEntry| -> Option<u64> {
-                entry
-                    .file_name()
-                    .to_str()?
-                    .rsplit('_')
-                    .next()?
-                    .split('.')
-                    .next()?
-                    .parse::<u64>()
-                    .ok()
-            };
-
-            let num_a = extract_number(a).unwrap_or(0);
-            let num_b = extract_number(b).unwrap_or(0);
-            num_a.cmp(&num_b)
-        });
-
-        if input_files.is_empty() {
-            return Err(anyhow!("No input files found"));
-        }
-        Ok(std::collections::VecDeque::from(input_files))
-    }
-}
 
 struct StandardPacketsBuffer {
     // queue
@@ -640,17 +566,13 @@ impl ConversionContext {
         }
     }
 
-    fn process_packet_pair(
+    fn process_packet(
         &mut self,
-        data_packet: MixedPacketInfo,
-        time_packet: MixedPacketInfo,
+        packet_info: PacketInfo,
     ) -> Result<bool> {
         // check if data end time reached
         let timeshift = TimeDelta::microseconds(self.timeshift * 1_000);
-        let timestamp = time_packet
-            .timestamp
-            .ok_or_else(|| anyhow!("No timestamp in time packet"))?
-            + timeshift;
+        let timestamp = packet_info.timestamp + timeshift;
         if let Some(data_end_time) = &self.data_end_time {
             if let Some(end_datetime) = DateTime::parse_from_rfc3339(data_end_time)
                 .with_context(|| format!("Failed to parse data_end_time: {}", data_end_time))?
@@ -672,13 +594,13 @@ impl ConversionContext {
 
         match self.state {
             AlsConverterStateMachine::Initial => {
-                self.process_initial_state(data_packet)?;
+                self.process_initial_state(packet_info)?;
             }
             AlsConverterStateMachine::FirstDataframes => {
-                self.process_first_dataframes_state(data_packet, time_packet)?;
+                self.process_first_dataframes_state(packet_info)?;
             }
             AlsConverterStateMachine::Pong | AlsConverterStateMachine::UpdateObjects => {
-                self.process_update_objects_state(data_packet, time_packet)?;
+                self.process_update_objects_state(packet_info)?;
             }
             AlsConverterStateMachine::Split => {
                 tracing::debug!("Segment ended, writing to file and starting new segment.");
@@ -700,7 +622,7 @@ impl ConversionContext {
         Ok(false)
     }
 
-    fn process_initial_state(&mut self, data_packet: MixedPacketInfo) -> Result<()> {
+    fn process_initial_state(&mut self, data_packet: PacketInfo) -> Result<()> {
         let frame = self
             .get_first_dataframe(&data_packet)
             .ok_or_else(|| anyhow!("No DataFrame found in initial fragment"))?;
@@ -732,41 +654,33 @@ impl ConversionContext {
     /// data packet 应该是 DataFrames(InstantiateObject|UpdateObject)
     fn process_first_dataframes_state(
         &mut self,
-        data_packet: MixedPacketInfo,
-        time_packet: MixedPacketInfo,
+        packet_info: PacketInfo,
     ) -> Result<()> {
         // control message 判断必须是Data
-        if !data_packet.data_pack.as_ref().map_or(false, |dp| {
-            dp.control
+        if !packet_info.data_pack.control
                 .as_ref()
-                .map_or(false, |c| matches!(c, data_pack::Control::Data(true)))
-        }) {
+                .map_or(false, |c| matches!(c, data_pack::Control::Data(true))) {
             return Ok(());
         }
         // 第一个 dataframe 必须是 InstantiateObject
-        if !data_packet.data_pack.as_ref().map_or(false, |dp| {
-            dp.frames.first().map_or(false, |f| {
+        if !packet_info.data_pack.frames.first().map_or(false, |f| {
                 matches!(f.message, Some(data_frame::Message::InstantiateObject(_)))
-            })
-        }) {
+            }) {
             return Ok(());
         }
         if let Some(start_time) = &self.start_time {
-            if let Some(timestamp) = time_packet.timestamp {
-                let start_datetime = DateTime::parse_from_rfc3339(start_time)
-                    .with_context(|| format!("Failed to parse start_time: {}", start_time))?;
-                if timestamp < start_datetime {
-                    // skip this packet
-                    return Ok(());
-                } else {
-                    // only check once
-                    self.start_time = None;
-                }
+            let timestamp = packet_info.timestamp;
+            let start_datetime = DateTime::parse_from_rfc3339(start_time)
+                .with_context(|| format!("Failed to parse start_time: {}", start_time))?;
+            if timestamp < start_datetime {
+                // skip this packet
+                return Ok(());
+            } else {
+                // only check once
+                self.start_time = None;
             }
         }
-        let mut timestamp = time_packet
-            .timestamp
-            .ok_or_else(|| anyhow!("No timestamp in time packet"))?;
+        let mut timestamp = packet_info.timestamp;
         timestamp = timestamp + TimeDelta::microseconds(self.timeshift * 1_000);
         self.initial_timestamp = timestamp;
 
@@ -783,8 +697,7 @@ impl ConversionContext {
             self.initial_timestamp
         );
 
-        let mut data_info = PacketInfo::try_from(data_packet)
-            .context("Failed to convert MixedPacketInfo to PacketInfo")?;
+        let mut data_info = packet_info.clone(); // TODO: maybe we do not need clone here
         data_info.timestamp = timestamp;
 
         let mut frames = std::mem::take(&mut data_info.data_pack.frames);
@@ -833,11 +746,10 @@ impl ConversionContext {
 
     fn process_update_objects_state(
         &mut self,
-        data_packet: MixedPacketInfo,
-        time_packet: MixedPacketInfo,
+        packet_info: PacketInfo,
     ) -> Result<()> {
         // control message 判断必须是Data
-        if let Some(control) = &data_packet.data_pack.as_ref().unwrap().control {
+        if let Some(control) = &packet_info.data_pack.control {
             match control {
                 data_pack::Control::Data(true) => {
                     self.state = AlsConverterStateMachine::UpdateObjects;
@@ -857,9 +769,7 @@ impl ConversionContext {
                 }
             }
         }
-        let mut timestamp = time_packet
-            .timestamp
-            .ok_or_else(|| anyhow!("No timestamp in time packet"))?;
+        let mut timestamp = packet_info.timestamp;
         timestamp = timestamp + TimeDelta::microseconds(self.timeshift * 1_000);
 
         let mut use_custom_data_start_time = false;
@@ -927,8 +837,7 @@ impl ConversionContext {
             }
         }
 
-        let data_info = PacketInfo::try_from(data_packet)
-            .context("Failed to convert MixedPacketInfo to PacketInfo")?;
+        let data_info = packet_info.clone(); // TODO: maybe we do not need clone here
         // 获取frames，填充target roomall
         let frames: Vec<DataFrame> = data_info.data_pack.frames
             .into_iter()
@@ -1044,12 +953,8 @@ impl ConversionContext {
         Ok(())
     }
 
-    fn get_first_dataframe<'b>(&self, mixed_packet: &'b MixedPacketInfo) -> Option<&'b DataFrame> {
-        if let Some(data_pack) = &mixed_packet.data_pack {
-            data_pack.frames.first()
-        } else {
-            None
-        }
+    fn get_first_dataframe<'b>(&self, packet_info: &'b PacketInfo) -> Option<&'b DataFrame> {
+        packet_info.data_pack.frames.first()
     }
 
     fn update_initial_dataframes(&mut self, mut dataframe: DataFrame) {

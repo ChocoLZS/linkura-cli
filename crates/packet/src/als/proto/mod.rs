@@ -1,3 +1,9 @@
+pub mod extension;
+pub mod analyzer;
+// pub mod application;
+pub mod formatter;
+pub mod reader;
+
 use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Utc};
 use prost::Message;
@@ -73,7 +79,7 @@ pub fn calculate_digest(data: &[u8]) -> String {
     hex::encode(hasher.finalize())
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PacketInfo {
     pub timestamp: DateTime<Utc>,
     pub data_pack: DataPack,
