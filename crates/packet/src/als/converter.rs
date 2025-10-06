@@ -102,6 +102,7 @@ impl AlsConverter {
         data_start_time: Option<String>,
         data_end_time: Option<String>,
         metadata_path: Option<String>,
+        auto_timestamp: bool,
     ) -> Result<()> {
         let input_dir = input_dir.as_ref();
         let output_dir = output_dir.as_ref();
@@ -114,6 +115,7 @@ impl AlsConverter {
             metadata_path,
             output_dir.to_str().map(String::from),
             self.use_audio_processing,
+            auto_timestamp,
         );
         let file_entries = Self::get_file_entries(input_dir)?;
         let mut packet_buffer = PacketsBufferReader::new(file_entries, |file| MixedPacketReader::boxed(file));
@@ -394,13 +396,17 @@ struct ConversionContext {
     initial_dataframes: Vec<DataFrame>,
     timeshift: i64,
     split_write_mode: bool,
-    start_time: Option<String>,
-    data_start_time: Option<String>,
-    data_end_time: Option<String>,
+    start_time: Option<DateTime<Utc>>,
+    data_start_time: Option<DateTime<Utc>>,
+    data_end_time: Option<DateTime<Utc>>,
     use_audio_processing: bool,
     segment_builder: SegmentBuilder,
     #[cfg(feature = "audio")]
     audio_builder: AudioBuilder,
+
+    /// 根据回放包的 audio 与datetime receiver来自动计算时间戳
+    /// 不会影响timeshift ?
+    auto_timestamp: bool,
 }
 
 impl ConversionContext {
@@ -413,7 +419,20 @@ impl ConversionContext {
         metadata_path: Option<String>,
         output_dir: Option<String>,
         use_audio_processing: bool,
+        auto_timestamp: bool,
     ) -> Self {
+        let mut st: Option<DateTime<Utc>> = None;
+        let mut dst: Option<DateTime<Utc>> = None;
+        let mut det: Option<DateTime<Utc>> = None;
+        if let Some(start_time) = start_time {
+            st = Some(DateTime::parse_from_rfc3339(&start_time).unwrap().with_timezone(&Utc))
+        }
+        if let Some(data_start_time) = data_start_time {
+            dst = Some(DateTime::parse_from_rfc3339(&data_start_time).unwrap().with_timezone(&Utc))
+        }
+        if let Some(data_end_time) = data_end_time {
+            det = Some(DateTime::parse_from_rfc3339(&data_end_time).unwrap().with_timezone(&Utc))
+        }
         Self {
             state: AlsConverterStateMachine::Initial,
             data_room: Room {
@@ -426,10 +445,11 @@ impl ConversionContext {
             initial_dataframes: Vec::new(),
             timeshift,
             split_write_mode,
-            start_time,
-            data_start_time,
-            data_end_time,
+            start_time: st,
+            data_start_time: dst,
+            data_end_time: det,
             use_audio_processing,
+            auto_timestamp,
             #[cfg(feature = "audio")]
             audio_builder: AudioBuilder::new(output_dir),
         }
@@ -479,9 +499,7 @@ impl ConversionContext {
         let timeshift = TimeDelta::microseconds(self.timeshift * 1_000);
         let timestamp = packet_info.timestamp + timeshift;
         if let Some(data_end_time) = &self.data_end_time {
-            if let Some(end_datetime) = DateTime::parse_from_rfc3339(data_end_time)
-                .with_context(|| format!("Failed to parse data_end_time: {}", data_end_time))?
-                .with_timezone(&Utc)
+            if let Some(end_datetime) = data_end_time
                 .checked_add_signed(timeshift)
             {
                 if timestamp > end_datetime {
@@ -559,7 +577,7 @@ impl ConversionContext {
     /// data packet 应该是 DataFrames(InstantiateObject|UpdateObject)
     fn process_first_dataframes_state(
         &mut self,
-        packet_info: PacketInfo,
+        mut packet_info: PacketInfo,
     ) -> Result<()> {
         // control message 判断必须是Data
         if !packet_info.data_pack.control
@@ -575,9 +593,7 @@ impl ConversionContext {
         }
         if let Some(start_time) = &self.start_time {
             let timestamp = packet_info.timestamp;
-            let start_datetime = DateTime::parse_from_rfc3339(start_time)
-                .with_context(|| format!("Failed to parse start_time: {}", start_time))?;
-            if timestamp < start_datetime {
+            if timestamp < *start_time {
                 // skip this packet
                 return Ok(());
             } else {
@@ -597,16 +613,10 @@ impl ConversionContext {
                 self.data_room.clone(),
             ))
             .add(PacketInfo::create_cache_end(timestamp));
-        tracing::debug!(
-            "Started new segment with initial timestamp: {}",
-            self.initial_timestamp
-        );
 
-        let mut data_info = packet_info.clone(); // TODO: maybe we do not need clone here
-        data_info.timestamp = timestamp;
+        packet_info.timestamp = timestamp;
 
-        let mut frames = std::mem::take(&mut data_info.data_pack.frames);
-        for frame in &mut frames {
+        for frame in &mut packet_info.data_pack.frames {
             if let Some(message) = &mut frame.message {
                 match message {
                     data_frame::Message::InstantiateObject(obj) => {
@@ -629,21 +639,16 @@ impl ConversionContext {
                     _ => {}
                 }
             }
+            // save initial_dataframes
+            self.insert_initial_dataframes(frame.clone());
         }
-        let mut data_frames_packet =
-            PacketInfo::create_room_frame(timestamp, self.data_room.clone());
-        data_frames_packet.data_pack.frames.extend(frames.clone());
         if self.use_audio_processing {
             #[cfg(feature = "audio")]
             // do nothing
             #[cfg(not(feature = "audio"))]
             unreachable!("Audio processing is disabled");
         } else {
-            self.segment_builder.add(data_frames_packet);
-        }
-        // save initial_dataframes
-        for frame in frames {
-            self.insert_initial_dataframes(frame);
+            self.segment_builder.add(packet_info);
         }
         self.state = AlsConverterStateMachine::UpdateObjects;
         Ok(())
@@ -680,9 +685,7 @@ impl ConversionContext {
         let mut use_custom_data_start_time = false;
         // check if skip this update object packet
         if let Some(data_start_time) = &self.data_start_time {
-            if let Some(start_datetime) = DateTime::parse_from_rfc3339(data_start_time)
-                .with_context(|| format!("Failed to parse data_start_time: {}", data_start_time))?
-                .with_timezone(&Utc)
+            if let Some(start_datetime) = data_start_time
                 .checked_add_signed(TimeDelta::microseconds(self.timeshift * 1_000))
             {
                 if timestamp < start_datetime {

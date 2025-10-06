@@ -199,6 +199,11 @@ pub struct ArgsConvert {
         help = "Metadata path in index.md"
     )]
     pub metadata_path: Option<String>,
+    #[clap(
+        long = "auto-timestamp",
+        help = "Auto adjust timestamps to ensure chronological order", default_value = "false"
+    )]
+    pub auto_timestamp: bool,
     #[cfg(feature = "audio")]
     #[clap(
         long = "audio-only",
@@ -517,6 +522,7 @@ async fn main() -> Result<()> {
                         convert_args.data_start_time,
                         convert_args.data_end_time,
                         convert_args.metadata_path,
+                        convert_args.auto_timestamp
                     )
                 }
             })
