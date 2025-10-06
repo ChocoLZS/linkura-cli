@@ -11,7 +11,7 @@ use std::fs::{DirEntry, File};
 use std::io::{BufReader, Read};
 use std::usize;
 
-use super::proto::als::DataPack;
+use super::define::DataPack;
 use crate::als::proto::PacketInfo;
 
 /// Trait for reading packets from different formats

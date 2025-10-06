@@ -7,7 +7,7 @@ use std::fs::File;
 use std::io::Write;
 
 use super::analyzer::PacketStats;
-use super::proto::als::{DataPack, data_frame, data_pack};
+use super::define::{DataPack, data_frame, data_pack};
 use crate::als::proto::PacketInfo;
 
 /// Output writer abstraction

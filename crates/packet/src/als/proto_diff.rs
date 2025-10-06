@@ -1,6 +1,6 @@
 use crate::als::proto::{
     OutputWriter, PacketInfo, ProtoPacketReader, calculate_digest,
-    proto::als::{DataFrame, data_frame},
+    define::{DataFrame, data_frame},
 };
 use anyhow::{Context, Result, anyhow};
 use prost::Message;

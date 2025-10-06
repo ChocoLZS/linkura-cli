@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 
-use crate::als::proto::{proto::als::{
+use super::define::{
     UpdateObject
-}};
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {

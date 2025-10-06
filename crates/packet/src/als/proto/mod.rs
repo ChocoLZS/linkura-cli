@@ -13,16 +13,14 @@ use std::fs::File;
 use std::io::{BufReader, Read, Seek, Write};
 use std::usize;
 
-pub mod proto {
-    pub mod als {
-        include!(concat!(env!("OUT_DIR"), "/als.rs"));
-    }
+pub mod define {
+    include!(concat!(env!("OUT_DIR"), "/als.rs"));
 }
 
 use prost::bytes::Buf;
-use proto::als::DataPack;
+use define::DataPack;
 
-use crate::als::proto::proto::als::{DataFrame, Room, data_frame};
+use crate::als::proto::define::{DataFrame, Room, data_frame};
 
 fn encode_frame(frame: &DataFrame, buf: &mut Vec<u8>) {
     let frame_bytes = frame.encode_to_vec();
@@ -46,22 +44,22 @@ fn encode_data_pack_custom_order(data_pack: &DataPack) -> Vec<u8> {
     // Then encode control messages in field number order
     if let Some(control) = &data_pack.control {
         match control {
-            proto::als::data_pack::Control::Data(value) => {
+            define::data_pack::Control::Data(value) => {
                 // Field number 2, wire type Varint
                 encode_key(2, WireType::Varint, &mut buf);
                 encode_varint(if *value { 1 } else { 0 }, &mut buf);
             }
-            proto::als::data_pack::Control::Pong(value) => {
+            define::data_pack::Control::Pong(value) => {
                 // Field number 10, wire type Varint
                 encode_key(10, WireType::Varint, &mut buf);
                 encode_varint(if *value { 1 } else { 0 }, &mut buf);
             }
-            proto::als::data_pack::Control::SegmentStartedAt(value) => {
+            define::data_pack::Control::SegmentStartedAt(value) => {
                 // Field number 14, wire type Varint
                 encode_key(14, WireType::Varint, &mut buf);
                 encode_varint(*value as u64, &mut buf);
             }
-            proto::als::data_pack::Control::CacheEnded(value) => {
+            define::data_pack::Control::CacheEnded(value) => {
                 // Field number 15, wire type Varint
                 encode_key(15, WireType::Varint, &mut buf);
                 encode_varint(if *value { 1 } else { 0 }, &mut buf);
@@ -113,7 +111,7 @@ impl PacketInfo {
         Self {
             timestamp: timestamp,
             data_pack: DataPack {
-                control: Some(proto::als::data_pack::Control::SegmentStartedAt(
+                control: Some(define::data_pack::Control::SegmentStartedAt(
                     timestamp.timestamp_micros(),
                 )),
                 frames: vec![],
@@ -126,7 +124,7 @@ impl PacketInfo {
         Self {
             timestamp,
             data_pack: DataPack {
-                control: Some(proto::als::data_pack::Control::Data(true)),
+                control: Some(define::data_pack::Control::Data(true)),
                 frames: vec![DataFrame {
                     message: Some(data_frame::Message::Room(room)),
                 }],
@@ -139,7 +137,7 @@ impl PacketInfo {
         Self {
             timestamp,
             data_pack: DataPack {
-                control: Some(proto::als::data_pack::Control::CacheEnded(true)),
+                control: Some(define::data_pack::Control::CacheEnded(true)),
                 frames: vec![],
             },
             raw_data: vec![],
@@ -353,35 +351,35 @@ fn read_varint(cursor: &mut std::io::Cursor<&[u8]>) -> Result<u64> {
 
 // Helper functions for formatting target types
 fn format_instantiate_object_target(
-    target: &Option<proto::als::instantiate_object::Target>,
+    target: &Option<define::instantiate_object::Target>,
 ) -> String {
     match target {
-        Some(proto::als::instantiate_object::Target::CurrentPlayer(_)) => {
+        Some(define::instantiate_object::Target::CurrentPlayer(_)) => {
             "CurrentPlayer".to_string()
         }
-        Some(proto::als::instantiate_object::Target::RoomAll(room)) => {
+        Some(define::instantiate_object::Target::RoomAll(room)) => {
             format!(
                 "RoomAll (room_id: {:?})",
                 String::from_utf8_lossy(&room.room_id)
             )
         }
-        Some(proto::als::instantiate_object::Target::PlayerId(player_id)) => {
+        Some(define::instantiate_object::Target::PlayerId(player_id)) => {
             format!("PlayerId ({:?})", String::from_utf8_lossy(player_id))
         }
         None => "None".to_string(),
     }
 }
 
-fn format_update_object_target(target: &Option<proto::als::update_object::Target>) -> String {
+fn format_update_object_target(target: &Option<define::update_object::Target>) -> String {
     match target {
-        Some(proto::als::update_object::Target::CurrentPlayer(_)) => "CurrentPlayer".to_string(),
-        Some(proto::als::update_object::Target::RoomAll(room)) => {
+        Some(define::update_object::Target::CurrentPlayer(_)) => "CurrentPlayer".to_string(),
+        Some(define::update_object::Target::RoomAll(room)) => {
             format!(
                 "RoomAll (room_id: {:?})",
                 String::from_utf8_lossy(&room.room_id)
             )
         }
-        Some(proto::als::update_object::Target::PlayerId(player_id)) => {
+        Some(define::update_object::Target::PlayerId(player_id)) => {
             format!("PlayerId ({:?})", String::from_utf8_lossy(player_id))
         }
         None => "None".to_string(),
@@ -389,18 +387,18 @@ fn format_update_object_target(target: &Option<proto::als::update_object::Target
 }
 
 impl ControlMessageStats {
-    pub fn update_from_control(&mut self, control: &proto::als::data_pack::Control) {
+    pub fn update_from_control(&mut self, control: &define::data_pack::Control) {
         match control {
-            proto::als::data_pack::Control::Data(_) => {
+            define::data_pack::Control::Data(_) => {
                 self.data_count += 1;
             }
-            proto::als::data_pack::Control::Pong(_) => {
+            define::data_pack::Control::Pong(_) => {
                 self.pong_count += 1;
             }
-            proto::als::data_pack::Control::SegmentStartedAt(_) => {
+            define::data_pack::Control::SegmentStartedAt(_) => {
                 self.segment_started_at_count += 1;
             }
-            proto::als::data_pack::Control::CacheEnded(_) => {
+            define::data_pack::Control::CacheEnded(_) => {
                 self.cache_ended_count += 1;
             }
         }
@@ -409,9 +407,9 @@ impl ControlMessageStats {
 }
 
 impl FrameMessageStats {
-    pub fn update_from_frame(&mut self, frame: &proto::als::DataFrame) {
+    pub fn update_from_frame(&mut self, frame: &define::DataFrame) {
         if let Some(message) = &frame.message {
-            use proto::als::data_frame::Message;
+            use define::data_frame::Message;
             match message {
                 Message::InstantiateObject(_) => self.instantiate_object_count += 1,
                 Message::UpdateObject(_) => self.update_object_count += 1,
@@ -778,19 +776,19 @@ fn print_data_pack_details_unified(writer: &mut OutputWriter, data_pack: &DataPa
     if let Some(control) = &data_pack.control {
         writer.writeln("  Control message:")?;
         match control {
-            proto::als::data_pack::Control::Data(data) => {
+            define::data_pack::Control::Data(data) => {
                 writer.writeln(&format!("    Type: Data, Value: {}", data))?;
             }
-            proto::als::data_pack::Control::Pong(pong) => {
+            define::data_pack::Control::Pong(pong) => {
                 writer.writeln(&format!("    Type: Pong, Value: {}", pong))?;
             }
-            proto::als::data_pack::Control::SegmentStartedAt(timestamp) => {
+            define::data_pack::Control::SegmentStartedAt(timestamp) => {
                 writer.writeln(&format!(
                     "    Type: SegmentStartedAt, Timestamp: {}",
                     timestamp
                 ))?;
             }
-            proto::als::data_pack::Control::CacheEnded(ended) => {
+            define::data_pack::Control::CacheEnded(ended) => {
                 writer.writeln(&format!("    Type: CacheEnded, Value: {}", ended))?;
             }
         }
@@ -809,7 +807,7 @@ fn print_data_pack_details_unified(writer: &mut OutputWriter, data_pack: &DataPa
             writer.writeln(&format!("      DataFrame SHA-256 digest: {}", frame_digest))?;
 
             if let Some(message) = &frame.message {
-                use proto::als::data_frame::Message;
+                use define::data_frame::Message;
                 match message {
                     Message::InstantiateObject(obj) => {
                         let target_desc = format_instantiate_object_target(&obj.target);
@@ -1462,16 +1460,16 @@ fn format_data_pack(data_pack: &DataPack, indent_level: usize) -> String {
     if let Some(control) = &data_pack.control {
         output.push_str(&format!("{}Control: ", indent));
         match control {
-            proto::als::data_pack::Control::Data(data) => {
+            define::data_pack::Control::Data(data) => {
                 output.push_str(&format!("Data({})\n", data));
             }
-            proto::als::data_pack::Control::Pong(pong) => {
+            define::data_pack::Control::Pong(pong) => {
                 output.push_str(&format!("Pong({})\n", pong));
             }
-            proto::als::data_pack::Control::SegmentStartedAt(timestamp) => {
+            define::data_pack::Control::SegmentStartedAt(timestamp) => {
                 output.push_str(&format!("SegmentStartedAt({})\n", timestamp));
             }
-            proto::als::data_pack::Control::CacheEnded(ended) => {
+            define::data_pack::Control::CacheEnded(ended) => {
                 output.push_str(&format!("CacheEnded({})\n", ended));
             }
         }
@@ -1488,12 +1486,12 @@ fn format_data_pack(data_pack: &DataPack, indent_level: usize) -> String {
     output
 }
 
-fn format_data_frame(frame: &proto::als::DataFrame, indent_level: usize) -> String {
+fn format_data_frame(frame: &define::DataFrame, indent_level: usize) -> String {
     let indent = "  ".repeat(indent_level);
     let mut output = String::new();
 
     if let Some(message) = &frame.message {
-        use proto::als::data_frame::Message;
+        use define::data_frame::Message;
 
         output.push_str(&format!("{}Message: ", indent));
         match message {
