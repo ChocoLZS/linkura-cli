@@ -67,7 +67,7 @@ pub struct ArgsAnalyze {
         short('t'),
         long = "type",
         value_name = "TYPE",
-        help = "Analysis type: 'standard', 'mixed'",
+        help = "Analysis type: 'standard', 'mixed', 'mixed-legacy'",
         default_value = "standard"
     )]
     pub analysis_type: String,

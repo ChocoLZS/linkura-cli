@@ -677,7 +677,7 @@ impl ConversionContext {
         
         let timestamp = packet_info.timestamp;
         let mut use_custom_data_start_time = false;
-        // check if skip this update object packet
+        // 保留初始initial_dataframe, 但是跳过指定时间之前的包
         if let Some(data_start_time) = &self.data_start_time {
             if timestamp < *data_start_time {
                 // skip and keep checking
@@ -711,7 +711,9 @@ impl ConversionContext {
                 }
             }
         }
-        // 判断时间戳
+        
+        
+        // 如果不是通过数据规律分段，则手动判断时间戳，添加新的回放段（对timestamp正常的包管用 ）
         if timestamp - self.initial_timestamp > DURATION {
             self.initial_timestamp += DURATION;
             if !use_custom_data_start_time {
@@ -741,14 +743,14 @@ impl ConversionContext {
         // 过滤我们不需要的包, 也许这里有逻辑上的问题
         packet_info.data_pack.frames.retain(|frame| {
             if let Some(message) = &frame.message {
-                    match message {
-                        data_frame::Message::UpdateObject(_) |
-                        data_frame::Message::InstantiateObject(_) |
-                        data_frame::Message::DestroyObject(_) => {
-                            true
-                        }
-                        _ => false,
+                match message {
+                    data_frame::Message::UpdateObject(_) |
+                    data_frame::Message::InstantiateObject(_) |
+                    data_frame::Message::DestroyObject(_) => {
+                        true
                     }
+                    _ => false,
+                }
             } else {
                 false
             }
@@ -886,4 +888,5 @@ impl ConversionContext {
         // then sort InitialObject is first
         self.initial_dataframes.sort_by(Self::compare_dataframes);
     }
+
 }

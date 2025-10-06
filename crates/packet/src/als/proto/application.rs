@@ -5,9 +5,7 @@ use anyhow::{Context, Result};
 use std::fs::File;
 use std::path::Path;
 
-use crate::als::proto::reader::{PacketReaderTrait};
-
-use super::reader::{PacketReader, MixedPacketReader};
+use super::reader::{PacketReaderTrait, PacketReader, MixedPacketReader, LegacyPacketReader};
 use super::analyzer::{PacketAnalyzer, PacketFilter};
 use super::formatter::{OutputWriter, PacketFormatter, StatsFormatter};
 
@@ -23,6 +21,7 @@ pub fn analyze(
     let reader_factory: Box<dyn Fn(File) -> Box<dyn PacketReaderTrait>> = match packet_type {
         "standard" => Box::new(|file| Box::new(PacketReader::new(file))),
         "mixed" => Box::new(|file| Box::new(MixedPacketReader::new(file))),
+        "mixed-legacy" => Box::new(|file| Box::new(LegacyPacketReader::new(file))),
         // Future types can be added here
         _ => return Err(anyhow::anyhow!("Unsupported packet type: {}", packet_type)),
     };

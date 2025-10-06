@@ -4,7 +4,7 @@
 //! This module provides a trait-based abstraction for reading different packet formats.
 
 use anyhow::{Context, Result, anyhow};
-use chrono::{DateTime};
+use chrono::{DateTime, Utc};
 use prost::Message;
 use std::collections::VecDeque;
 use std::fs::{DirEntry, File};
@@ -264,6 +264,73 @@ impl PacketReaderTrait for MixedPacketReader {
         }
     }
     
+    fn read_packets(&mut self) -> Result<Vec<PacketInfo>> {
+        let mut packets = Vec::new();
+        while let Some(packet) = self.read_packet()? {
+            packets.push(packet);
+        }
+        Ok(packets)
+    }
+}
+
+/// Reader for legacy mixed packet format, no timestamp packet
+pub struct LegacyPacketReader {
+    reader: BufReader<File>,
+}
+
+impl LegacyPacketReader {
+    pub fn new(file: File) -> Self {
+        Self {
+            reader: BufReader::new(file),
+        }
+    }
+
+    /// Create a boxed trait object for polymorphic use
+    pub fn boxed(file: File) -> Box<dyn PacketReaderTrait> {
+        Box::new(Self::new(file))
+    }
+
+    fn read_u16_be(&mut self) -> Result<u16> {
+        let mut buf = [0u8; 2];
+        self.reader.read_exact(&mut buf)?;
+        Ok(u16::from_be_bytes(buf))
+    }
+
+    fn read_u8(&mut self) -> Result<u8> {
+        let mut buf = [0u8; 1];
+        self.reader.read_exact(&mut buf)?;
+        Ok(buf[0])
+    }
+
+    // fn read_u64_be(&mut self) -> Result<u64> {
+    //     let mut buf = [0u8; 8];
+    //     self.reader.read_exact(&mut buf)?;
+    //     Ok(u64::from_be_bytes(buf))
+    // }
+}
+
+impl PacketReaderTrait for LegacyPacketReader {
+    // read two packets each time, convert it to one PacketInfo
+    fn read_packet(&mut self) -> Result<Option<PacketInfo>> {
+        // Read length header
+        let length = match self.read_u16_be() {
+            Ok(len) => len,
+            Err(e) if is_eof_error(&e) => return Ok(None),
+            Err(e) => return Err(e),
+        };
+
+        // Read protobuf packet
+        if length < 3 {
+            return Err(anyhow!("Invalid protobuf packet length: {}", length));
+        }
+        let _unused = self.read_u8()?;
+        let data_length = length - 1;
+        let mut data = vec![0u8; data_length as usize];
+        self.reader.read_exact(&mut data)?;
+        let data_pack = DataPack::decode(data.as_slice())
+            .with_context(|| "Failed to decode protobuf")?;
+        return Ok(Some(PacketInfo { timestamp: Utc::now(), raw_data: data_pack.encode_to_vec(), data_pack: data_pack }));
+    }
     fn read_packets(&mut self) -> Result<Vec<PacketInfo>> {
         let mut packets = Vec::new();
         while let Some(packet) = self.read_packet()? {
