@@ -214,20 +214,24 @@ struct SegmentBuilder {
     metadata_path: Option<String>,
     output_dir: Option<String>,
     part_count: u32,
+    timeshift: i64,
 }
 
 impl SegmentBuilder {
-    pub fn new(metadata_path: Option<String>, output_dir: Option<String>) -> Self {
+    pub fn new(metadata_path: Option<String>, output_dir: Option<String>, timeshift: i64) -> Self {
         SegmentBuilder {
             current_sequence: 0,
             segments: Vec::new(),
             metadata_path,
             output_dir,
             part_count: 0,
+            timeshift
         }
     }
 
-    pub fn add(&mut self, packet_info: PacketInfo) -> &mut Self {
+    pub fn add(&mut self, mut packet_info: PacketInfo) -> &mut Self {
+        // add timeshift
+        packet_info.timestamp = packet_info.timestamp + TimeDelta::microseconds(self.timeshift);
         if let Some(segment) = self.segments.last_mut() {
             // check if packet length will exceed 16k bytes 16 * 1024 bytes (maybe the official limit is 16k bytes)
             // but we use 12k bytes as threshold in case of some overhead
@@ -288,6 +292,8 @@ impl SegmentBuilder {
         }
         self
     }
+
+    // pub fn update_first_
 
     pub fn write(&mut self, started_at: i64, data_room_id: &[u8]) -> Result<()> {
         if let Some(output_dir) = self.output_dir.clone() {
@@ -394,7 +400,6 @@ struct ConversionContext {
     data_room: Room,
     initial_timestamp: DateTime<Utc>,
     initial_dataframes: Vec<DataFrame>,
-    timeshift: i64,
     split_write_mode: bool,
     start_time: Option<DateTime<Utc>>,
     data_start_time: Option<DateTime<Utc>>,
@@ -441,9 +446,8 @@ impl ConversionContext {
                 ended_at: 0,
             },
             initial_timestamp: DateTime::<Utc>::from_timestamp_micros(0).unwrap(),
-            segment_builder: SegmentBuilder::new(metadata_path, output_dir.clone()),
+            segment_builder: SegmentBuilder::new(metadata_path, output_dir.clone(), timeshift),
             initial_dataframes: Vec::new(),
-            timeshift,
             split_write_mode,
             start_time: st,
             data_start_time: dst,
@@ -495,23 +499,17 @@ impl ConversionContext {
         &mut self,
         packet_info: PacketInfo,
     ) -> Result<bool> {
-        // check if data end time reached
-        let timeshift = TimeDelta::microseconds(self.timeshift * 1_000);
-        let timestamp = packet_info.timestamp + timeshift;
+        let timestamp = packet_info.timestamp;
         if let Some(data_end_time) = &self.data_end_time {
-            if let Some(end_datetime) = data_end_time
-                .checked_add_signed(timeshift)
-            {
-                if timestamp > end_datetime {
-                    tracing::info!(
-                        "Data end time reached: {}, current timestamp: {}, no longer to process remain packets.",
-                        end_datetime,
-                        timestamp
-                    );
-                    // end processing
-                    self.state = AlsConverterStateMachine::End;
-                    return Ok(true);
-                }
+            if timestamp > *data_end_time {
+                tracing::info!(
+                    "Data end time reached: {}, current timestamp: {}, no longer to process remain packets.",
+                    data_end_time,
+                    timestamp
+                );
+                // end processing
+                self.state = AlsConverterStateMachine::End;
+                return Ok(true);
             }
         }
 
@@ -601,8 +599,7 @@ impl ConversionContext {
                 self.start_time = None;
             }
         }
-        let mut timestamp = packet_info.timestamp;
-        timestamp = timestamp + TimeDelta::microseconds(self.timeshift * 1_000);
+        let timestamp = packet_info.timestamp;
         self.initial_timestamp = timestamp;
 
         self.segment_builder
@@ -613,8 +610,6 @@ impl ConversionContext {
                 self.data_room.clone(),
             ))
             .add(PacketInfo::create_cache_end(timestamp));
-
-        packet_info.timestamp = timestamp;
 
         for frame in &mut packet_info.data_pack.frames {
             if let Some(message) = &mut frame.message {
@@ -656,7 +651,7 @@ impl ConversionContext {
 
     fn process_update_objects_state(
         &mut self,
-        packet_info: PacketInfo,
+        mut packet_info: PacketInfo,
     ) -> Result<()> {
         // control message 判断必须是Data
         if let Some(control) = &packet_info.data_pack.control {
@@ -679,23 +674,21 @@ impl ConversionContext {
                 }
             }
         }
-        let mut timestamp = packet_info.timestamp;
-        timestamp = timestamp + TimeDelta::microseconds(self.timeshift * 1_000);
-
+        
+        let timestamp = packet_info.timestamp;
         let mut use_custom_data_start_time = false;
         // check if skip this update object packet
         if let Some(data_start_time) = &self.data_start_time {
-            if let Some(start_datetime) = data_start_time
-                .checked_add_signed(TimeDelta::microseconds(self.timeshift * 1_000))
-            {
-                if timestamp < start_datetime {
-                    // skip and keep checking
-                    use_custom_data_start_time = true;
-                } else {
-                    // only check once
-                    self.data_start_time = None;
+            if timestamp < *data_start_time {
+                // skip and keep checking
+                use_custom_data_start_time = true;
+            } else {
+                // only check once
+                self.data_start_time = None;
+                self.initial_timestamp = timestamp;
+                {
                     // and update the initial timestamp in the segment builder
-                    self.initial_timestamp = timestamp;
+                    // because this time only initial packets in the Buffer
                     self.segment_builder.segments[0]
                         .packets
                         .iter_mut()
@@ -745,96 +738,73 @@ impl ConversionContext {
             }
         }
 
-        let data_info = packet_info.clone(); // TODO: maybe we do not need clone here
-        // 获取frames，填充target roomall
-        let frames: Vec<DataFrame> = data_info.data_pack.frames
-            .into_iter()
-            .filter_map(|mut frame| {
-                if let Some(message) = &mut frame.message {
+        // 过滤我们不需要的包, 也许这里有逻辑上的问题
+        packet_info.data_pack.frames.retain(|frame| {
+            if let Some(message) = &frame.message {
                     match message {
-                        data_frame::Message::UpdateObject(obj) => {
-                            obj.target = Some(update_object::Target::RoomAll(RoomAll {
-                                room_id: self.data_room.id.clone(),
-                            }));
-                            // tacing if update object id is exist in initial_dataframes
-                            let obj_id = obj.object_id;
-                            if !self.initial_dataframes.iter().any(|f| {
-                                if let Some(data_frame::Message::InstantiateObject(inst_obj)) = &f.message {
-                                    inst_obj.object_id == obj_id
-                                } else {
-                                    false
-                                }
-                            }) {
-                                tracing::warn!("UpdateObject with id {:?} not found in initial_dataframes at timestamp: {}", obj_id, timestamp);
-                            }
-                            self.update_initial_dataframes(frame.clone());
-                            Some(frame)
+                        data_frame::Message::UpdateObject(_) |
+                        data_frame::Message::InstantiateObject(_) |
+                        data_frame::Message::DestroyObject(_) => {
+                            true
                         }
-                        data_frame::Message::InstantiateObject(obj) => {
-                            obj.target = Some(instantiate_object::Target::RoomAll(RoomAll {
-                                room_id: self.data_room.id.clone(),
-                            })); // 修改 InstantiateObject 的目标为 RoomAll
-                            obj.owner_id = b"sys".to_vec(); // 设置 owner_id 为 "sys"
-                            tracing::trace!("New object instantiated in update state: {:?} with id {:?} at timestamp: {}", String::from_utf8_lossy(&obj.prefab_name), obj.object_id, timestamp);
-                            let new_frame = frame.clone();
-                            self.insert_initial_dataframes(new_frame);
-                            Some(frame)
-                        }
-                        data_frame::Message::DestroyObject(obj) => {
-                            obj.target = Some(destroy_object::Target::RoomAll(RoomAll {
-                                room_id: self.data_room.id.clone(),
-                            }));
-                            tracing::trace!("Object destroyed with id {:?} at timestamp: {}", obj.object_id, timestamp);
-                            // // also remove from initial_dataframes
-                            // self.initial_dataframes.retain(|f| {
-                            //     if let Some(data_frame::Message::InstantiateObject(inst_obj)) = &f.message {
-                            //         inst_obj.object_id != obj.object_id
-                            //     } else if let Some(data_frame::Message::UpdateObject(upd_obj)) = &f.message {
-                            //         upd_obj.object_id != obj.object_id
-                            //     } else {
-                            //         true
-                            //     }
-                            // });
-                            Some(frame)
-                        }
-                        _ => None,
+                        _ => false,
                     }
-                } else {
-                    None
-                }
-            })
-            .collect();
-        if !frames.is_empty()
-            && frames.iter().any(|f| {
-                if let Some(data_frame::Message::DestroyObject(_)) = &f.message {
-                    true
-                } else {
-                    false
-                }
-            })
-        {
-            tracing::debug!(
-                "Processing DestroyObject frames at timestamp: {} with initial timestamp segment: {}",
-                timestamp,
-                self.initial_timestamp
-            );
-        }
-        if frames.is_empty() || use_custom_data_start_time {
-            return Ok(());
-        }
-        // handle destroy object, remove from initial_dataframes
-        for frame in &frames {
-            if let Some(data_frame::Message::DestroyObject(obj)) = &frame.message {
-                self.initial_dataframes.retain(|f| {
-                    if let Some(data_frame::Message::InstantiateObject(inst_obj)) = &f.message {
-                        inst_obj.object_id != obj.object_id
-                    } else if let Some(data_frame::Message::UpdateObject(upd_obj)) = &f.message {
-                        upd_obj.object_id != obj.object_id
-                    } else {
-                        true
-                    }
-                });
+            } else {
+                false
             }
+        });
+        
+        for frame in &mut packet_info.data_pack.frames {
+            match &mut frame.message {
+                Some(data_frame::Message::UpdateObject(obj)) => {
+                    obj.target = Some(update_object::Target::RoomAll(RoomAll {
+                        room_id: self.data_room.id.clone(),
+                    }));
+                    // tacing if update object id is exist in initial_dataframes
+                    let obj_id = obj.object_id;
+                    if !self.initial_dataframes.iter().any(|f| {
+                        if let Some(data_frame::Message::InstantiateObject(inst_obj)) = &f.message {
+                            inst_obj.object_id == obj_id
+                        } else {
+                            false
+                        }
+                    }) {
+                        tracing::warn!("UpdateObject with id {:?} not found in initial_dataframes at timestamp: {}", obj_id, timestamp);
+                    }
+                    self.update_initial_dataframes(frame.clone());
+                }
+                Some(data_frame::Message::InstantiateObject(obj)) => {
+                    obj.target = Some(instantiate_object::Target::RoomAll(RoomAll {
+                        room_id: self.data_room.id.clone(),
+                    })); // 修改 InstantiateObject 的目标为 RoomAll
+                    obj.owner_id = b"sys".to_vec(); // 设置 owner_id 为 "sys"
+                    tracing::trace!("New object instantiated in update state: {:?} with id {:?} at timestamp: {}", String::from_utf8_lossy(&obj.prefab_name), obj.object_id, timestamp);
+                    let new_frame = frame.clone();
+                    self.insert_initial_dataframes(new_frame);
+                }
+                Some(data_frame::Message::DestroyObject(obj)) => {
+                    obj.target = Some(destroy_object::Target::RoomAll(RoomAll {
+                        room_id: self.data_room.id.clone(),
+                    }));
+                    tracing::trace!("Object destroyed with id {:?} at timestamp: {}", obj.object_id, timestamp);
+                    // remove it in initial_dataframes
+                    self.initial_dataframes.retain(|f| {
+                        if let Some(data_frame::Message::InstantiateObject(inst_obj)) = &f.message {
+                            inst_obj.object_id != obj.object_id
+                        } else if let Some(data_frame::Message::UpdateObject(upd_obj)) = &f.message {
+                            upd_obj.object_id != obj.object_id
+                        } else {
+                            true
+                        }
+                    });
+                }
+                Some(_) |
+                None => unreachable!("Frame can't be None here.")
+            }
+        }
+        
+        if packet_info.data_pack.frames.is_empty() || use_custom_data_start_time {
+            return Ok(());
         }
         // if all frames are destroy object, state to Split
         if self.split_write_mode && self.initial_dataframes.is_empty() {
@@ -842,21 +812,13 @@ impl ConversionContext {
             return Ok(());
         }
 
-        let update_packet = PacketInfo {
-            timestamp,
-            data_pack: DataPack {
-                control: Some(data_pack::Control::Data(true)),
-                frames,
-            },
-            raw_data: Vec::new(),
-        };
         if self.use_audio_processing {
             #[cfg(feature = "audio")]
-            self.audio_builder.handle_update_audio(&update_packet);
+            self.audio_builder.handle_update_audio(&packet_info);
             #[cfg(not(feature = "audio"))]
             unreachable!("Audio feature is not enabled");
         } else {
-            self.segment_builder.add(update_packet);
+            self.segment_builder.add(packet_info);
         }
         Ok(())
     }
