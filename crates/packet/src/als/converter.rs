@@ -227,13 +227,14 @@ impl SegmentBuilder {
 
     pub fn add(&mut self, packet_info: PacketInfo) -> &mut Self {
         if let Some(segment) = self.segments.last_mut() {
-            // check if packet length will exceed 16k bytes 16 * 1024 bytes
-            if packet_info.to_vec().len() >= 15 * 1024 {
+            // check if packet length will exceed 16k bytes 16 * 1024 bytes (maybe the official limit is 16k bytes)
+            // but we use 12k bytes as threshold in case of some overhead
+            if packet_info.to_vec().len() >= 12 * 1024 {
                 let mut check_buf = Vec::new();
                 let mut packets_buf: Vec<DataFrame> = Vec::new();
                 for p in packet_info.data_pack.frames {
                     let frame_bytes = PacketInfo::frame_to_vec(&p);
-                    if check_buf.len() + frame_bytes.len() < 15 * 1024 {
+                    if check_buf.len() + frame_bytes.len() < 12 * 1024 {
                         check_buf.extend_from_slice(&frame_bytes);
                         packets_buf.push(p);
                     } else {

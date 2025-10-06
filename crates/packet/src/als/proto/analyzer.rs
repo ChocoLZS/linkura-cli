@@ -4,7 +4,7 @@
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 
-use super::define::{DataPack, DataFrame, data_pack, data_frame};
+use super::define::{DataFrame, data_pack, data_frame};
 use crate::als::proto::PacketInfo;
 
 /// Main analyzer for packet statistics

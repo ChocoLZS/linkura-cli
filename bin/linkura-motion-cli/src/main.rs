@@ -11,7 +11,7 @@ i18n::init!();
 
 use linkura_common::log;
 use linkura_downloader::{AlsDownloader, BaseDownloader, MrsDownloader, R2Uploader};
-use linkura_packet::als::{converter::AlsConverter, proto, proto_diff};
+use linkura_packet::als::{converter::AlsConverter, proto};
 use url::Url;
 
 /** ARG PARSER **/
@@ -67,7 +67,7 @@ pub struct ArgsAnalyze {
         short('t'),
         long = "type",
         value_name = "TYPE",
-        help = "Analysis type: 'standard', 'mixed', or 'diff'",
+        help = "Analysis type: 'standard', 'mixed'",
         default_value = "standard"
     )]
     pub analysis_type: String,
@@ -453,87 +453,30 @@ async fn main() -> Result<()> {
             info!("🎉 Download + Upload finished!");
         }
         Some(Commands::Analyze(analyze_args)) => {
-            match analyze_args.analysis_type.as_str() {
-                "diff" => {
-                    // Handle diff analysis
-                    let file2_path = analyze_args.file_path2.as_ref().ok_or_else(|| {
-                        Error::msg(
-                            "Second file path is required for diff analysis. Use --file2 option.",
-                        )
-                    })?;
-
-                    info!("🔍 Starting ALS diff analysis");
-                    info!("📂 File 1: {}", analyze_args.file_path);
-                    info!("📂 File 2: {}", file2_path);
-                    info!("📄 Output will be written to: {}", analyze_args.output_path);
-
-                    // Convert async context to sync for the diff function
-                    let _result = tokio::task::spawn_blocking({
-                        let file1_path = analyze_args.file_path.clone();
-                        let file2_path = file2_path.clone();
-
-                        move || {
-                            proto_diff::diff_standard_files(
-                                &file1_path,
-                                &file2_path,
-                                Some(analyze_args.output_path.as_ref()),
-                            )
-                        }
-                    })
-                    .await??;
-
-                    info!("✅ ALS diff analysis completed successfully!");
-                }
-                _ => {
-                    // Handle standard and mixed analysis
-                    info!(
-                        "🔍 Starting ALS packet analysis for file: {}",
-                        analyze_args.file_path
-                    );
-                    info!(
-                        "📊 Analysis type: {}, Packet count: {}",
-                        analyze_args.analysis_type, analyze_args.packet_count
-                    );
-
-                    info!("📄 Output will be written to: {}", analyze_args.output_path);
-
-                    // Convert async context to sync for the analysis functions
-                    let _result = tokio::task::spawn_blocking({
-                        let file_path = analyze_args.file_path.clone();
-                        let output_path = analyze_args.output_path.clone();
-                        let packet_count = analyze_args.packet_count;
-                        let analysis_type = analyze_args.analysis_type.clone();
-
-                        move || match analysis_type.as_str() {
-                            "standard" => proto::analyze_binary_file_with_output_and_count(
-                                &file_path,
-                                Some(&output_path),
-                                packet_count,
-                                analyze_args.file_count_limit,
-                                analyze_args.file_size_limit,
-                                analyze_args.data_start_time.clone(),
-                                analyze_args.data_end_time.clone(),
-                            ),
-                            "mixed" => proto::analyze_mixed_binary_file_with_output_and_count(
-                                &file_path,
-                                Some(&output_path),
-                                packet_count,
-                                analyze_args.file_count_limit,
-                                analyze_args.file_size_limit,
-                                analyze_args.data_start_time.clone(),
-                                analyze_args.data_end_time.clone(),
-                            ),
-                            _ => Err(anyhow::anyhow!(
-                                "Unknown analysis type: {}. Use 'standard', 'mixed', or 'diff'",
-                                analysis_type
-                            )),
-                        }
-                    })
-                    .await??;
-
-                    info!("✅ ALS packet analysis completed successfully!");
-                }
-            }
+            // Handle standard and mixed analysis
+            info!(
+                "🔍 Starting ALS packet analysis for file: {}",
+                analyze_args.file_path
+            );
+            info!(
+                "📊 Analysis type: {}, Packet count: {}",
+                analyze_args.analysis_type, analyze_args.packet_count
+            );
+            info!("📄 Output will be written to: {}", analyze_args.output_path);
+            // Convert async context to sync for the analysis functions
+            let file_path = analyze_args.file_path.clone();
+            let output_path = analyze_args.output_path.clone();
+            let packet_count = analyze_args.packet_count;
+            let analysis_type = analyze_args.analysis_type.clone();
+            proto::application::analyze(
+                file_path.as_ref(),
+                Some(output_path.as_ref()),
+                analysis_type.as_ref(),
+                packet_count,
+                analyze_args.data_start_time,
+                analyze_args.data_end_time
+            )?;
+            info!("✅ ALS packet analysis completed successfully!");
         }
         Some(Commands::Convert(convert_args)) => {
             info!("🔄 Starting ALS conversion from mixed to standard format");

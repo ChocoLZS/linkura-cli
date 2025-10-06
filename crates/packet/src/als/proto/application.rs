@@ -5,11 +5,49 @@ use anyhow::{Context, Result};
 use std::fs::File;
 use std::path::Path;
 
-use crate::als::proto::reader::{PacketIterator, PacketReaderTrait};
+use crate::als::proto::reader::{PacketReaderTrait};
 
-use super::reader::PacketReader;
+use super::reader::{PacketReader, MixedPacketReader};
 use super::analyzer::{PacketAnalyzer, PacketFilter};
 use super::formatter::{OutputWriter, PacketFormatter, StatsFormatter};
+
+pub fn analyze(
+    input_path: &str,
+    output_path: Option<&str>,
+    packet_type: &str,
+    max_packets: usize,
+    start_time: Option<String>,
+    end_time: Option<String>,
+) -> Result<()> {
+    let path = Path::new(input_path);
+    let reader_factory: Box<dyn Fn(File) -> Box<dyn PacketReaderTrait>> = match packet_type {
+        "standard" => Box::new(|file| Box::new(PacketReader::new(file))),
+        "mixed" => Box::new(|file| Box::new(MixedPacketReader::new(file))),
+        // Future types can be added here
+        _ => return Err(anyhow::anyhow!("Unsupported packet type: {}", packet_type)),
+    };
+    if path.is_file() {
+        analyze_file(
+            input_path,
+            output_path,
+            max_packets,
+            start_time,
+            end_time,
+            &reader_factory,
+        )
+    } else if path.is_dir() {
+        analyze_directory(
+            input_path,
+            output_path,
+            max_packets,
+            start_time,
+            end_time,
+            &reader_factory,
+        )
+    } else {
+        Err(anyhow::anyhow!("Input path is neither file nor directory"))
+    }
+}
 
 /// Analyze a single file with the new architecture
 pub fn analyze_file(
@@ -18,7 +56,7 @@ pub fn analyze_file(
     max_packets: usize,
     start_time: Option<String>,
     end_time: Option<String>,
-    verbose: bool,
+    reader_factory: &dyn Fn(File) -> Box<dyn PacketReaderTrait>,
 ) -> Result<()> {
     let mut writer = OutputWriter::new(output_path)?;
     let file = File::open(file_path)
@@ -29,8 +67,7 @@ pub fn analyze_file(
     writer.writeln("")?;
 
     // Create components
-    let mut reader = PacketReader::new(file);
-    let iter = PacketIterator::new(&mut reader);
+    let mut reader = reader_factory(file);
     let mut analyzer = PacketAnalyzer::new();
     let filter = PacketFilter::new(start_time, end_time);
 
@@ -38,8 +75,7 @@ pub fn analyze_file(
     let mut packet_count = 0;
     let mut processed_count = 0;
 
-    for result in iter {
-        let packet = result?;
+    for packet in reader.read_packets()? {
         packet_count += 1;
 
         // Apply time filter
@@ -57,10 +93,8 @@ pub fn analyze_file(
         analyzer.analyze_packet(&packet);
         processed_count += 1;
 
-        // Optionally format each packet
-        if verbose {
-            PacketFormatter::format_packet(&mut writer, processed_count, &packet)?;
-        }
+        // Format each packet
+        PacketFormatter::format_packet(&mut writer, processed_count, &packet)?;
 
         // Check limit
         if processed_count >= max_packets {
@@ -83,22 +117,15 @@ pub fn analyze_directory(
     dir_path: &str,
     output_path: Option<&str>,
     max_packets_per_file: usize,
-    max_files: usize,
     start_time: Option<String>,
     end_time: Option<String>,
+    reader_factory: &dyn Fn(File) -> Box<dyn PacketReaderTrait>,
 ) -> Result<()> {
     let mut writer = OutputWriter::new(output_path)?;
     let path = Path::new(dir_path);
 
     // Collect and sort files
-    let mut files = collect_files(path)?;
-    if files.len() > max_files {
-        files.truncate(max_files);
-        writer.writeln(&format!(
-            "Warning: Limited to first {} files",
-            max_files
-        ))?;
-    }
+    let files = collect_files(path)?;
 
     writer.writeln(&format!("=== Batch Analysis: {} ===", dir_path))?;
     writer.writeln(&format!("Total files: {}", files.len()))?;
@@ -118,7 +145,7 @@ pub fn analyze_directory(
             file_path.display()
         ))?;
 
-        match analyze_single_file(file_path, max_packets_per_file, &filter) {
+        match analyze_single_file(file_path, max_packets_per_file, &filter, &reader_factory) {
             Ok(file_analyzer) => {
                 let stats = file_analyzer.stats();
                 writer.writeln(&format!("  Packets analyzed: {}", stats.total_packets))?;
@@ -145,16 +172,16 @@ fn analyze_single_file(
     file_path: &Path,
     max_packets: usize,
     filter: &PacketFilter,
+    reader_factory: &dyn Fn(File) -> Box<dyn PacketReaderTrait>
 ) -> Result<PacketAnalyzer> {
     let file = File::open(file_path)
         .with_context(|| format!("Failed to open file: {}", file_path.display()))?;
 
-    let mut reader = PacketReader::new(file);
+    let mut reader = reader_factory(file);
     let mut analyzer = PacketAnalyzer::new();
 
     let mut count = 0;
-    for result in reader.packets() {
-        let packet = result?;
+    for packet in reader.read_packets()? {
 
         if !filter.should_include(&packet.timestamp) {
             continue;

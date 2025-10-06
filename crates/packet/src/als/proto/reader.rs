@@ -4,7 +4,7 @@
 //! This module provides a trait-based abstraction for reading different packet formats.
 
 use anyhow::{Context, Result, anyhow};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime};
 use prost::Message;
 use std::collections::VecDeque;
 use std::fs::{DirEntry, File};

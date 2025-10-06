@@ -3,13 +3,34 @@
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
+use prost::Message;
 use std::fs::File;
 use std::io::Write;
+use std::fmt::Display;
 
 use super::analyzer::PacketStats;
-use super::define::{DataPack, data_frame, data_pack};
+use super::define::{DataPack, data_frame, data_pack, instantiate_object, update_object};
 use crate::als::proto::PacketInfo;
 
+
+impl Display for instantiate_object::Target {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            instantiate_object::Target::CurrentPlayer(_) => write!(f, "CurrentPlayer"),
+            instantiate_object::Target::RoomAll(room) => write!(f, "RoomAll(room_id: {})", String::from_utf8_lossy(room.room_id.as_slice())),
+            instantiate_object::Target::PlayerId(player) => write!(f, "PlayerId(player_id: {})", String::from_utf8_lossy(player)),
+        }
+    }
+}
+impl Display for update_object::Target {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            update_object::Target::CurrentPlayer(_) => write!(f, "CurrentPlayer"),
+            update_object::Target::RoomAll(room) => write!(f, "RoomAll(room_id: {})", String::from_utf8_lossy(room.room_id.as_slice())),
+            update_object::Target::PlayerId(player) => write!(f, "PlayerId(player_id: {})", String::from_utf8_lossy(player)),
+        }
+    }
+}
 /// Output writer abstraction
 pub struct OutputWriter {
     writer: Box<dyn Write>,
@@ -116,6 +137,9 @@ impl PacketFormatter {
             writer.writeln(&format!("  Frames ({}):", data_pack.frames.len()))?;
             for (i, frame) in data_pack.frames.iter().enumerate() {
                 writer.writeln(&format!("    Frame #{}:", i + 1))?;
+                // print sha-256 for frame
+                let frame_digest = super::calculate_digest(&frame.encode_to_vec());
+                writer.writeln(&format!("      SHA-256: {}", frame_digest))?;
                 if let Some(message) = &frame.message {
                     Self::format_frame_message(writer, message)?;
                 } else {
@@ -139,12 +163,24 @@ impl PacketFormatter {
                 writer.writeln(&format!("        Object ID: {}", obj.object_id))?;
                 writer.writeln(&format!("        Owner ID: {:?}", String::from_utf8_lossy(&obj.owner_id)))?;
                 writer.writeln(&format!("        Prefab: {:?}", String::from_utf8_lossy(&obj.prefab_name)))?;
+                if let Some(target) = &obj.target {
+                    writer.writeln(&format!("        Target: {}", target))?;
+                }
+                writer.writeln(&format!("        Init data size: {} bytes", obj.init_data.len()))?;
+                // print first 32 bytes
+                let debug_len = 32.min(obj.init_data.len());
+                writer.writeln(&format!("        Init data (first {} bytes): {}", debug_len, hex_string(&obj.init_data[..debug_len])))?;
             }
             Message::UpdateObject(obj) => {
                 writer.writeln("      Type: UpdateObject")?;
                 writer.writeln(&format!("        Object ID: {}", obj.object_id))?;
                 writer.writeln(&format!("        Method: {}", obj.method))?;
+                if let Some(target) = &obj.target {
+                    writer.writeln(&format!("        Target: {}", target))?;
+                }
                 writer.writeln(&format!("        Payload size: {} bytes", obj.payload.len()))?;
+                let debug_len = 32.min(obj.payload.len());
+                writer.writeln(&format!("        Payload (first {} bytes): {}", debug_len, hex_string(&obj.payload[..debug_len])))?;
             }
             Message::DestroyObject(obj) => {
                 writer.writeln("      Type: DestroyObject")?;
