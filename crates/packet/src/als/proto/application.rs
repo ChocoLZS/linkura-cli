@@ -74,6 +74,7 @@ pub fn analyze_file(
     // Process packets
     let mut packet_count = 0;
     let mut processed_count = 0;
+    let mut objects_map = std::collections::HashMap::<i32, String>::new();
 
     for packet in reader.read_packets()? {
         packet_count += 1;
@@ -94,7 +95,7 @@ pub fn analyze_file(
         processed_count += 1;
 
         // Format each packet
-        PacketFormatter::format_packet(&mut writer, processed_count, &packet)?;
+        PacketFormatter::new(&mut objects_map).format_packet(&mut writer, processed_count, &packet)?;
 
         // Check limit
         if processed_count >= max_packets {

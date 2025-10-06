@@ -2,8 +2,8 @@
 //! All formatting logic in one place
 
 use anyhow::{Context, Result};
-use chrono::{DateTime, Utc};
 use prost::Message;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::fmt::Display;
@@ -68,11 +68,19 @@ impl OutputWriter {
 }
 
 /// Packet formatter
-pub struct PacketFormatter;
+pub struct PacketFormatter<'a> {
+    objects_map: &'a mut HashMap<i32, String>, // object_id to prefab_name mapping
+}
 
-impl PacketFormatter {
+impl<'a> PacketFormatter<'a> {
+    /// Create a new PacketFormatter
+    pub fn new(objects_map: &'a mut HashMap<i32, String>) -> Self {
+        Self { objects_map }
+    }
+
     /// Format a single packet with full details
     pub fn format_packet(
+        &mut self,
         writer: &mut OutputWriter,
         packet_number: usize,
         packet: &PacketInfo,
@@ -103,14 +111,14 @@ impl PacketFormatter {
             hex_string(&packet.raw_data[..debug_len])
         ))?;
 
-        Self::format_data_pack(writer, &packet.data_pack)?;
+        self.format_data_pack(writer, &packet.data_pack)?;
         writer.writeln("")?;
 
         Ok(())
     }
 
     /// Format DataPack details
-    fn format_data_pack(writer: &mut OutputWriter, data_pack: &DataPack) -> Result<()> {
+    fn format_data_pack(&mut self, writer: &mut OutputWriter, data_pack: &DataPack) -> Result<()> {
         // Control message
         if let Some(control) = &data_pack.control {
             writer.writeln("  Control message:")?;
@@ -141,7 +149,7 @@ impl PacketFormatter {
                 let frame_digest = super::calculate_digest(&frame.encode_to_vec());
                 writer.writeln(&format!("      SHA-256: {}", frame_digest))?;
                 if let Some(message) = &frame.message {
-                    Self::format_frame_message(writer, message)?;
+                    self.format_frame_message(writer, message)?;
                 } else {
                     writer.writeln("      No message in frame")?;
                 }
@@ -154,15 +162,18 @@ impl PacketFormatter {
     }
 
     /// Format frame message
-    fn format_frame_message(writer: &mut OutputWriter, message: &data_frame::Message) -> Result<()> {
+    fn format_frame_message(&mut self, writer: &mut OutputWriter, message: &data_frame::Message) -> Result<()> {
         use data_frame::Message;
 
         match message {
             Message::InstantiateObject(obj) => {
+                let object_id = obj.object_id;
+                let prefab_name = String::from_utf8_lossy(&obj.prefab_name).to_string();
+                self.objects_map.insert(object_id, prefab_name.clone());
                 writer.writeln("      Type: InstantiateObject")?;
-                writer.writeln(&format!("        Object ID: {}", obj.object_id))?;
+                writer.writeln(&format!("        Object ID: {}", object_id))?;
                 writer.writeln(&format!("        Owner ID: {:?}", String::from_utf8_lossy(&obj.owner_id)))?;
-                writer.writeln(&format!("        Prefab: {:?}", String::from_utf8_lossy(&obj.prefab_name)))?;
+                writer.writeln(&format!("        Prefab: {:?}", prefab_name))?;
                 if let Some(target) = &obj.target {
                     writer.writeln(&format!("        Target: {}", target))?;
                 }
@@ -172,8 +183,11 @@ impl PacketFormatter {
                 writer.writeln(&format!("        Init data (first {} bytes): {}", debug_len, hex_string(&obj.init_data[..debug_len])))?;
             }
             Message::UpdateObject(obj) => {
+                let object_id = obj.object_id;
+                let prefab_name = self.objects_map.get(&object_id).cloned().unwrap_or_else(|| "<unknown>".to_string());
                 writer.writeln("      Type: UpdateObject")?;
-                writer.writeln(&format!("        Object ID: {}", obj.object_id))?;
+                writer.writeln(&format!("        Object ID: {}", object_id))?;
+                writer.writeln(&format!("        Prefab: {}", prefab_name))?;
                 writer.writeln(&format!("        Method: {}", obj.method))?;
                 if let Some(target) = &obj.target {
                     writer.writeln(&format!("        Target: {}", target))?;
