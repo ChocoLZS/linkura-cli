@@ -6,9 +6,9 @@ use std::{
     path::Path,
 };
 
-use crate::als::proto::{
+use super::proto::{
     PacketInfo,
-    proto::als::data_frame,
+    define::data_frame,
 };
 
 pub struct AudioRawPacket {

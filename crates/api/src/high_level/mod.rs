@@ -193,7 +193,9 @@ impl<'a> HighLevelApi<'a> {
     pub fn get_fes_live_info(&self, id: &str) -> Result<serde_json::Value> {
         let res = self.raw().fes_live().enter(id)?;
         if res.status() != reqwest::StatusCode::OK {
-            return Err(anyhow::anyhow!("Get fes live info failed: {:?}", res));
+            let status = res.status();
+            let error_text = res.text().unwrap_or_default();
+            return Err(anyhow::anyhow!("Get fes live info failed with status {}: {:?}", status, error_text));
         }
         let fes_info: serde_json::Value = res.json()?;
         Ok(json!({
@@ -201,6 +203,7 @@ impl<'a> HighLevelApi<'a> {
             "name": fes_info.get("name").unwrap().as_str().unwrap(),
             "description": fes_info.get("description").unwrap().as_str().unwrap(),
             "characters": fes_info.get("characters").unwrap().as_array().unwrap(),
+            "hls": fes_info.get("hls").unwrap().as_object().unwrap(),
         }))
     }
 

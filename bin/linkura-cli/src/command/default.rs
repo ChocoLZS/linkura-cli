@@ -112,16 +112,19 @@ fn print_latest_trailer_archive(ctx: &Global, wm: &serde_json::Value) {
         }
     }
     if live_type == 1 {
+        // enter fes lobby first
+        let _ = api_client.raw().fes_live().lobby(id);
         let res: Result<serde_json::Value, anyhow::Error> =
             api_client.high_level().get_fes_live_info(id);
         match res {
             Ok(res) => {
                 tracing::info!(
-                    "fes live info: \n title: {}\n description: {:?}\n room: {:?}\n characters: {:?}",
+                    "fes live info: \n title: {}\n description: {:?}\n room: {:?}\n characters: {:?}\nhls: {:?}",
                     name,
                     res.get("description").unwrap().as_str().unwrap(),
                     res.get("room").unwrap().as_object().unwrap(),
                     res.get("characters").unwrap().as_array().unwrap(),
+                    res.get("hls").unwrap().as_object().unwrap()
                 );
             }
             Err(_) => {

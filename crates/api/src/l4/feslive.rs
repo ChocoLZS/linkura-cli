@@ -19,6 +19,20 @@ impl<'a> FesLiveApi<'a> {
         Ok(res)
     }
 
+    pub fn lobby(&self, id: &str) -> Result<Response> {
+        let url = format!("{API_BASE}/feslive/lobby");
+        let res = self
+            .client
+            .post(url)
+            .headers(self.runtime_header.clone())
+            .header("x-idempotency-key", gen_random_idempotency_key())
+            .json(&json!({
+                "live_id": id,
+            }))
+            .send()?;
+        Ok(res)
+    }
+
     pub fn connect_token(&self, live_id: &str) -> Result<Response> {
         let url = format!("{API_BASE}/feslive/connect_token");
         let res = self

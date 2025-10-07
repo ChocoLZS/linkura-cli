@@ -11,7 +11,7 @@ i18n::init!();
 
 use linkura_common::log;
 use linkura_downloader::{AlsDownloader, BaseDownloader, MrsDownloader, R2Uploader};
-use linkura_packet::als::{converter::AlsConverter, proto, proto_diff};
+use linkura_packet::als::{converter::AlsConverter, proto};
 use url::Url;
 
 /** ARG PARSER **/
@@ -67,7 +67,7 @@ pub struct ArgsAnalyze {
         short('t'),
         long = "type",
         value_name = "TYPE",
-        help = "Analysis type: 'standard', 'mixed', or 'diff'",
+        help = "Analysis type: 'standard', 'mixed', 'mixed-legacy'",
         default_value = "standard"
     )]
     pub analysis_type: String,
@@ -144,6 +144,10 @@ pub struct ArgsSync {
 #[derive(Debug, ClapArgs)]
 pub struct ArgsConvert {
     #[clap(
+        long = "type", value_name = "TYPE", help = "Conversion type: 'als', 'als-legacy'", default_value = "als"
+    )]
+    pub convert_type: String,
+    #[clap(
         short('i'),
         long = "input",
         value_name = "INPUT_FILE",
@@ -199,6 +203,11 @@ pub struct ArgsConvert {
         help = "Metadata path in index.md"
     )]
     pub metadata_path: Option<String>,
+    #[clap(
+        long = "auto-timestamp",
+        help = "Auto adjust timestamps to ensure chronological order", default_value = "false"
+    )]
+    pub auto_timestamp: bool,
     #[cfg(feature = "audio")]
     #[clap(
         long = "audio-only",
@@ -453,87 +462,30 @@ async fn main() -> Result<()> {
             info!("🎉 Download + Upload finished!");
         }
         Some(Commands::Analyze(analyze_args)) => {
-            match analyze_args.analysis_type.as_str() {
-                "diff" => {
-                    // Handle diff analysis
-                    let file2_path = analyze_args.file_path2.as_ref().ok_or_else(|| {
-                        Error::msg(
-                            "Second file path is required for diff analysis. Use --file2 option.",
-                        )
-                    })?;
-
-                    info!("🔍 Starting ALS diff analysis");
-                    info!("📂 File 1: {}", analyze_args.file_path);
-                    info!("📂 File 2: {}", file2_path);
-                    info!("📄 Output will be written to: {}", analyze_args.output_path);
-
-                    // Convert async context to sync for the diff function
-                    let _result = tokio::task::spawn_blocking({
-                        let file1_path = analyze_args.file_path.clone();
-                        let file2_path = file2_path.clone();
-
-                        move || {
-                            proto_diff::diff_standard_files(
-                                &file1_path,
-                                &file2_path,
-                                Some(analyze_args.output_path.as_ref()),
-                            )
-                        }
-                    })
-                    .await??;
-
-                    info!("✅ ALS diff analysis completed successfully!");
-                }
-                _ => {
-                    // Handle standard and mixed analysis
-                    info!(
-                        "🔍 Starting ALS packet analysis for file: {}",
-                        analyze_args.file_path
-                    );
-                    info!(
-                        "📊 Analysis type: {}, Packet count: {}",
-                        analyze_args.analysis_type, analyze_args.packet_count
-                    );
-
-                    info!("📄 Output will be written to: {}", analyze_args.output_path);
-
-                    // Convert async context to sync for the analysis functions
-                    let _result = tokio::task::spawn_blocking({
-                        let file_path = analyze_args.file_path.clone();
-                        let output_path = analyze_args.output_path.clone();
-                        let packet_count = analyze_args.packet_count;
-                        let analysis_type = analyze_args.analysis_type.clone();
-
-                        move || match analysis_type.as_str() {
-                            "standard" => proto::analyze_binary_file_with_output_and_count(
-                                &file_path,
-                                Some(&output_path),
-                                packet_count,
-                                analyze_args.file_count_limit,
-                                analyze_args.file_size_limit,
-                                analyze_args.data_start_time.clone(),
-                                analyze_args.data_end_time.clone(),
-                            ),
-                            "mixed" => proto::analyze_mixed_binary_file_with_output_and_count(
-                                &file_path,
-                                Some(&output_path),
-                                packet_count,
-                                analyze_args.file_count_limit,
-                                analyze_args.file_size_limit,
-                                analyze_args.data_start_time.clone(),
-                                analyze_args.data_end_time.clone(),
-                            ),
-                            _ => Err(anyhow::anyhow!(
-                                "Unknown analysis type: {}. Use 'standard', 'mixed', or 'diff'",
-                                analysis_type
-                            )),
-                        }
-                    })
-                    .await??;
-
-                    info!("✅ ALS packet analysis completed successfully!");
-                }
-            }
+            // Handle standard and mixed analysis
+            info!(
+                "🔍 Starting ALS packet analysis for file: {}",
+                analyze_args.file_path
+            );
+            info!(
+                "📊 Analysis type: {}, Packet count: {}",
+                analyze_args.analysis_type, analyze_args.packet_count
+            );
+            info!("📄 Output will be written to: {}", analyze_args.output_path);
+            // Convert async context to sync for the analysis functions
+            let file_path = analyze_args.file_path.clone();
+            let output_path = analyze_args.output_path.clone();
+            let packet_count = analyze_args.packet_count;
+            let analysis_type = analyze_args.analysis_type.clone();
+            proto::application::analyze(
+                file_path.as_ref(),
+                Some(output_path.as_ref()),
+                analysis_type.as_ref(),
+                packet_count,
+                analyze_args.data_start_time,
+                analyze_args.data_end_time
+            )?;
+            info!("✅ ALS packet analysis completed successfully!");
         }
         Some(Commands::Convert(convert_args)) => {
             info!("🔄 Starting ALS conversion from mixed to standard format");
@@ -553,32 +505,28 @@ async fn main() -> Result<()> {
             }
 
             // Convert async context to sync for the conversion
-            let _result = tokio::task::spawn_blocking({
-                let input_file = convert_args.input_file.clone();
-                let output_dir = convert_args.output_dir.clone();
-                let segment_duration = convert_args.segment_duration;
+            let input_file = convert_args.input_file.clone();
+            let output_dir = convert_args.output_dir.clone();
+            let segment_duration = convert_args.segment_duration;
 
-                move || {
-                    #[cfg(feature = "audio")]
-                    let use_audio_processing = convert_args.audio_only;
-                    #[cfg(not(feature = "audio"))]
-                    let use_audio_processing = false;
-                    let converter = AlsConverter::new(segment_duration, use_audio_processing);
-                    converter.convert_mixed_to_standard(
-                        &input_file,
-                        &output_dir,
-                        // TODO: better args passing
-                        convert_args.timeshift,
-                        convert_args.split,
-                        convert_args.start_time,
-                        convert_args.data_start_time,
-                        convert_args.data_end_time,
-                        convert_args.metadata_path,
-                    )
-                }
-            })
-            .await??;
-
+            #[cfg(feature = "audio")]
+            let use_audio_processing = convert_args.audio_only;
+            #[cfg(not(feature = "audio"))]
+            let use_audio_processing = false;
+            let converter = AlsConverter::new(segment_duration, use_audio_processing);
+            converter.convert_mixed_to_standard(
+                &input_file,
+                &output_dir,
+                &convert_args.convert_type,
+                // TODO: better args passing
+                convert_args.timeshift,
+                convert_args.split,
+                convert_args.start_time,
+                convert_args.data_start_time,
+                convert_args.data_end_time,
+                convert_args.metadata_path,
+                convert_args.auto_timestamp
+            )?;
             info!("✅ ALS conversion completed successfully!");
             info!("📄 Output files written to: {}", convert_args.output_dir);
         }

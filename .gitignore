@@ -7,6 +7,9 @@
 
 output-*
 
+# development usage
 *.txt
 data
 data_*
+python
+audio
