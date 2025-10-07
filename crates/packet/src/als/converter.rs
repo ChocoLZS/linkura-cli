@@ -4,16 +4,16 @@ use super::proto::{
             destroy_object, instantiate_object, update_object,
         }, reader::PacketReaderTrait
     };
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Ok, Result, anyhow};
 use chrono::{DateTime, FixedOffset, TimeDelta, Utc};
-use std::io::{BufWriter, Write};
+use std::{collections::HashSet, io::{BufWriter, Write}};
 use std::path::Path;
 use std::{
     cmp::Ordering,
     fs::{DirEntry, File},
     path::PathBuf,
 };
-use crate::als::proto::reader::{PacketsBufferReader, MixedPacketReader, StandardPacketReader};
+use crate::als::proto::{extension::UpdateObjectExt, reader::{LegacyPacketReader, MixedPacketReader, PacketsBufferReader, StandardPacketReader}};
 
 #[cfg(feature = "audio")]
 use super::audio::{AudioBuilder};
@@ -95,6 +95,7 @@ impl AlsConverter {
         &self,
         input_dir: P,
         output_dir: P,
+        convert_type: &str,
         // todo: config struct
         timeshift: i64,
         split: bool,
@@ -118,7 +119,11 @@ impl AlsConverter {
             auto_timestamp,
         );
         let file_entries = Self::get_file_entries(input_dir)?;
-        let mut packet_buffer = PacketsBufferReader::new(file_entries, |file| MixedPacketReader::boxed(file));
+        let mut packet_buffer = if convert_type == "als-legacy" {
+            PacketsBufferReader::new(file_entries, |file| LegacyPacketReader::boxed(file))
+        } else {
+            PacketsBufferReader::new(file_entries, |file| MixedPacketReader::boxed(file))
+        };
 
         self.process_all_packets(&mut context, &mut packet_buffer)?;
         self.finalize_conversion(&mut context, output_dir)?;
@@ -173,6 +178,9 @@ impl AlsConverter {
             #[cfg(not(feature = "audio"))]
             unreachable!("Audio feature is not enabled");
         } else {
+            if context.auto_timestamp {
+                context.handle_packetinfo_buffer()?;
+            } 
             context.segment_builder.write_to_file(
                 output_dir,
                 context.data_room.started_at,
@@ -235,12 +243,12 @@ impl SegmentBuilder {
         if let Some(segment) = self.segments.last_mut() {
             // check if packet length will exceed 16k bytes 16 * 1024 bytes (maybe the official limit is 16k bytes)
             // but we use 12k bytes as threshold in case of some overhead
-            if packet_info.to_vec().len() >= 12 * 1024 {
+            if packet_info.to_vec().len() >= 15 * 1024 {
                 let mut check_buf = Vec::new();
                 let mut packets_buf: Vec<DataFrame> = Vec::new();
                 for p in packet_info.data_pack.frames {
                     let frame_bytes = PacketInfo::frame_to_vec(&p);
-                    if check_buf.len() + frame_bytes.len() < 12 * 1024 {
+                    if check_buf.len() + frame_bytes.len() < 15 * 1024 {
                         check_buf.extend_from_slice(&frame_bytes);
                         packets_buf.push(p);
                     } else {
@@ -410,8 +418,8 @@ struct ConversionContext {
     audio_builder: AudioBuilder,
 
     /// 根据回放包的 audio 与datetime receiver来自动计算时间戳
-    /// 不会影响timeshift ?
     auto_timestamp: bool,
+    packetinfo_buffer: Vec<PacketInfo>
 }
 
 impl ConversionContext {
@@ -454,6 +462,7 @@ impl ConversionContext {
             data_end_time: det,
             use_audio_processing,
             auto_timestamp,
+            packetinfo_buffer: Vec::new(),
             #[cfg(feature = "audio")]
             audio_builder: AudioBuilder::new(output_dir),
         }
@@ -531,6 +540,9 @@ impl ConversionContext {
                     #[cfg(not(feature = "audio"))]
                     unreachable!("Audio feature is not enabled");
                 } else {
+                    if self.auto_timestamp {
+                        self.handle_packetinfo_buffer()?;
+                    }
                     self.segment_builder
                         .write(self.data_room.started_at, &self.data_room.id)?;
                 }
@@ -602,14 +614,17 @@ impl ConversionContext {
         let timestamp = packet_info.timestamp;
         self.initial_timestamp = timestamp;
 
-        self.segment_builder
-            .start()
-            .add(PacketInfo::create_segment_started_packet(timestamp))
-            .add(PacketInfo::create_room_frame(
-                timestamp,
-                self.data_room.clone(),
-            ))
-            .add(PacketInfo::create_cache_end(timestamp));
+        if !self.auto_timestamp {
+            self.segment_builder
+                .start()
+                .add(PacketInfo::create_segment_started_packet(timestamp))
+                .add(PacketInfo::create_room_frame(
+                    timestamp,
+                    self.data_room.clone(),
+                ))
+                .add(PacketInfo::create_cache_end(timestamp));
+        }
+
 
         for frame in &mut packet_info.data_pack.frames {
             if let Some(message) = &mut frame.message {
@@ -642,6 +657,8 @@ impl ConversionContext {
             // do nothing
             #[cfg(not(feature = "audio"))]
             unreachable!("Audio processing is disabled");
+        } else if self.auto_timestamp {
+            self.packetinfo_buffer.push(packet_info);
         } else {
             self.segment_builder.add(packet_info);
         }
@@ -677,67 +694,69 @@ impl ConversionContext {
         
         let timestamp = packet_info.timestamp;
         let mut use_custom_data_start_time = false;
-        // 保留初始initial_dataframe, 但是跳过指定时间之前的包
-        if let Some(data_start_time) = &self.data_start_time {
-            if timestamp < *data_start_time {
-                // skip and keep checking
-                use_custom_data_start_time = true;
-            } else {
-                // only check once
-                self.data_start_time = None;
-                self.initial_timestamp = timestamp;
-                {
-                    // and update the initial timestamp in the segment builder
-                    // because this time only initial packets in the Buffer
-                    self.segment_builder.segments[0]
-                        .packets
-                        .iter_mut()
-                        .for_each(|packet| {
-                            packet.timestamp = timestamp;
-                        });
-                    // update initial dataframes for segment builder,
-                    // remove last and inset new one
-                    if let Some(_last_packet) = self.segment_builder.segments[0].packets.pop() {
-                        let mut new_initial_packet =
-                            PacketInfo::create_room_frame(timestamp, self.data_room.clone());
-                        new_initial_packet
-                            .data_pack
-                            .frames
-                            .extend(self.initial_dataframes.clone());
+        if !self.auto_timestamp {
+            // 保留初始initial_dataframe, 但是跳过指定时间之前的包
+            if let Some(data_start_time) = &self.data_start_time {
+                if timestamp < *data_start_time {
+                    // skip and keep checking
+                    use_custom_data_start_time = true;
+                } else {
+                    // only check once
+                    self.data_start_time = None;
+                    self.initial_timestamp = timestamp;
+                    {
+                        // and update the initial timestamp in the segment builder
+                        // because this time only initial packets in the Buffer
                         self.segment_builder.segments[0]
                             .packets
-                            .push(new_initial_packet);
+                            .iter_mut()
+                            .for_each(|packet| {
+                                packet.timestamp = timestamp;
+                            });
+                        // update initial dataframes for segment builder,
+                        // remove last and inset new one
+                        if let Some(_last_packet) = self.segment_builder.segments[0].packets.pop() {
+                            let mut new_initial_packet =
+                                PacketInfo::create_room_frame(timestamp, self.data_room.clone());
+                            new_initial_packet
+                                .data_pack
+                                .frames
+                                .extend(self.initial_dataframes.clone());
+                            self.segment_builder.segments[0]
+                                .packets
+                                .push(new_initial_packet);
+                        }
                     }
                 }
-            }
-        }
+            }  
         
-        
-        // 如果不是通过数据规律分段，则手动判断时间戳，添加新的回放段（对timestamp正常的包管用 ）
-        if timestamp - self.initial_timestamp > DURATION {
-            self.initial_timestamp += DURATION;
-            if !use_custom_data_start_time {
-                // 处理新分片的头
-                self.segment_builder
-                    .set_current_segment_duration(DURATION.as_seconds_f64())
-                    .next()
-                    .add(PacketInfo::create_segment_started_packet(
-                        self.initial_timestamp,
-                    ))
-                    .add(PacketInfo::create_room_frame(
-                        timestamp,
-                        self.data_room.clone(),
-                    ))
-                    .add(PacketInfo {
-                        timestamp,
-                        data_pack: DataPack {
-                            control: Some(data_pack::Control::Data(true)),
-                            frames: self.initial_dataframes.clone(),
-                        },
-                        raw_data: Vec::new(),
-                    })
-                    .add(PacketInfo::create_cache_end(timestamp));
+            // 如果不是通过数据规律分段，则手动判断时间戳，添加新的回放段（对timestamp正常的包管用 ）
+            if timestamp - self.initial_timestamp > DURATION {
+                self.initial_timestamp += DURATION;
+                if !use_custom_data_start_time {
+                    // 处理新分片的头
+                    self.segment_builder
+                        .set_current_segment_duration(DURATION.as_seconds_f64())
+                        .next()
+                        .add(PacketInfo::create_segment_started_packet(
+                            self.initial_timestamp,
+                        ))
+                        .add(PacketInfo::create_room_frame(
+                            timestamp,
+                            self.data_room.clone(),
+                        ))
+                        .add(PacketInfo {
+                            timestamp,
+                            data_pack: DataPack {
+                                control: Some(data_pack::Control::Data(true)),
+                                frames: self.initial_dataframes.clone(),
+                            },
+                            raw_data: Vec::new(),
+                        })
+                        .add(PacketInfo::create_cache_end(timestamp));
+                }
             }
+
         }
 
         // 过滤我们不需要的包, 也许这里有逻辑上的问题
@@ -819,6 +838,8 @@ impl ConversionContext {
             self.audio_builder.handle_update_audio(&packet_info);
             #[cfg(not(feature = "audio"))]
             unreachable!("Audio feature is not enabled");
+        } else if self.auto_timestamp {
+            self.packetinfo_buffer.push(packet_info);
         } else {
             self.segment_builder.add(packet_info);
         }
@@ -889,4 +910,308 @@ impl ConversionContext {
         self.initial_dataframes.sort_by(Self::compare_dataframes);
     }
 
+    // 仅仅更新时间戳，不要考虑其他逻辑
+    // 逻辑:
+    // 1. 统计两个 DateTimeReceiver 之间的 MusicBroadcaster 包数量
+    // 2. 根据音频包数量,将总时间 delta 均分给每个音频包
+    // 3. 在每两个音频包之间,将其他包的时间也均分
+    fn handle_auto_timestamp(&mut self, start_index: usize, end_index: usize, last_timestamp: DateTime<Utc>, cur_timestamp: DateTime<Utc>, music_broadcasters: &HashSet<i32>) -> Result<()> {
+        let total_delta = cur_timestamp - last_timestamp;
+        if total_delta <= TimeDelta::zero() {
+            return Err(anyhow::anyhow!("Non-positive time delta between confirmed timestamps: {} to {}, skipping adjustment.", last_timestamp, cur_timestamp));
+        }
+        
+        if start_index >= end_index {
+            return Ok(());
+        }
+        
+        // 结构体记录每个包的信息
+        struct PacketTimeInfo {
+            index: usize,
+            is_music: bool,
+        }
+        
+        let mut packet_infos: Vec<PacketTimeInfo> = Vec::new();
+        let mut music_packet_count = 0;
+        
+        // 第一步: 统计所有包的信息
+        for i in start_index..=end_index {
+            let packet_info = &self.packetinfo_buffer[i];
+            let mut is_music_packet = false;
+            
+            // 检查这个包是否包含 MusicBroadcaster 的 UpdateObject
+            for frame in &packet_info.data_pack.frames {
+                if let Some(data_frame::Message::UpdateObject(obj)) = &frame.message {
+                    if music_broadcasters.contains(&obj.object_id) {
+                        is_music_packet = true;
+                        music_packet_count += 1;
+                        break;
+                    }
+                }
+            }
+            
+            packet_infos.push(PacketTimeInfo {
+                index: i,
+                is_music: is_music_packet,
+            });
+        }
+        
+        // 如果没有找到音频包，使用均匀分布所有包
+        if music_packet_count == 0 {
+            tracing::info!("HashSet of MusicBroadcaster IDs: {:?}", music_broadcasters);
+            tracing::warn!("No MusicBroadcaster found between confirmed timestamps: {} to {}, using uniform distribution.", last_timestamp, cur_timestamp);
+
+            let total_packets = packet_infos.len();
+            if total_packets == 1 {
+                // 只有一个包，直接设置为结束时间
+                self.packetinfo_buffer[end_index].timestamp = cur_timestamp;
+            } else {
+                // 均匀分布时间
+                let time_step = total_delta / (total_packets as i32 - 1);
+                for (local_idx, info) in packet_infos.iter().enumerate() {
+                    let new_timestamp = last_timestamp + time_step * (local_idx as i32);
+                    self.packetinfo_buffer[info.index].timestamp = new_timestamp;
+                    tracing::trace!("Packet {} (uniform): {}", info.index, new_timestamp);
+                }
+                // 确保最后一个包精确匹配结束时间
+                self.packetinfo_buffer[end_index].timestamp = cur_timestamp;
+            }
+            return Ok(());
+        }
+
+        tracing::debug!("Found {} music packets between index {} and {}, total delta: {:?}",
+            music_packet_count, start_index, end_index, total_delta);
+
+        // 第二步: 将总时间按音频包数量均分
+        let time_per_music_segment = total_delta / music_packet_count;
+
+        // 第三步: 计算每个包的时间戳
+        let mut current_time = last_timestamp;
+        let mut music_segment_index = 0;
+        let mut music_segment_start_packet_idx = 0;
+
+        for (local_idx, packet_info) in packet_infos.iter().enumerate() {
+            if packet_info.is_music {
+                // 这是一个音频包
+                // 先处理上一个音频段到当前音频包之间的其他包
+                let packets_before_this_music = local_idx - music_segment_start_packet_idx;
+                if packets_before_this_music > 0 {
+                    // 有其他包需要插值（包括第一个音频包之前的包）
+                    let time_step = time_per_music_segment / (packets_before_this_music as i32 + 1);
+                    for (step, info) in packet_infos[music_segment_start_packet_idx..local_idx].iter().enumerate() {
+                        let new_timestamp = current_time + time_step * ((step + 1) as i32);
+                        self.packetinfo_buffer[info.index].timestamp = new_timestamp;
+                        tracing::trace!("Packet {} (before music {}): {}", info.index, music_segment_index, new_timestamp);
+                    }
+                }
+
+                // 更新当前音频段的时间
+                current_time = current_time + time_per_music_segment;
+                self.packetinfo_buffer[packet_info.index].timestamp = current_time;
+                tracing::debug!("Music packet {} at index {}: {}", music_segment_index, packet_info.index, current_time);
+
+                music_segment_index += 1;
+                music_segment_start_packet_idx = local_idx + 1; // 下一个区间从这个音频包的下一个包开始
+            }
+        }
+
+        // 第四步: 处理最后一个音频包之后到 end_index 之间的包
+        if music_segment_start_packet_idx < packet_infos.len() {
+            let remaining_packets = packet_infos.len() - music_segment_start_packet_idx;
+            if remaining_packets > 0 {
+                let remaining_time = cur_timestamp - current_time;
+                let time_step = remaining_time / (remaining_packets as i32 + 1);
+                for (step, info) in packet_infos[music_segment_start_packet_idx..].iter().enumerate() {
+                    let new_timestamp = current_time + time_step * ((step + 1) as i32);
+                    self.packetinfo_buffer[info.index].timestamp = new_timestamp;
+                    tracing::trace!("Packet {} (after last music): {}", info.index, new_timestamp);
+                }
+            }
+        }
+
+        // 确保最后一个包的时间戳正确
+        self.packetinfo_buffer[end_index].timestamp = cur_timestamp;
+        tracing::debug!("End packet {}: {}", end_index, cur_timestamp);
+        
+        Ok(())
+    }
+    /// 
+    /// 
+    fn handle_packetinfo_buffer(&mut self) -> Result<()> {
+        if self.packetinfo_buffer.is_empty() {
+            return Ok(());
+        }
+        tracing::warn!("This is experimental auto timestamp feature, please report issues if any bugs found.");
+        self.initial_dataframes.clear(); // clear initial dataframes first
+        let mut last_confirmed_timestamp: Option<DateTime<Utc>> = None;
+        let mut last_confirmed_packet_index: usize = 0;
+        let mut music_broadcasters: HashSet<i32> = HashSet::new();
+        let mut datetime_receiver_id = 0;
+        
+        // 收集需要处理的时间段信息
+        struct TimestampRange {
+            start_index: usize,
+            end_index: usize,
+            start_time: DateTime<Utc>,
+            end_time: DateTime<Utc>,
+        }
+        let mut ranges_to_process: Vec<TimestampRange> = Vec::new();
+        
+        for (index, packet_info) in self.packetinfo_buffer.iter().enumerate() {
+            for frame in &packet_info.data_pack.frames {
+                match &frame.message {
+                    Some(data_frame::Message::InstantiateObject(obj)) => {
+                        let name = String::from_utf8_lossy(&obj.prefab_name);
+                        if name.contains("TimedAsset/DateTimeReceiver") {
+                            datetime_receiver_id = obj.object_id;
+                        }
+                        if name.contains("VoiceObject/MusicBroadcaster") {
+                            music_broadcasters.insert(obj.object_id);
+                        }
+                    }
+                    Some(data_frame::Message::UpdateObject(obj)) => {
+                        if obj.object_id == datetime_receiver_id {
+                            let date_convert = obj.try_parse_date_time()?;
+                            if last_confirmed_timestamp.is_none() {
+                                last_confirmed_timestamp = Some(date_convert.date_time);
+                                last_confirmed_packet_index = index;
+                                tracing::debug!("First confirmed timestamp: {} at packet index: {}", date_convert.date_time, index);
+                                break; // next loop
+                            }
+                            let confirmed_timestamp = last_confirmed_timestamp.unwrap();
+                            
+                            // 收集需要处理的范围
+                            ranges_to_process.push(TimestampRange {
+                                start_index: last_confirmed_packet_index,
+                                end_index: index,
+                                start_time: confirmed_timestamp,
+                                end_time: date_convert.date_time,
+                            });
+                            
+                            // 更新为当前确认的时间戳
+                            last_confirmed_timestamp = Some(date_convert.date_time);
+                            last_confirmed_packet_index = index;
+                        }
+                    }
+                    Some(data_frame::Message::DestroyObject(_)) => {
+                        // do nothing right now
+                        // tracing::info!("DestroyObject with id {:?} at packet index: {}", obj.object_id, index);
+                        // if obj.object_id == datetime_receiver_id {
+                        //     datetime_receiver_id = 0; // reset
+                        //     last_confirmed_timestamp = None;
+                        //     last_confirmed_packet_index = 0;
+                        //     music_broadcasters.clear(); // clear all broadcasters
+                        // }
+                        // special handle datetime
+                    }
+                    _ => {}
+                }
+            }
+        }
+        
+        // 现在统一处理所有范围
+        let last_range_info = ranges_to_process.last().map(|r| (r.end_index, r.end_time));
+        for range in ranges_to_process {
+            self.handle_auto_timestamp(
+                range.start_index, 
+                range.end_index, 
+                range.start_time, 
+                range.end_time, 
+                &music_broadcasters
+            )?;
+        }
+
+        // 处理剩余的包(如果最后一个 range 的 end_index 后面还有包)
+        // 这些包没有 DateTimeReceiver,按固定 20ms 间隔处理
+        if let Some((last_end_index, last_end_time)) = last_range_info {
+            let remaining_start = last_end_index + 1;
+            let remaining_end = self.packetinfo_buffer.len() - 1;
+            
+            if remaining_start <= remaining_end {
+                const FIXED_INTERVAL_MS: i64 = 20; // 每个包 20 毫秒
+                
+                tracing::debug!(
+                    "Processing remaining {} packets with fixed 20ms interval from index {} to {}",
+                    remaining_end - remaining_start + 1,
+                    remaining_start,
+                    remaining_end
+                );
+                
+                for i in remaining_start..=remaining_end {
+                    let offset = (i - remaining_start + 1) as i64;
+                    let new_timestamp = last_end_time + TimeDelta::milliseconds(FIXED_INTERVAL_MS * offset);
+                    self.packetinfo_buffer[i].timestamp = new_timestamp;
+                    tracing::trace!("Fixed interval packet {}: {}", i, new_timestamp);
+                }
+            }
+        }
+        // after timestamp confirmed, we can use segment_builder then.
+        for packet_info in std::mem::take(&mut self.packetinfo_buffer) {
+            let timestamp = packet_info.timestamp;
+            tracing::debug!("Processing packet with confirmed timestamp: {}", timestamp);
+            // first segment start
+            if self.segment_builder.segments.is_empty() {
+                self.initial_timestamp = timestamp;
+                self.segment_builder
+                    .start()
+                    .add(PacketInfo::create_segment_started_packet(timestamp))
+                    .add(PacketInfo::create_room_frame(
+                        timestamp,
+                        self.data_room.clone(),
+                    ))
+                    .add(PacketInfo::create_cache_end(timestamp));
+            }
+            // timestamp segment
+            if timestamp - self.initial_timestamp > DURATION {
+                self.initial_timestamp += DURATION;
+                self.segment_builder
+                    .set_current_segment_duration(DURATION.as_seconds_f64())
+                    .next()
+                    .add(PacketInfo::create_segment_started_packet(
+                        self.initial_timestamp,
+                    ))
+                    .add(PacketInfo::create_room_frame(
+                        timestamp,
+                        self.data_room.clone(),
+                    ))
+                    .add(PacketInfo {
+                            timestamp,
+                            data_pack: DataPack {
+                                control: Some(data_pack::Control::Data(true)),
+                                frames: self.initial_dataframes.clone(),
+                            },
+                            raw_data: Vec::new(),
+                    })
+                    .add(PacketInfo::create_cache_end(timestamp));
+            }
+            // update initial frames
+            for frame in &packet_info.data_pack.frames {
+                match &frame.message {
+                    Some(data_frame::Message::InstantiateObject(_)) => {
+                        self.insert_initial_dataframes(frame.clone()); // clone it will not change the original frame
+                    }
+                    Some(data_frame::Message::UpdateObject(_)) => {
+                       self.update_initial_dataframes(frame.clone()); // clone it will not change the original frame
+                    }
+                    Some(data_frame::Message::DestroyObject(obj)) => {
+                        self.initial_dataframes.retain(|f| {
+                            if let Some(data_frame::Message::InstantiateObject(inst_obj)) = &f.message {
+                                inst_obj.object_id != obj.object_id
+                            } else if let Some(data_frame::Message::UpdateObject(upd_obj)) = &f.message {
+                                upd_obj.object_id != obj.object_id
+                            } else {
+                                true
+                            }
+                        });
+                    }
+                    _ => {
+                        // do nothing
+                    }
+                }
+            }
+            self.segment_builder.add(packet_info);
+        }
+        Ok(())
+    }
 }
+

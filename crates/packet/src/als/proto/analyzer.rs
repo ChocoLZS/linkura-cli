@@ -225,6 +225,7 @@ impl PacketFilter {
 #[derive(Debug)]
 struct ProtobufField {
     field_number: u32,
+    #[allow(unused)]
     wire_type: u8,
 }
 

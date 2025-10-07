@@ -163,10 +163,10 @@ impl PacketInfo {
     }
 }
 
-macro_rules! if_some {
-    ($var:ident in $expr:expr, $block:block) => {
-        if let Some(ref mut $var) = $expr {
-            $block
-        }
-    };
-}
+// macro_rules! if_some {
+//     ($var:ident in $expr:expr, $block:block) => {
+//         if let Some(ref mut $var) = $expr {
+//             $block
+//         }
+//     };
+// }

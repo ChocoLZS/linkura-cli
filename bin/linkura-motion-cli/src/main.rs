@@ -144,6 +144,10 @@ pub struct ArgsSync {
 #[derive(Debug, ClapArgs)]
 pub struct ArgsConvert {
     #[clap(
+        long = "type", value_name = "TYPE", help = "Conversion type: 'als', 'als-legacy'", default_value = "als"
+    )]
+    pub convert_type: String,
+    #[clap(
         short('i'),
         long = "input",
         value_name = "INPUT_FILE",
@@ -501,33 +505,28 @@ async fn main() -> Result<()> {
             }
 
             // Convert async context to sync for the conversion
-            let _result = tokio::task::spawn_blocking({
-                let input_file = convert_args.input_file.clone();
-                let output_dir = convert_args.output_dir.clone();
-                let segment_duration = convert_args.segment_duration;
+            let input_file = convert_args.input_file.clone();
+            let output_dir = convert_args.output_dir.clone();
+            let segment_duration = convert_args.segment_duration;
 
-                move || {
-                    #[cfg(feature = "audio")]
-                    let use_audio_processing = convert_args.audio_only;
-                    #[cfg(not(feature = "audio"))]
-                    let use_audio_processing = false;
-                    let converter = AlsConverter::new(segment_duration, use_audio_processing);
-                    converter.convert_mixed_to_standard(
-                        &input_file,
-                        &output_dir,
-                        // TODO: better args passing
-                        convert_args.timeshift,
-                        convert_args.split,
-                        convert_args.start_time,
-                        convert_args.data_start_time,
-                        convert_args.data_end_time,
-                        convert_args.metadata_path,
-                        convert_args.auto_timestamp
-                    )
-                }
-            })
-            .await??;
-
+            #[cfg(feature = "audio")]
+            let use_audio_processing = convert_args.audio_only;
+            #[cfg(not(feature = "audio"))]
+            let use_audio_processing = false;
+            let converter = AlsConverter::new(segment_duration, use_audio_processing);
+            converter.convert_mixed_to_standard(
+                &input_file,
+                &output_dir,
+                &convert_args.convert_type,
+                // TODO: better args passing
+                convert_args.timeshift,
+                convert_args.split,
+                convert_args.start_time,
+                convert_args.data_start_time,
+                convert_args.data_end_time,
+                convert_args.metadata_path,
+                convert_args.auto_timestamp
+            )?;
             info!("✅ ALS conversion completed successfully!");
             info!("📄 Output files written to: {}", convert_args.output_dir);
         }
