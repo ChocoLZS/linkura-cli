@@ -31,14 +31,12 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  create-release:
-    if: inputs.create_release == true
+  # Get or generate tag name (always runs)
+  get-tag:
     runs-on: ubuntu-latest
     outputs:
       tag_name: ${{ steps.get_tag.outputs.tag_name }}
     steps:
-      - uses: actions/checkout@v5
-
       - name: Get tag name
         id: get_tag
         run: |
@@ -52,37 +50,42 @@ jobs:
             # Manual workflow_dispatch without tag, auto-generate
             echo "tag_name=v$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
           fi
-      
+
+  # Create GitHub release (conditional)
+  create-release:
+    needs: [get-tag]
+    if: inputs.create_release == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
       - name: Prepare Release Body
         id: prepare_release_body
         run: |
-          tag_name="${{ steps.get_tag.outputs.tag_name }}"
+          tag_name="${{ needs.get-tag.outputs.tag_name }}"
 
           # Read the template and replace placeholders
           template_content=$(cat .github/release_template.md)
           release_body="${template_content//VERSION/$tag_name}"
-          
+
           # Save to output
           echo "release_body<<EOF" >> $GITHUB_OUTPUT
           echo "$release_body" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-      
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.get_tag.outputs.tag_name }}
-          name: Release ${{ steps.get_tag.outputs.tag_name }}
+          tag_name: ${{ needs.get-tag.outputs.tag_name }}
+          name: Release ${{ needs.get-tag.outputs.tag_name }}
           body: ${{ steps.prepare_release_body.outputs.release_body }}
           draft: false
-          prerelease: ${{ contains(steps.get_tag.outputs.tag_name, '-') }}
+          prerelease: ${{ contains(needs.get-tag.outputs.tag_name, '-') }}
 
   # Cross-compilation builds using `cross` tool (Linux targets + Android)
   build-release-cross:
-    needs: [create-release]
-    if: |
-      always() &&
-      !contains(needs.*.result, 'failure') &&
-      !contains(needs.*.result, 'cancelled')
+    needs: [get-tag, create-release]
+    if: always() && !cancelled() && needs.get-tag.result == 'success'
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: full
@@ -111,13 +114,12 @@ jobs:
         run: |
           cross build --release --locked --target ${{ matrix.target }} --bin ${{ inputs.binary_name }} ${{ inputs.features || '--all-features' }}
 
-      - name: PostBuild | Prepare artifacts
+      - name: PostBuild | Strip and rename binary
         run: |
           cd target/${{ matrix.target }}/release
-
           binary_name="${{ inputs.binary_name }}"
           strip $binary_name || true
-          tar czvf ../../../${binary_name}-${{ matrix.target }}.tar.gz $binary_name
+          mv $binary_name ../../../${binary_name}-${{ matrix.target }}
           cd -
 
       - name: Upload Github Assets
@@ -125,16 +127,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: ${{ inputs.binary_name }}-${{ matrix.target }}.tar.gz
-          tag_name: ${{ needs.create-release.outputs.tag_name }}
+          files: ${{ inputs.binary_name }}-${{ matrix.target }}
+          tag_name: ${{ needs.get-tag.outputs.tag_name }}
 
   # Native builds for Unix (macOS)
   build-release-unix:
-    needs: [create-release]
-    if: |
-      always() &&
-      !contains(needs.*.result, 'failure') &&
-      !contains(needs.*.result, 'cancelled')
+    needs: [get-tag, create-release]
+    if: always() && !cancelled() && needs.get-tag.result == 'success'
     runs-on: macos-latest
     env:
       RUST_BACKTRACE: full
@@ -165,13 +164,12 @@ jobs:
         run: |
           cargo build --release --locked --target ${{ matrix.target }} --bin ${{ inputs.binary_name }} ${{ inputs.features || '--all-features' }}
 
-      - name: PostBuild | Prepare artifacts
+      - name: PostBuild | Strip and rename binary
         run: |
           cd target/${{ matrix.target }}/release
-
           binary_name="${{ inputs.binary_name }}"
           strip $binary_name || true
-          tar czvf ../../../${binary_name}-${{ matrix.target }}.tar.gz $binary_name
+          mv $binary_name ../../../${binary_name}-${{ matrix.target }}
           cd -
 
       - name: Upload Github Assets
@@ -179,16 +177,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: ${{ inputs.binary_name }}-${{ matrix.target }}.tar.gz
-          tag_name: ${{ needs.create-release.outputs.tag_name }}
+          files: ${{ inputs.binary_name }}-${{ matrix.target }}
+          tag_name: ${{ needs.get-tag.outputs.tag_name }}
 
   # Cross-compilation builds for Windows (MinGW on Linux)
   build-release-windows:
-    needs: [create-release]
-    if: |
-      always() &&
-      !contains(needs.*.result, 'failure') &&
-      !contains(needs.*.result, 'cancelled')
+    needs: [get-tag, create-release]
+    if: always() && !cancelled() && needs.get-tag.result == 'success'
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: full
@@ -223,13 +218,12 @@ jobs:
         run: |
           cargo build --release --locked --target ${{ matrix.target }} --bin ${{ inputs.binary_name }} ${{ inputs.features || '--all-features' }}
 
-      - name: PostBuild | Prepare artifacts
+      - name: PostBuild | Strip and rename binary
         run: |
           cd target/${{ matrix.target }}/release
-
           binary_name="${{ inputs.binary_name }}"
           strip ${binary_name}.exe || true
-          tar czvf ../../../${binary_name}-${{ matrix.target }}.tar.gz ${binary_name}.exe
+          mv ${binary_name}.exe ../../../${binary_name}-${{ matrix.target }}.exe
           cd -
 
       - name: Upload Github Assets
@@ -237,5 +231,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: ${{ inputs.binary_name }}-${{ matrix.target }}.tar.gz
-          tag_name: ${{ needs.create-release.outputs.tag_name }}
+          files: ${{ inputs.binary_name }}-${{ matrix.target }}.exe
+          tag_name: ${{ needs.get-tag.outputs.tag_name }}
