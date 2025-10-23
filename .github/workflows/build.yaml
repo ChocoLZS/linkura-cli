@@ -155,19 +155,18 @@ jobs:
           name: linkura-${{ matrix.target }}${{ matrix.suffix }}.tar.gz
           path: linkura-${{ matrix.target }}${{ matrix.suffix }}.tar.gz
 
-  # Native builds for Windows
+  # Cross-compilation builds for Windows (MinGW on Linux)
   build-windows:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     env:
-      RUSTFLAGS: "-C target-feature=+crt-static"
       RUST_BACKTRACE: full
     strategy:
       fail-fast: false
       matrix:
         include:
-          - target: x86_64-pc-windows-msvc
+          - target: x86_64-pc-windows-gnu
             features: ""
-          - target: x86_64-pc-windows-msvc
+          - target: x86_64-pc-windows-gnu
             features: "--all-features"
             suffix: "-full-features"
     steps:
@@ -179,6 +178,20 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup | Cache Cargo
+        uses: actions/cache@v4.2.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Setup | Cache Cargo Target
+        uses: actions/cache@v4.2.0
+        with:
+          path: target
+          key: ${{ matrix.target }}-cargo-target
+
       - name: Setup | Rust
         run: |
           rustup set profile minimal
@@ -187,12 +200,16 @@ jobs:
           rustup override set stable
           rustup target add --toolchain stable ${{ matrix.target }}
 
-      - name: Build | Native build ${{ matrix.target }}
+      - name: Setup | MinGW
+        run: |
+          sudo apt-get update -qq && sudo apt-get -y install mingw-w64
+          echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
+
+      - name: Build | Windows cross compile
         run: |
           cargo build --release --locked --target ${{ matrix.target }} --workspace ${{ matrix.features }}
 
       - name: PostBuild | Prepare artifacts
-        shell: bash
         run: |
           cd target/${{ matrix.target }}/release
           strip linkura-cli.exe || true
@@ -202,14 +219,14 @@ jobs:
           if [ -n "$suffix" ]; then
             cp linkura-cli.exe linkura-cli${suffix}.exe
             cp linkura-motion-cli.exe linkura-motion-cli${suffix}.exe
-            7z a ../../../linkura-cli-${{ matrix.target }}${suffix}.zip linkura-cli${suffix}.exe linkura-motion-cli${suffix}.exe
+            tar czvf ../../../linkura-cli-${{ matrix.target }}${suffix}.tar.gz linkura-cli${suffix}.exe linkura-motion-cli${suffix}.exe
           else
-            7z a ../../../linkura-cli-${{ matrix.target }}.zip linkura-cli.exe linkura-motion-cli.exe
+            tar czvf ../../../linkura-cli-${{ matrix.target }}.tar.gz linkura-cli.exe linkura-motion-cli.exe
           fi
           cd -
 
       - name: Deploy | Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: linkura-cli-${{ matrix.target }}${{ matrix.suffix }}.zip
-          path: linkura-cli-${{ matrix.target }}${{ matrix.suffix }}.zip
+          name: linkura-cli-${{ matrix.target }}${{ matrix.suffix }}.tar.gz
+          path: linkura-cli-${{ matrix.target }}${{ matrix.suffix }}.tar.gz
