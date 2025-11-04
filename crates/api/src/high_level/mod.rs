@@ -1,10 +1,63 @@
-use crate::macros::{define_api_struct, use_common_crate};
+use std::fmt;
+
+use crate::{get_appstore_version, get_google_play_version, macros::{define_api_struct, use_common_crate}};
 use reqwest::header;
 use serde_json::json;
 
-use crate::{LINKURA_APP_STORE_URL, UA_PREFIX, WEB_UA};
+use crate::UA_PREFIX;
 
 use_common_crate!();
+
+/// Helper struct to format Response with body for debugging
+pub struct ResponseDebug {
+    pub url: String,
+    pub status: reqwest::StatusCode,
+    pub headers: reqwest::header::HeaderMap,
+    pub body: String,
+}
+
+impl fmt::Debug for ResponseDebug {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Response")
+            .field("url", &self.url)
+            .field("status", &self.status)
+            .field("headers", &self.headers)
+            .field("body", &self.body)
+            .finish()
+    }
+}
+
+impl ResponseDebug {
+    /// Create a ResponseDebug from a reqwest::Response (consumes the response)
+    pub async fn from_response(res: reqwest::Response) -> Result<Self> {
+        let url = res.url().to_string();
+        let status = res.status();
+        let headers = res.headers().clone();
+        let body = res.text().await?;
+        
+        Ok(Self {
+            url,
+            status,
+            headers,
+            body,
+        })
+    }
+    
+    /// Create a ResponseDebug from a blocking reqwest::Response (consumes the response)
+    pub fn from_blocking_response(res: reqwest::blocking::Response) -> Result<Self> {
+        let url = res.url().to_string();
+        let status = res.status();
+        let headers = res.headers().clone();
+        let body = res.text()?;
+        
+        Ok(Self {
+            url,
+            status,
+            headers,
+            body,
+        })
+    }
+}
 define_api_struct!(AssetsApi);
 
 impl<'a> AssetsApi<'a> {
@@ -34,21 +87,8 @@ impl<'a> HighLevelApi<'a> {
     ///
     /// Returns (x-res-version, `app version from website`)
     pub fn get_app_version(&self) -> Result<(Option<String>, Option<String>)> {
-        let website = reqwest::blocking::Client::new()
-            .get(LINKURA_APP_STORE_URL)
-            .header(header::USER_AGENT, WEB_UA)
-            .send()?;
-        if website.status() != reqwest::StatusCode::OK {
-            tracing::error!("Failed to get app version from website: {:?}", website);
-            return Err(anyhow::anyhow!("Failed to get app version from website"));
-        }
-        let html = website.text()?;
-        let re = regex::Regex::new(r#"\\"versionDisplay\\":\\"(\d+\.\d+\.\d+)\\"#).unwrap();
-        let captures = re.captures(&html);
-        let app_version = captures
-            .and_then(|cap| cap.get(1))
-            .map(|m| m.as_str().to_string());
-
+        let app_version = get_appstore_version().or_else(|| get_google_play_version());
+        tracing::info!("Detected app version: {:?}", app_version);
         // empty id login check
         let url = format!("{API_BASE}/user/login");
         let res = self
@@ -68,11 +108,11 @@ impl<'a> HighLevelApi<'a> {
             }))
             .send()?;
 
+        let headers = res.headers().clone();
         if res.status() != reqwest::StatusCode::OK {
-            tracing::error!("Linkura api request failed: {:?}", res);
-            return Err(anyhow::anyhow!("Linkura api request failed"));
+            tracing::error!("Linkura api request failed: {:?}", ResponseDebug::from_blocking_response(res)?);
         }
-        let res_version = res.headers().get("x-res-version").map(|v| {
+        let res_version = headers.get("x-res-version").map(|v| {
             let version = v.to_str().unwrap_or_default();
             version.split('@').next().unwrap_or_default().to_string()
         });
