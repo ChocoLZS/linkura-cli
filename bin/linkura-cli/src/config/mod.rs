@@ -52,6 +52,8 @@ pub struct Args {
 pub enum Commands {
     /// Get api response data
     API(ArgsAPI),
+    /// Get app version & res version
+    Version,
 }
 
 /** ARG PARSER END**/

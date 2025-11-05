@@ -13,10 +13,14 @@ pub fn run(ctx: &Global) {
         tracing::info!("wm info: {:?}", res);
     } else {
         let trailers = wm_res.as_array().unwrap();
-        tracing::info!("Trailers: {:?}", trailers);
+        tracing::trace!("Trailers: {:?}", trailers);
+        trailers.iter().for_each(|value| {
+            print_trailer_info(value);
+        });
+        
         let first_trailer = trailers.first();
         if let Some(trailer) = first_trailer {
-            print_latest_trailer_archive(ctx, trailer);
+            print_latest_trailer_info(ctx, trailer);
         }
     }
 
@@ -25,7 +29,33 @@ pub fn run(ctx: &Global) {
     print_latest_archive_info(ctx, &latest_archive_res);
 }
 
-fn print_latest_trailer_archive(ctx: &Global, wm: &serde_json::Value) {
+fn print_trailer_info(wm: &serde_json::Value) {
+    let live_type = wm.get("live_type").unwrap().as_u64().unwrap();
+    let name: &str = wm.get("name").unwrap().as_str().unwrap();
+    let description: &str = wm.get("description").unwrap().as_str().unwrap();
+    let start_time: &str = wm.get("live_start_time").unwrap().as_str().unwrap();
+    let open_time: &str = wm.get("open_time").unwrap().as_str().unwrap();
+    tracing::info!(
+        "{} info: \n{}\n\n{}\nstart_time: {}\nopen_time: {}",
+        if live_type == 2 {
+            "with meets"
+        } else {
+            "fes live"
+        },
+        name,
+        description,
+        chrono::DateTime::parse_from_rfc3339(start_time)
+            .unwrap()
+            .with_timezone(&Local)
+            .format("%Y-%m-%d %H:%M:%S %:z"),
+        chrono::DateTime::parse_from_rfc3339(open_time)
+            .unwrap()
+            .with_timezone(&Local)
+            .format("%Y-%m-%d %H:%M:%S %:z")
+    );
+}
+
+fn print_latest_trailer_info(ctx: &Global, wm: &serde_json::Value) {
     let api_client = &ctx.api_client;
     let id = wm.get("live_id").unwrap().as_str().unwrap();
     let live_type = wm.get("live_type").unwrap().as_u64().unwrap();
