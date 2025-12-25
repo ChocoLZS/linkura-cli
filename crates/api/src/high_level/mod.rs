@@ -215,14 +215,7 @@ impl<'a> HighLevelApi<'a> {
             return Err(anyhow::anyhow!("Get meets info failed: {:?}", res));
         }
         let wm_info: serde_json::Value = res.json()?;
-        Ok(json!({
-            "room": wm_info.get("room").unwrap().as_object().unwrap(),
-            "name": wm_info.get("name").unwrap().as_str().unwrap(),
-            "description": wm_info.get("description").unwrap().as_str().unwrap(),
-            "thumbnail": wm_info.get("cover_image_url").unwrap().as_str().unwrap(),
-            "characters": wm_info.get("characters").unwrap().as_array().unwrap(),
-            "hls_url": wm_info.get("hls").unwrap().as_object().unwrap().get("url").unwrap().as_str().unwrap(),
-        }))
+        Ok(wm_info)
     }
 
     pub fn get_with_meets_connect_token(&self, live_id: &str) -> Result<String> {
@@ -249,13 +242,7 @@ impl<'a> HighLevelApi<'a> {
             ));
         }
         let fes_info: serde_json::Value = res.json()?;
-        Ok(json!({
-            "room": fes_info.get("room").unwrap().as_object().unwrap(),
-            "name": fes_info.get("name").unwrap().as_str().unwrap(),
-            "description": fes_info.get("description").unwrap().as_str().unwrap(),
-            "characters": fes_info.get("characters").unwrap().as_array().unwrap(),
-            "hls": fes_info.get("hls").unwrap().as_object().unwrap(),
-        }))
+        Ok(fes_info)
     }
 
     pub fn get_fes_live_connect_token(&self, live_id: &str) -> Result<String> {

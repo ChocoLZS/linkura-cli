@@ -99,14 +99,16 @@ fn print_latest_trailer_info(ctx: &Global, wm: &serde_json::Value) {
             api_client.high_level().get_with_meets_info(id);
         match res {
             Ok(res) => {
+                let characters = res.get("characters").unwrap().as_array().unwrap()
+                .iter().map(|v| v["character_id"].as_u64().unwrap()).collect::<Vec<u64>>();
                 tracing::info!(
                     "with meets info: \ntitle: {}\ndescription: {:?}\nroom: {:?}\nthumbnail: {:?}\nhls_url: {:?}\ncharacters: {:?}\ncostume_ids: {:?}\nlive_location_id: {:?}",
                     name,
                     res.get("description").unwrap().as_str().unwrap(),
                     res.get("room").unwrap().as_object().unwrap(),
-                    res.get("thumbnail").unwrap().as_str().unwrap(),
-                    res.get("hls_url").unwrap().as_str().unwrap(),
-                    res.get("characters").unwrap().as_array().unwrap(),
+                    res.get("cover_image_url").unwrap().as_str().unwrap(),
+                    res.get("hls").unwrap().as_object().unwrap().get("url").unwrap().as_str().unwrap(),
+                    characters,
                     res.get("costume_ids").unwrap().as_array().unwrap(),
                     res.get("live_location_id").unwrap().as_u64().unwrap(),
                 );
@@ -127,12 +129,14 @@ fn print_latest_trailer_info(ctx: &Global, wm: &serde_json::Value) {
             api_client.high_level().get_fes_live_info(id);
         match res {
             Ok(res) => {
+                let characters = res.get("characters").unwrap().as_array().unwrap()
+                .iter().map(|v| v["character_id"].as_u64().unwrap()).collect::<Vec<u64>>();
                 tracing::info!(
                     "fes live info: \ntitle: {}\ndescription: {:?}\nroom: {:?}\ncharacters: {:?}\nhls: {:?}\ncostume_ids: {:?}\nlive_location_id: {:?}",
                     name,
                     res.get("description").unwrap().as_str().unwrap(),
                     res.get("room").unwrap().as_object().unwrap(),
-                    res.get("characters").unwrap().as_array().unwrap(),
+                    characters,
                     res.get("hls").unwrap().as_object().unwrap(),
                     res.get("costume_ids").unwrap().as_array().unwrap(),
                     res.get("live_location_id").unwrap().as_u64().unwrap(),
