@@ -1,6 +1,6 @@
 [package]
 name = "linkura-cli"
-version = "0.0.9"
+version = "0.0.10"
 edition.workspace = true
 default-run = "linkura-cli"
 
@@ -8,16 +8,17 @@ default-run = "linkura-cli"
 linkura-api.workspace = true
 linkura-common.workspace = true
 linkura-packet.workspace = true
+linkura-i18n.workspace = true
 
 anyhow.workspace = true
 tokio.workspace = true
 chrono.workspace = true
-rust-i18n.workspace = true
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 ctrlc.workspace = true
 tracing.workspace = true
+rust-i18n.workspace = true
 
 indicatif.workspace = true
 inquire = "0.7.5"

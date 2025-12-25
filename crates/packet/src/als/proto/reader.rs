@@ -15,7 +15,7 @@ use super::define::DataPack;
 use crate::als::proto::PacketInfo;
 
 /// Trait for reading packets from different formats
-/// 
+///
 /// Implement this trait to support new packet formats while reusing
 /// all analysis and formatting logic.
 pub trait PacketReaderTrait {
@@ -249,7 +249,9 @@ impl PacketReaderTrait for MixedPacketReader {
                         .ok_or_else(|| anyhow!("Invalid timestamp: {}", timestamp_micros))?;
 
                     // Combine with pending protobuf
-                    let (data_pack, raw_data) = self.pending_protobuf.take()
+                    let (data_pack, raw_data) = self
+                        .pending_protobuf
+                        .take()
                         .ok_or_else(|| anyhow!("Missing protobuf packet"))?;
 
                     self.state = MixedReaderState::ExpectProtobuf;
@@ -263,7 +265,7 @@ impl PacketReaderTrait for MixedPacketReader {
             }
         }
     }
-    
+
     fn read_packets(&mut self) -> Result<Vec<PacketInfo>> {
         let mut packets = Vec::new();
         while let Some(packet) = self.read_packet()? {
@@ -327,9 +329,13 @@ impl PacketReaderTrait for LegacyPacketReader {
         let data_length = length - 1;
         let mut data = vec![0u8; data_length as usize];
         self.reader.read_exact(&mut data)?;
-        let data_pack = DataPack::decode(data.as_slice())
-            .with_context(|| "Failed to decode protobuf")?;
-        return Ok(Some(PacketInfo { timestamp: Utc::now(), raw_data: data_pack.encode_to_vec(), data_pack: data_pack }));
+        let data_pack =
+            DataPack::decode(data.as_slice()).with_context(|| "Failed to decode protobuf")?;
+        return Ok(Some(PacketInfo {
+            timestamp: Utc::now(),
+            raw_data: data_pack.encode_to_vec(),
+            data_pack: data_pack,
+        }));
     }
     fn read_packets(&mut self) -> Result<Vec<PacketInfo>> {
         let mut packets = Vec::new();
@@ -424,7 +430,6 @@ impl PacketsBufferReader {
     where
         F: Fn(File) -> Box<dyn PacketReaderTrait> + 'static,
     {
-
         Self {
             current_reader: None,
             file_entries,
@@ -449,7 +454,7 @@ impl PacketsBufferReader {
     /// Set limits (Builder pattern)
     pub fn with_limits(mut self, limits: ReaderLimits) -> Self {
         self.limits = limits;
-        
+
         // Apply max_files limit by truncating the queue
         self.file_entries.truncate(limits.max_files);
 
@@ -457,7 +462,10 @@ impl PacketsBufferReader {
     }
 
     /// Create a boxed trait object for polymorphic use
-    pub fn boxed<F>(file_entries: VecDeque<DirEntry>, reader_factory: F) -> Box<dyn PacketReaderTrait>
+    pub fn boxed<F>(
+        file_entries: VecDeque<DirEntry>,
+        reader_factory: F,
+    ) -> Box<dyn PacketReaderTrait>
     where
         F: Fn(File) -> Box<dyn PacketReaderTrait> + 'static,
     {
@@ -525,10 +533,9 @@ impl PacketReaderTrait for PacketsBufferReader {
             // Check if limits reached
             if self.check_limits() {
                 // Per-file limit reached, move to next file
-                if self.current_file_packets >= self.limits.max_packets_per_file
-                {
+                if self.current_file_packets >= self.limits.max_packets_per_file {
                     self.current_reader = None; // Close current file
-                    // Try next file (will be opened below)
+                // Try next file (will be opened below)
                 } else {
                     // Total packets limit reached, stop completely
                     return Ok(None);
@@ -568,8 +575,6 @@ impl PacketReaderTrait for PacketsBufferReader {
         Ok(packets)
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

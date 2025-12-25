@@ -1,5 +1,6 @@
 use indicatif::{ProgressBar, ProgressStyle};
 
+#[allow(dead_code)]
 pub const TICK_CLOCK: [&str; 12] = [
     "🕐 ", "🕑 ", "🕒 ", "🕓 ", "🕔 ", "🕕 ", "🕖 ", "🕗 ", "🕘 ", "🕙 ", "🕚 ", "🕛 ",
 ];

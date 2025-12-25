@@ -1,13 +1,10 @@
-// use i18n::t;
-
-// i18n::init!()
 use anyhow::{Error, Result};
 use clap::{Args as ClapArgs, Parser, Subcommand};
-use i18n::t;
+use linkura_i18n::t;
 use std::{ops::Deref, path::Path, usize};
 use tracing::{info, warn};
 
-i18n::init!();
+linkura_i18n::init!();
 
 use linkura_common::log;
 use linkura_downloader::{AlsDownloader, BaseDownloader, MrsDownloader, R2Uploader};
@@ -144,7 +141,10 @@ pub struct ArgsSync {
 #[derive(Debug, ClapArgs)]
 pub struct ArgsConvert {
     #[clap(
-        long = "type", value_name = "TYPE", help = "Conversion type: 'als', 'als-legacy'", default_value = "als"
+        long = "type",
+        value_name = "TYPE",
+        help = "Conversion type: 'als', 'als-legacy'",
+        default_value = "als"
     )]
     pub convert_type: String,
     #[clap(
@@ -205,7 +205,8 @@ pub struct ArgsConvert {
     pub metadata_path: Option<String>,
     #[clap(
         long = "auto-timestamp",
-        help = "Auto adjust timestamps to ensure chronological order", default_value = "false"
+        help = "Auto adjust timestamps to ensure chronological order",
+        default_value = "false"
     )]
     pub auto_timestamp: bool,
     #[cfg(feature = "audio")]
@@ -221,9 +222,20 @@ pub struct ArgsConvert {
 #[derive(Debug, ClapArgs)]
 /// Extract archive audio from archive files
 pub struct ArgsAudio {
-    #[clap(short('i'), long = "input", value_name = "INPUT_FILE", help = "Input archive file path")]
+    #[clap(
+        short('i'),
+        long = "input",
+        value_name = "INPUT_FILE",
+        help = "Input archive file path"
+    )]
     pub input_file: String,
-    #[clap(short('o'), long = "output", value_name = "OUTPUT_DIR", help = "Output directory for extracted audio", default_value = "audio")]
+    #[clap(
+        short('o'),
+        long = "output",
+        value_name = "OUTPUT_DIR",
+        help = "Output directory for extracted audio",
+        default_value = "audio"
+    )]
     pub output_dir: String,
 }
 
@@ -483,7 +495,7 @@ async fn main() -> Result<()> {
                 analysis_type.as_ref(),
                 packet_count,
                 analyze_args.data_start_time,
-                analyze_args.data_end_time
+                analyze_args.data_end_time,
             )?;
             info!("✅ ALS packet analysis completed successfully!");
         }
@@ -525,7 +537,7 @@ async fn main() -> Result<()> {
                 convert_args.data_start_time,
                 convert_args.data_end_time,
                 convert_args.metadata_path,
-                convert_args.auto_timestamp
+                convert_args.auto_timestamp,
             )?;
             info!("✅ ALS conversion completed successfully!");
             info!("📄 Output files written to: {}", convert_args.output_dir);
@@ -553,7 +565,10 @@ async fn main() -> Result<()> {
             })
             .await??;
             info!("✅ Audio extraction completed successfully!");
-            info!("📄 Output audio files written to: {}", audio_args.output_dir);
+            info!(
+                "📄 Output audio files written to: {}",
+                audio_args.output_dir
+            );
         }
         None => {}
     }
@@ -581,7 +596,7 @@ fn get_bucket_prefix(url: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_get_bucket_prefix() {
         let url = "https://example.org/archive/alst/directory_name/index.md";

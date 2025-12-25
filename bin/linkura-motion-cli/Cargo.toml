@@ -1,6 +1,6 @@
 [package]
 name = "linkura-motion-cli"
-version = "1.3.0"
+version = "1.3.1"
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
@@ -11,17 +11,17 @@ metadata.workspace = true
 linkura-common.workspace = true
 linkura-downloader.workspace = true
 linkura-packet.workspace = true
-i18n.workspace = true
+linkura-i18n.workspace = true
 
 anyhow.workspace = true
 clap.workspace = true
 chrono.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-rust-i18n.workspace = true
 tokio.workspace = true
 async-trait.workspace = true
 url.workspace = true
+rust-i18n.workspace = true
 
 [features]
 default = []

@@ -1,6 +1,9 @@
 use std::fmt;
 
-use crate::{get_appstore_version, get_google_play_version, macros::{define_api_struct, use_common_crate}};
+use crate::{
+    get_appstore_version, get_google_play_version,
+    macros::{define_api_struct, use_common_crate},
+};
 use reqwest::header;
 use serde_json::json;
 
@@ -28,13 +31,14 @@ impl fmt::Debug for ResponseDebug {
 }
 
 impl ResponseDebug {
+    #[allow(unused)]
     /// Create a ResponseDebug from a reqwest::Response (consumes the response)
     pub async fn from_response(res: reqwest::Response) -> Result<Self> {
         let url = res.url().to_string();
         let status = res.status();
         let headers = res.headers().clone();
         let body = res.text().await?;
-        
+
         Ok(Self {
             url,
             status,
@@ -42,14 +46,14 @@ impl ResponseDebug {
             body,
         })
     }
-    
+
     /// Create a ResponseDebug from a blocking reqwest::Response (consumes the response)
     pub fn from_blocking_response(res: reqwest::blocking::Response) -> Result<Self> {
         let url = res.url().to_string();
         let status = res.status();
         let headers = res.headers().clone();
         let body = res.text()?;
-        
+
         Ok(Self {
             url,
             status,
@@ -110,7 +114,10 @@ impl<'a> HighLevelApi<'a> {
 
         let headers = res.headers().clone();
         if res.status() != reqwest::StatusCode::OK {
-            tracing::error!("Linkura api request failed: {:?}", ResponseDebug::from_blocking_response(res)?);
+            tracing::error!(
+                "Linkura api request failed: {:?}",
+                ResponseDebug::from_blocking_response(res)?
+            );
         }
         let res_version = headers.get("x-res-version").map(|v| {
             let version = v.to_str().unwrap_or_default();
@@ -208,14 +215,7 @@ impl<'a> HighLevelApi<'a> {
             return Err(anyhow::anyhow!("Get meets info failed: {:?}", res));
         }
         let wm_info: serde_json::Value = res.json()?;
-        Ok(json!({
-            "room": wm_info.get("room").unwrap().as_object().unwrap(),
-            "name": wm_info.get("name").unwrap().as_str().unwrap(),
-            "description": wm_info.get("description").unwrap().as_str().unwrap(),
-            "thumbnail": wm_info.get("cover_image_url").unwrap().as_str().unwrap(),
-            "characters": wm_info.get("characters").unwrap().as_array().unwrap(),
-            "hls_url": wm_info.get("hls").unwrap().as_object().unwrap().get("url").unwrap().as_str().unwrap(),
-        }))
+        Ok(wm_info)
     }
 
     pub fn get_with_meets_connect_token(&self, live_id: &str) -> Result<String> {
@@ -235,16 +235,14 @@ impl<'a> HighLevelApi<'a> {
         if res.status() != reqwest::StatusCode::OK {
             let status = res.status();
             let error_text = res.text().unwrap_or_default();
-            return Err(anyhow::anyhow!("Get fes live info failed with status {}: {:?}", status, error_text));
+            return Err(anyhow::anyhow!(
+                "Get fes live info failed with status {}: {:?}",
+                status,
+                error_text
+            ));
         }
         let fes_info: serde_json::Value = res.json()?;
-        Ok(json!({
-            "room": fes_info.get("room").unwrap().as_object().unwrap(),
-            "name": fes_info.get("name").unwrap().as_str().unwrap(),
-            "description": fes_info.get("description").unwrap().as_str().unwrap(),
-            "characters": fes_info.get("characters").unwrap().as_array().unwrap(),
-            "hls": fes_info.get("hls").unwrap().as_object().unwrap(),
-        }))
+        Ok(fes_info)
     }
 
     pub fn get_fes_live_connect_token(&self, live_id: &str) -> Result<String> {

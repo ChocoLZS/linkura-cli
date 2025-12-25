@@ -1,6 +1,5 @@
 use crate::config::Global;
 use chrono::{Local, Utc};
-use linkura_common::jwt::extract_jwt_payload;
 
 pub fn run(ctx: &Global) {
     let args = &ctx.args;
@@ -17,7 +16,7 @@ pub fn run(ctx: &Global) {
         trailers.iter().for_each(|value| {
             print_trailer_info(value);
         });
-        
+
         let first_trailer = trailers.first();
         if let Some(trailer) = first_trailer {
             print_latest_trailer_info(ctx, trailer);
@@ -94,23 +93,24 @@ fn print_latest_trailer_info(ctx: &Global, wm: &serde_json::Value) {
         );
         return;
     }
-    let maybe_started = Utc::now()
-        >= chrono::DateTime::parse_from_rfc3339(start_time).unwrap()
-            - chrono::Duration::minutes(10);
 
     if live_type == 2 {
         let res: Result<serde_json::Value, anyhow::Error> =
             api_client.high_level().get_with_meets_info(id);
         match res {
             Ok(res) => {
+                let characters = res.get("characters").unwrap().as_array().unwrap()
+                .iter().map(|v| v["character_id"].as_u64().unwrap()).collect::<Vec<u64>>();
                 tracing::info!(
-                    "with meets info: \n title: {}\n description: {:?}\n room: {:?}\n thumbnail: {:?}\n hls_url: {:?}\n characters: {:?}",
+                    "with meets info: \ntitle: {}\ndescription: {:?}\nroom: {:?}\nthumbnail: {:?}\nhls_url: {:?}\ncharacters: {:?}\ncostume_ids: {:?}\nlive_location_id: {:?}",
                     name,
                     res.get("description").unwrap().as_str().unwrap(),
                     res.get("room").unwrap().as_object().unwrap(),
-                    res.get("thumbnail").unwrap().as_str().unwrap(),
-                    res.get("hls_url").unwrap().as_str().unwrap(),
-                    res.get("characters").unwrap().as_array().unwrap()
+                    res.get("cover_image_url").unwrap().as_str().unwrap(),
+                    res.get("hls").unwrap().as_object().unwrap().get("url").unwrap().as_str().unwrap(),
+                    characters,
+                    res.get("costume_ids").unwrap().as_array().unwrap(),
+                    res.get("live_location_id").unwrap().as_u64().unwrap(),
                 );
             }
             Err(_) => {
@@ -121,25 +121,6 @@ fn print_latest_trailer_info(ctx: &Global, wm: &serde_json::Value) {
                 );
             }
         }
-        if maybe_started {
-            let token = api_client.high_level().get_with_meets_connect_token(id);
-            match token {
-                Ok(token) => {
-                    let _ = extract_jwt_payload(token.as_str()).and_then(|payload| {
-                        tracing::info!(
-                            "Room info: \n address: {}\n port: {}\n room_id: {}",
-                            payload["pod"]["address"].as_str().unwrap().to_string(),
-                            payload["pod"]["port"].as_u64().unwrap(),
-                            payload["room_id"].as_str().unwrap().to_string()
-                        );
-                        Ok(payload)
-                    });
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to get with meets connect token: {}", e);
-                }
-            }
-        }
     }
     if live_type == 1 {
         // enter fes lobby first
@@ -148,13 +129,17 @@ fn print_latest_trailer_info(ctx: &Global, wm: &serde_json::Value) {
             api_client.high_level().get_fes_live_info(id);
         match res {
             Ok(res) => {
+                let characters = res.get("characters").unwrap().as_array().unwrap()
+                .iter().map(|v| v["character_id"].as_u64().unwrap()).collect::<Vec<u64>>();
                 tracing::info!(
-                    "fes live info: \n title: {}\n description: {:?}\n room: {:?}\n characters: {:?}\nhls: {:?}",
+                    "fes live info: \ntitle: {}\ndescription: {:?}\nroom: {:?}\ncharacters: {:?}\nhls: {:?}\ncostume_ids: {:?}\nlive_location_id: {:?}",
                     name,
                     res.get("description").unwrap().as_str().unwrap(),
                     res.get("room").unwrap().as_object().unwrap(),
-                    res.get("characters").unwrap().as_array().unwrap(),
-                    res.get("hls").unwrap().as_object().unwrap()
+                    characters,
+                    res.get("hls").unwrap().as_object().unwrap(),
+                    res.get("costume_ids").unwrap().as_array().unwrap(),
+                    res.get("live_location_id").unwrap().as_u64().unwrap(),
                 );
             }
             Err(_) => {

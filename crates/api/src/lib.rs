@@ -25,7 +25,8 @@ pub struct Credential {
 
 const API_BASE: &str = "https://api.link-like-lovelive.app/v1";
 const LINKURA_APP_STORE_URL: &str = "https://apps.apple.com/jp/app/link-like-%E3%83%A9%E3%83%96%E3%83%A9%E3%82%A4%E3%83%96-%E8%93%AE%E3%83%8E%E7%A9%BA%E3%82%B9%E3%82%AF%E3%83%BC%E3%83%AB%E3%82%A2%E3%82%A4%E3%83%89%E3%83%AB%E3%82%AF%E3%83%A9%E3%83%96/id1665027261";
-const LINKURA_GOOGLE_PLAY_URL: &str = "https://play.google.com/store/apps/details?id=com.oddno.lovelive&hl=en";
+const LINKURA_GOOGLE_PLAY_URL: &str =
+    "https://play.google.com/store/apps/details?id=com.oddno.lovelive&hl=en";
 const WEB_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
 /* CONFIG **/
 pub const UA_PREFIX: &str = "inspix-android";
@@ -173,7 +174,7 @@ fn _get_appstore_version() -> Result<Option<String>> {
 pub fn get_appstore_version() -> Option<String> {
     return _get_appstore_version().ok().flatten();
 }
-    
+
 fn _get_google_play_version() -> Result<Option<String>> {
     let website = reqwest::blocking::Client::new()
         .get(LINKURA_GOOGLE_PLAY_URL)
@@ -182,7 +183,10 @@ fn _get_google_play_version() -> Result<Option<String>> {
     if website.status() != reqwest::StatusCode::OK {
         tracing::error!("Failed to get app version from website: {:?}", website);
     }
-    let re = regex::Regex::new(r#"Link！Like！ラブライブ！蓮ノ空スクールアイドルクラブ"[^\n]*\["(\d+\.\d+\.\d+)"\]"#).unwrap();
+    let re = regex::Regex::new(
+        r#"Link！Like！ラブライブ！蓮ノ空スクールアイドルクラブ"[^\n]*\["(\d+\.\d+\.\d+)"\]"#,
+    )
+    .unwrap();
     let text = website.text()?;
     let captures = re.captures(&text);
     Ok(captures

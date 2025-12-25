@@ -1,22 +1,30 @@
 use super::proto::{
-        PacketInfo, define::{
-            CurrentPlayer, DataFrame, DataPack, Room, RoomAll, data_frame, data_pack,
-            destroy_object, instantiate_object, update_object,
-        }, reader::PacketReaderTrait
-    };
+    PacketInfo,
+    define::{
+        CurrentPlayer, DataFrame, DataPack, Room, RoomAll, data_frame, data_pack, destroy_object,
+        instantiate_object, update_object,
+    },
+    reader::PacketReaderTrait,
+};
+use crate::als::proto::{
+    extension::UpdateObjectExt,
+    reader::{LegacyPacketReader, MixedPacketReader, PacketsBufferReader, StandardPacketReader},
+};
 use anyhow::{Context, Ok, Result, anyhow};
 use chrono::{DateTime, FixedOffset, TimeDelta, Utc};
-use std::{collections::HashSet, io::{BufWriter, Write}};
 use std::path::Path;
 use std::{
     cmp::Ordering,
     fs::{DirEntry, File},
     path::PathBuf,
 };
-use crate::als::proto::{extension::UpdateObjectExt, reader::{LegacyPacketReader, MixedPacketReader, PacketsBufferReader, StandardPacketReader}};
+use std::{
+    collections::HashSet,
+    io::{BufWriter, Write},
+};
 
 #[cfg(feature = "audio")]
-use super::audio::{AudioBuilder};
+use super::audio::AudioBuilder;
 
 #[derive(PartialEq, Eq, Debug)]
 enum AlsConverterStateMachine {
@@ -139,9 +147,10 @@ impl AlsConverter {
         let input_dir = input_dir.as_ref();
         let output_dir = output_dir.as_ref();
         // Process each audio file in the input directory
-        let mut packet_buffer = PacketsBufferReader::new(Self::get_file_entries(input_dir)?, |file| {
-            StandardPacketReader::boxed(file)
-        });
+        let mut packet_buffer =
+            PacketsBufferReader::new(Self::get_file_entries(input_dir)?, |file| {
+                StandardPacketReader::boxed(file)
+            });
         let mut audio_builder = AudioBuilder::new(output_dir.to_str().map(String::from));
         while let Some(packet) = packet_buffer.read_packet()? {
             audio_builder.handle_audio_packet(&packet);
@@ -180,7 +189,7 @@ impl AlsConverter {
         } else {
             if context.auto_timestamp {
                 context.handle_packetinfo_buffer()?;
-            } 
+            }
             context.segment_builder.write_to_file(
                 output_dir,
                 context.data_room.started_at,
@@ -189,8 +198,6 @@ impl AlsConverter {
         }
         Ok(())
     }
-
-
 }
 
 #[derive(Debug, Default)]
@@ -233,7 +240,7 @@ impl SegmentBuilder {
             metadata_path,
             output_dir,
             part_count: 0,
-            timeshift
+            timeshift,
         }
     }
 
@@ -419,7 +426,7 @@ struct ConversionContext {
 
     /// 根据回放包的 audio 与datetime receiver来自动计算时间戳
     auto_timestamp: bool,
-    packetinfo_buffer: Vec<PacketInfo>
+    packetinfo_buffer: Vec<PacketInfo>,
 }
 
 impl ConversionContext {
@@ -438,13 +445,25 @@ impl ConversionContext {
         let mut dst: Option<DateTime<Utc>> = None;
         let mut det: Option<DateTime<Utc>> = None;
         if let Some(start_time) = start_time {
-            st = Some(DateTime::parse_from_rfc3339(&start_time).unwrap().with_timezone(&Utc))
+            st = Some(
+                DateTime::parse_from_rfc3339(&start_time)
+                    .unwrap()
+                    .with_timezone(&Utc),
+            )
         }
         if let Some(data_start_time) = data_start_time {
-            dst = Some(DateTime::parse_from_rfc3339(&data_start_time).unwrap().with_timezone(&Utc))
+            dst = Some(
+                DateTime::parse_from_rfc3339(&data_start_time)
+                    .unwrap()
+                    .with_timezone(&Utc),
+            )
         }
         if let Some(data_end_time) = data_end_time {
-            det = Some(DateTime::parse_from_rfc3339(&data_end_time).unwrap().with_timezone(&Utc))
+            det = Some(
+                DateTime::parse_from_rfc3339(&data_end_time)
+                    .unwrap()
+                    .with_timezone(&Utc),
+            )
         }
         Self {
             state: AlsConverterStateMachine::Initial,
@@ -504,10 +523,7 @@ impl ConversionContext {
         }
     }
 
-    fn process_packet(
-        &mut self,
-        packet_info: PacketInfo,
-    ) -> Result<bool> {
+    fn process_packet(&mut self, packet_info: PacketInfo) -> Result<bool> {
         let timestamp = packet_info.timestamp;
         if let Some(data_end_time) = &self.data_end_time {
             if timestamp > *data_end_time {
@@ -585,20 +601,20 @@ impl ConversionContext {
     }
 
     /// data packet 应该是 DataFrames(InstantiateObject|UpdateObject)
-    fn process_first_dataframes_state(
-        &mut self,
-        mut packet_info: PacketInfo,
-    ) -> Result<()> {
+    fn process_first_dataframes_state(&mut self, mut packet_info: PacketInfo) -> Result<()> {
         // control message 判断必须是Data
-        if !packet_info.data_pack.control
-                .as_ref()
-                .map_or(false, |c| matches!(c, data_pack::Control::Data(true))) {
+        if !packet_info
+            .data_pack
+            .control
+            .as_ref()
+            .map_or(false, |c| matches!(c, data_pack::Control::Data(true)))
+        {
             return Ok(());
         }
         // 第一个 dataframe 必须是 InstantiateObject
         if !packet_info.data_pack.frames.first().map_or(false, |f| {
-                matches!(f.message, Some(data_frame::Message::InstantiateObject(_)))
-            }) {
+            matches!(f.message, Some(data_frame::Message::InstantiateObject(_)))
+        }) {
             return Ok(());
         }
         if let Some(start_time) = &self.start_time {
@@ -624,7 +640,6 @@ impl ConversionContext {
                 ))
                 .add(PacketInfo::create_cache_end(timestamp));
         }
-
 
         for frame in &mut packet_info.data_pack.frames {
             if let Some(message) = &mut frame.message {
@@ -666,10 +681,7 @@ impl ConversionContext {
         Ok(())
     }
 
-    fn process_update_objects_state(
-        &mut self,
-        mut packet_info: PacketInfo,
-    ) -> Result<()> {
+    fn process_update_objects_state(&mut self, mut packet_info: PacketInfo) -> Result<()> {
         // control message 判断必须是Data
         if let Some(control) = &packet_info.data_pack.control {
             match control {
@@ -691,7 +703,7 @@ impl ConversionContext {
                 }
             }
         }
-        
+
         let timestamp = packet_info.timestamp;
         let mut use_custom_data_start_time = false;
         if !self.auto_timestamp {
@@ -728,8 +740,8 @@ impl ConversionContext {
                         }
                     }
                 }
-            }  
-        
+            }
+
             // 如果不是通过数据规律分段，则手动判断时间戳，添加新的回放段（对timestamp正常的包管用 ）
             if timestamp - self.initial_timestamp > DURATION {
                 self.initial_timestamp += DURATION;
@@ -756,25 +768,22 @@ impl ConversionContext {
                         .add(PacketInfo::create_cache_end(timestamp));
                 }
             }
-
         }
 
         // 过滤我们不需要的包, 也许这里有逻辑上的问题
         packet_info.data_pack.frames.retain(|frame| {
             if let Some(message) = &frame.message {
                 match message {
-                    data_frame::Message::UpdateObject(_) |
-                    data_frame::Message::InstantiateObject(_) |
-                    data_frame::Message::DestroyObject(_) => {
-                        true
-                    }
+                    data_frame::Message::UpdateObject(_)
+                    | data_frame::Message::InstantiateObject(_)
+                    | data_frame::Message::DestroyObject(_) => true,
                     _ => false,
                 }
             } else {
                 false
             }
         });
-        
+
         for frame in &mut packet_info.data_pack.frames {
             match &mut frame.message {
                 Some(data_frame::Message::UpdateObject(obj)) => {
@@ -790,7 +799,11 @@ impl ConversionContext {
                             false
                         }
                     }) {
-                        tracing::warn!("UpdateObject with id {:?} not found in initial_dataframes at timestamp: {}", obj_id, timestamp);
+                        tracing::warn!(
+                            "UpdateObject with id {:?} not found in initial_dataframes at timestamp: {}",
+                            obj_id,
+                            timestamp
+                        );
                     }
                     self.update_initial_dataframes(frame.clone());
                 }
@@ -799,7 +812,12 @@ impl ConversionContext {
                         room_id: self.data_room.id.clone(),
                     })); // 修改 InstantiateObject 的目标为 RoomAll
                     obj.owner_id = b"sys".to_vec(); // 设置 owner_id 为 "sys"
-                    tracing::trace!("New object instantiated in update state: {:?} with id {:?} at timestamp: {}", String::from_utf8_lossy(&obj.prefab_name), obj.object_id, timestamp);
+                    tracing::trace!(
+                        "New object instantiated in update state: {:?} with id {:?} at timestamp: {}",
+                        String::from_utf8_lossy(&obj.prefab_name),
+                        obj.object_id,
+                        timestamp
+                    );
                     let new_frame = frame.clone();
                     self.insert_initial_dataframes(new_frame);
                 }
@@ -807,23 +825,27 @@ impl ConversionContext {
                     obj.target = Some(destroy_object::Target::RoomAll(RoomAll {
                         room_id: self.data_room.id.clone(),
                     }));
-                    tracing::trace!("Object destroyed with id {:?} at timestamp: {}", obj.object_id, timestamp);
+                    tracing::trace!(
+                        "Object destroyed with id {:?} at timestamp: {}",
+                        obj.object_id,
+                        timestamp
+                    );
                     // remove it in initial_dataframes
                     self.initial_dataframes.retain(|f| {
                         if let Some(data_frame::Message::InstantiateObject(inst_obj)) = &f.message {
                             inst_obj.object_id != obj.object_id
-                        } else if let Some(data_frame::Message::UpdateObject(upd_obj)) = &f.message {
+                        } else if let Some(data_frame::Message::UpdateObject(upd_obj)) = &f.message
+                        {
                             upd_obj.object_id != obj.object_id
                         } else {
                             true
                         }
                     });
                 }
-                Some(_) |
-                None => unreachable!("Frame can't be None here.")
+                Some(_) | None => unreachable!("Frame can't be None here."),
             }
         }
-        
+
         if packet_info.data_pack.frames.is_empty() || use_custom_data_start_time {
             return Ok(());
         }
@@ -915,30 +937,41 @@ impl ConversionContext {
     // 1. 统计两个 DateTimeReceiver 之间的 MusicBroadcaster 包数量
     // 2. 根据音频包数量,将总时间 delta 均分给每个音频包
     // 3. 在每两个音频包之间,将其他包的时间也均分
-    fn handle_auto_timestamp(&mut self, start_index: usize, end_index: usize, last_timestamp: DateTime<Utc>, cur_timestamp: DateTime<Utc>, music_broadcasters: &HashSet<i32>) -> Result<()> {
+    fn handle_auto_timestamp(
+        &mut self,
+        start_index: usize,
+        end_index: usize,
+        last_timestamp: DateTime<Utc>,
+        cur_timestamp: DateTime<Utc>,
+        music_broadcasters: &HashSet<i32>,
+    ) -> Result<()> {
         let total_delta = cur_timestamp - last_timestamp;
         if total_delta <= TimeDelta::zero() {
-            return Err(anyhow::anyhow!("Non-positive time delta between confirmed timestamps: {} to {}, skipping adjustment.", last_timestamp, cur_timestamp));
+            return Err(anyhow::anyhow!(
+                "Non-positive time delta between confirmed timestamps: {} to {}, skipping adjustment.",
+                last_timestamp,
+                cur_timestamp
+            ));
         }
-        
+
         if start_index >= end_index {
             return Ok(());
         }
-        
+
         // 结构体记录每个包的信息
         struct PacketTimeInfo {
             index: usize,
             is_music: bool,
         }
-        
+
         let mut packet_infos: Vec<PacketTimeInfo> = Vec::new();
         let mut music_packet_count = 0;
-        
+
         // 第一步: 统计所有包的信息
         for i in start_index..=end_index {
             let packet_info = &self.packetinfo_buffer[i];
             let mut is_music_packet = false;
-            
+
             // 检查这个包是否包含 MusicBroadcaster 的 UpdateObject
             for frame in &packet_info.data_pack.frames {
                 if let Some(data_frame::Message::UpdateObject(obj)) = &frame.message {
@@ -949,17 +982,21 @@ impl ConversionContext {
                     }
                 }
             }
-            
+
             packet_infos.push(PacketTimeInfo {
                 index: i,
                 is_music: is_music_packet,
             });
         }
-        
+
         // 如果没有找到音频包，使用均匀分布所有包
         if music_packet_count == 0 {
             tracing::info!("HashSet of MusicBroadcaster IDs: {:?}", music_broadcasters);
-            tracing::warn!("No MusicBroadcaster found between confirmed timestamps: {} to {}, using uniform distribution.", last_timestamp, cur_timestamp);
+            tracing::warn!(
+                "No MusicBroadcaster found between confirmed timestamps: {} to {}, using uniform distribution.",
+                last_timestamp,
+                cur_timestamp
+            );
 
             let total_packets = packet_infos.len();
             if total_packets == 1 {
@@ -979,8 +1016,13 @@ impl ConversionContext {
             return Ok(());
         }
 
-        tracing::debug!("Found {} music packets between index {} and {}, total delta: {:?}",
-            music_packet_count, start_index, end_index, total_delta);
+        tracing::debug!(
+            "Found {} music packets between index {} and {}, total delta: {:?}",
+            music_packet_count,
+            start_index,
+            end_index,
+            total_delta
+        );
 
         // 第二步: 将总时间按音频包数量均分
         let time_per_music_segment = total_delta / music_packet_count;
@@ -998,17 +1040,30 @@ impl ConversionContext {
                 if packets_before_this_music > 0 {
                     // 有其他包需要插值（包括第一个音频包之前的包）
                     let time_step = time_per_music_segment / (packets_before_this_music as i32 + 1);
-                    for (step, info) in packet_infos[music_segment_start_packet_idx..local_idx].iter().enumerate() {
+                    for (step, info) in packet_infos[music_segment_start_packet_idx..local_idx]
+                        .iter()
+                        .enumerate()
+                    {
                         let new_timestamp = current_time + time_step * ((step + 1) as i32);
                         self.packetinfo_buffer[info.index].timestamp = new_timestamp;
-                        tracing::trace!("Packet {} (before music {}): {}", info.index, music_segment_index, new_timestamp);
+                        tracing::trace!(
+                            "Packet {} (before music {}): {}",
+                            info.index,
+                            music_segment_index,
+                            new_timestamp
+                        );
                     }
                 }
 
                 // 更新当前音频段的时间
                 current_time = current_time + time_per_music_segment;
                 self.packetinfo_buffer[packet_info.index].timestamp = current_time;
-                tracing::debug!("Music packet {} at index {}: {}", music_segment_index, packet_info.index, current_time);
+                tracing::debug!(
+                    "Music packet {} at index {}: {}",
+                    music_segment_index,
+                    packet_info.index,
+                    current_time
+                );
 
                 music_segment_index += 1;
                 music_segment_start_packet_idx = local_idx + 1; // 下一个区间从这个音频包的下一个包开始
@@ -1021,10 +1076,17 @@ impl ConversionContext {
             if remaining_packets > 0 {
                 let remaining_time = cur_timestamp - current_time;
                 let time_step = remaining_time / (remaining_packets as i32 + 1);
-                for (step, info) in packet_infos[music_segment_start_packet_idx..].iter().enumerate() {
+                for (step, info) in packet_infos[music_segment_start_packet_idx..]
+                    .iter()
+                    .enumerate()
+                {
                     let new_timestamp = current_time + time_step * ((step + 1) as i32);
                     self.packetinfo_buffer[info.index].timestamp = new_timestamp;
-                    tracing::trace!("Packet {} (after last music): {}", info.index, new_timestamp);
+                    tracing::trace!(
+                        "Packet {} (after last music): {}",
+                        info.index,
+                        new_timestamp
+                    );
                 }
             }
         }
@@ -1032,22 +1094,24 @@ impl ConversionContext {
         // 确保最后一个包的时间戳正确
         self.packetinfo_buffer[end_index].timestamp = cur_timestamp;
         tracing::debug!("End packet {}: {}", end_index, cur_timestamp);
-        
+
         Ok(())
     }
-    /// 
-    /// 
+    ///
+    ///
     fn handle_packetinfo_buffer(&mut self) -> Result<()> {
         if self.packetinfo_buffer.is_empty() {
             return Ok(());
         }
-        tracing::warn!("This is experimental auto timestamp feature, please report issues if any bugs found.");
+        tracing::warn!(
+            "This is experimental auto timestamp feature, please report issues if any bugs found."
+        );
         self.initial_dataframes.clear(); // clear initial dataframes first
         let mut last_confirmed_timestamp: Option<DateTime<Utc>> = None;
         let mut last_confirmed_packet_index: usize = 0;
         let mut music_broadcasters: HashSet<i32> = HashSet::new();
         let mut datetime_receiver_id = 0;
-        
+
         // 收集需要处理的时间段信息
         struct TimestampRange {
             start_index: usize,
@@ -1056,7 +1120,7 @@ impl ConversionContext {
             end_time: DateTime<Utc>,
         }
         let mut ranges_to_process: Vec<TimestampRange> = Vec::new();
-        
+
         for (index, packet_info) in self.packetinfo_buffer.iter().enumerate() {
             for frame in &packet_info.data_pack.frames {
                 match &frame.message {
@@ -1075,11 +1139,15 @@ impl ConversionContext {
                             if last_confirmed_timestamp.is_none() {
                                 last_confirmed_timestamp = Some(date_convert.date_time);
                                 last_confirmed_packet_index = index;
-                                tracing::debug!("First confirmed timestamp: {} at packet index: {}", date_convert.date_time, index);
+                                tracing::debug!(
+                                    "First confirmed timestamp: {} at packet index: {}",
+                                    date_convert.date_time,
+                                    index
+                                );
                                 break; // next loop
                             }
                             let confirmed_timestamp = last_confirmed_timestamp.unwrap();
-                            
+
                             // 收集需要处理的范围
                             ranges_to_process.push(TimestampRange {
                                 start_index: last_confirmed_packet_index,
@@ -1087,7 +1155,7 @@ impl ConversionContext {
                                 start_time: confirmed_timestamp,
                                 end_time: date_convert.date_time,
                             });
-                            
+
                             // 更新为当前确认的时间戳
                             last_confirmed_timestamp = Some(date_convert.date_time);
                             last_confirmed_packet_index = index;
@@ -1108,16 +1176,16 @@ impl ConversionContext {
                 }
             }
         }
-        
+
         // 现在统一处理所有范围
         let last_range_info = ranges_to_process.last().map(|r| (r.end_index, r.end_time));
         for range in ranges_to_process {
             self.handle_auto_timestamp(
-                range.start_index, 
-                range.end_index, 
-                range.start_time, 
-                range.end_time, 
-                &music_broadcasters
+                range.start_index,
+                range.end_index,
+                range.start_time,
+                range.end_time,
+                &music_broadcasters,
             )?;
         }
 
@@ -1126,20 +1194,21 @@ impl ConversionContext {
         if let Some((last_end_index, last_end_time)) = last_range_info {
             let remaining_start = last_end_index + 1;
             let remaining_end = self.packetinfo_buffer.len() - 1;
-            
+
             if remaining_start <= remaining_end {
                 const FIXED_INTERVAL_MS: i64 = 20; // 每个包 20 毫秒
-                
+
                 tracing::debug!(
                     "Processing remaining {} packets with fixed 20ms interval from index {} to {}",
                     remaining_end - remaining_start + 1,
                     remaining_start,
                     remaining_end
                 );
-                
+
                 for i in remaining_start..=remaining_end {
                     let offset = (i - remaining_start + 1) as i64;
-                    let new_timestamp = last_end_time + TimeDelta::milliseconds(FIXED_INTERVAL_MS * offset);
+                    let new_timestamp =
+                        last_end_time + TimeDelta::milliseconds(FIXED_INTERVAL_MS * offset);
                     self.packetinfo_buffer[i].timestamp = new_timestamp;
                     tracing::trace!("Fixed interval packet {}: {}", i, new_timestamp);
                 }
@@ -1175,12 +1244,12 @@ impl ConversionContext {
                         self.data_room.clone(),
                     ))
                     .add(PacketInfo {
-                            timestamp,
-                            data_pack: DataPack {
-                                control: Some(data_pack::Control::Data(true)),
-                                frames: self.initial_dataframes.clone(),
-                            },
-                            raw_data: Vec::new(),
+                        timestamp,
+                        data_pack: DataPack {
+                            control: Some(data_pack::Control::Data(true)),
+                            frames: self.initial_dataframes.clone(),
+                        },
+                        raw_data: Vec::new(),
                     })
                     .add(PacketInfo::create_cache_end(timestamp));
             }
@@ -1191,13 +1260,17 @@ impl ConversionContext {
                         self.insert_initial_dataframes(frame.clone()); // clone it will not change the original frame
                     }
                     Some(data_frame::Message::UpdateObject(_)) => {
-                       self.update_initial_dataframes(frame.clone()); // clone it will not change the original frame
+                        self.update_initial_dataframes(frame.clone()); // clone it will not change the original frame
                     }
                     Some(data_frame::Message::DestroyObject(obj)) => {
                         self.initial_dataframes.retain(|f| {
-                            if let Some(data_frame::Message::InstantiateObject(inst_obj)) = &f.message {
+                            if let Some(data_frame::Message::InstantiateObject(inst_obj)) =
+                                &f.message
+                            {
                                 inst_obj.object_id != obj.object_id
-                            } else if let Some(data_frame::Message::UpdateObject(upd_obj)) = &f.message {
+                            } else if let Some(data_frame::Message::UpdateObject(upd_obj)) =
+                                &f.message
+                            {
                                 upd_obj.object_id != obj.object_id
                             } else {
                                 true
@@ -1214,4 +1287,3 @@ impl ConversionContext {
         Ok(())
     }
 }
-
