@@ -28,6 +28,7 @@ impl fmt::Debug for ResponseDebug {
 }
 
 impl ResponseDebug {
+    #[allow(unused)]
     /// Create a ResponseDebug from a reqwest::Response (consumes the response)
     pub async fn from_response(res: reqwest::Response) -> Result<Self> {
         let url = res.url().to_string();

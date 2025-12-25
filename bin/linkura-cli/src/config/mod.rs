@@ -8,7 +8,7 @@ use std::{
 };
 
 use linkura_api::{self, ApiClient, Credential};
-use rust_i18n::t;
+use linkura_i18n::t;
 
 /** ARG PARSER **/
 #[derive(Parser, Debug)]
@@ -186,15 +186,16 @@ impl Global {
             match config_res.unwrap() {
                 Some(mut config) => {
                     if !args.skip {
-                        let sp = spinner_manager.create_spinner("Checking for linkura version...");
+                        let sp = spinner_manager.create_spinner(&t!("linkura.config.checking.version"));
                         // check if latest res_version and client_version
                         let (res_version, client_version) =
                             api_client.high_level().get_app_version().unwrap();
                         if let Some(res_version) = res_version {
                             if res_version != config.credential.res_version {
-                                sp.set_message(format!(
-                                    "New res version found, update from {} to {}",
-                                    config.credential.res_version, res_version
+                                sp.set_message(t!(
+                                    "linkura.config.new.res.version",
+                                    old = config.credential.res_version.clone(),
+                                    new = res_version.clone()
                                 ));
 
                                 config.credential.res_version = res_version;
@@ -203,15 +204,16 @@ impl Global {
 
                         if let Some(client_version) = client_version {
                             if client_version != config.credential.client_version {
-                                sp.set_message(format!(
-                                    "New client version found, update from {} to {}",
-                                    config.credential.client_version, client_version
+                                sp.set_message(t!(
+                                    "linkura.config.new.client.version",
+                                    old = config.credential.client_version.clone(),
+                                    new = client_version.clone()
                                 ));
                                 config.credential.client_version = client_version;
                             }
                         }
 
-                        sp.finish_with_message("Version check complete!");
+                        sp.finish_with_message(t!("linkura.config.version.check.complete"));
                     }
 
                     config
@@ -266,7 +268,7 @@ pub fn init(args: Args) -> Result<Global> {
 
     let sp = global
         .spinner_manager
-        .create_spinner_with_color("登陆中...", "blue");
+        .create_spinner_with_color(&t!("linkura.config.logging.in"), "blue");
     let session_token = if global.config.credential.session_token.is_none() {
         let session_token = global.api_client.high_level().device_id_login(
             &global.config.credential.player_id,
@@ -279,11 +281,11 @@ pub fn init(args: Args) -> Result<Global> {
     };
     global.api_client.set_session_token(&session_token);
     // 测试登录态
-    sp.set_message("测试是否登录成功...");
+    sp.set_message(t!("linkura.config.testing.login"));
     match global.api_client.high_level().get_plan_list() {
         Ok(_) => {}
         Err(_) => {
-            sp.set_message("测试获取信息失败，尝试重新登录");
+            sp.set_message(t!("linkura.config.test.failed.retry"));
             global.api_client.del_session_token();
             // delete session token
             let session_token = global
@@ -294,10 +296,7 @@ pub fn init(args: Args) -> Result<Global> {
                     &global.config.credential.device_specific_id,
                 )
                 .map_err(|e| {
-                    anyhow::anyhow!(
-                        "初始化登录失败: {:?}，请尝试删除配置文件重新配置，或者使用命令行参数...",
-                        e
-                    )
+                    anyhow::anyhow!(t!("linkura.config.login.failed", error = e.to_string()))
                 })?;
             global.config.credential.session_token = Some(session_token.clone());
             global.api_client.set_session_token(&session_token);
@@ -308,10 +307,10 @@ pub fn init(args: Args) -> Result<Global> {
         .config_manager
         .save_config(&global.config)
         .context("Failed to save config")?;
-    sp.finish_with_message(format!(
-        "登陆成功！信息已保存至{}，session token: {}",
-        global.config_manager.get_config_path().display(),
-        session_token
+    sp.finish_with_message(t!(
+        "linkura.config.login.success",
+        path = global.config_manager.get_config_path().display().to_string(),
+        token = session_token
     ));
     Ok(global)
 }

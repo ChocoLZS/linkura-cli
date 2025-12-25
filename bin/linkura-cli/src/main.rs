@@ -4,16 +4,16 @@ use config::init;
 
 use linkura_api::ApiClient;
 use linkura_common::log;
-
-rust_i18n::i18n!("../../locales", fallback = "en");
+use linkura_i18n::t;
 
 mod cli;
 mod command;
 mod config;
 
-use rust_i18n::t;
-
 use crate::config::Commands;
+
+linkura_i18n::init!();
+
 fn main() {
     let args = config::Args::parse();
     // Commands that will not need to initialize

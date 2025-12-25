@@ -10,6 +10,59 @@ linkura:
       zh: "请输入你的账号id（app登陆界面左上角）"
       ja: "アカウントIDを入力してください（アプリのログイン画面の左上）"
       en: "Please enter your account ID (top left of the app login screen)"
+    prompt.password:
+      zh: "请输入你的账户密码"
+      ja: "アカウントのパスワードを入力してください"
+      en: "Please enter your account password"
+    fetching.login.info:
+      zh: "正在获取登录信息..."
+      ja: "ログイン情報を取得中..."
+      en: "Fetching login information..."
+    fetch.app.version.success:
+      zh: "获取app版本信息成功！"
+      ja: "アプリバージョン情報の取得に成功しました！"
+      en: "Successfully fetched app version info!"
+    fetch.login.info.success:
+      zh: "获取登录信息成功！"
+      ja: "ログイン情報の取得に成功しました！"
+      en: "Successfully fetched login information!"
+  config:
+    logging.in:
+      zh: "登陆中..."
+      ja: "ログイン中..."
+      en: "Logging in..."
+    testing.login:
+      zh: "测试是否登录成功..."
+      ja: "ログイン成功をテスト中..."
+      en: "Testing login status..."
+    test.failed.retry:
+      zh: "测试获取信息失败，尝试重新登录"
+      ja: "情報取得テストに失敗しました。再ログインを試みます"
+      en: "Failed to fetch info, retrying login"
+    login.failed:
+      zh: "初始化登录失败: %{error}，请尝试删除配置文件重新配置，或者使用命令行参数..."
+      ja: "ログインの初期化に失敗しました: %{error}。設定ファイルを削除して再設定するか、コマンドライン引数を使用してください..."
+      en: "Login initialization failed: %{error}. Please try deleting the config file and reconfigure, or use command line arguments..."
+    login.success:
+      zh: "登陆成功！信息已保存至%{path}，session token: %{token}"
+      ja: "ログイン成功！情報は%{path}に保存されました。session token: %{token}"
+      en: "Login successful! Info saved to %{path}, session token: %{token}"
+    checking.version:
+      zh: "正在检查林库拉版本..."
+      ja: "リンクラのバージョンを確認中..."
+      en: "Checking for linkura version..."
+    new.res.version:
+      zh: "发现新资源版本，从 %{old} 更新到 %{new}"
+      ja: "新しいリソースバージョンが見つかりました。%{old} から %{new} に更新"
+      en: "New res version found, update from %{old} to %{new}"
+    new.client.version:
+      zh: "发现新客户端版本，从 %{old} 更新到 %{new}"
+      ja: "新しいクライアントバージョンが見つかりました。%{old} から %{new} に更新"
+      en: "New client version found, update from %{old} to %{new}"
+    version.check.complete:
+      zh: "版本检查完成！"
+      ja: "バージョンチェック完了！"
+      en: "Version check complete!"
 
 common:
   config.initialize.failed:

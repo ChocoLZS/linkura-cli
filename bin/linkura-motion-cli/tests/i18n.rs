@@ -1,6 +1,6 @@
-use i18n::t;
+use linkura_i18n::t;
 
-i18n::init!();
+linkura_i18n::init!();
 
 #[test]
 fn test_locale_switching() {

@@ -28,9 +28,9 @@ impl Backend for I18nBackend {
 
     fn translate(&self, locale: &str, key: &str) -> Option<&str> {
         let system_locale = SYSTEM_LOCALE.get_or_init(|| detect_system_locale());
-        let val = _RUST_I18N_BACKEND.translate(locale, key);
+        let val = _RUST_I18N_BACKEND.translate(system_locale, key);
         if val.is_none() {
-            _RUST_I18N_BACKEND.translate(system_locale, key)
+            _RUST_I18N_BACKEND.translate(locale, key)
         } else {
             val
         }
@@ -40,9 +40,10 @@ impl Backend for I18nBackend {
 #[macro_export]
 macro_rules! init {
     () => {
-        rust_i18n::i18n!(backend = i18n::I18nBackend);
+        linkura_i18n::rust_i18n::i18n!(backend = linkura_i18n::I18nBackend);
     };
 }
 
 pub use rust_i18n::set_locale;
 pub use rust_i18n::t;
+pub use rust_i18n;

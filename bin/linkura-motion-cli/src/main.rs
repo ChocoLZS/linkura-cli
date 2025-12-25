@@ -1,13 +1,10 @@
-// use i18n::t;
-
-// i18n::init!()
 use anyhow::{Error, Result};
 use clap::{Args as ClapArgs, Parser, Subcommand};
-use i18n::t;
+use linkura_i18n::t;
 use std::{ops::Deref, path::Path, usize};
 use tracing::{info, warn};
 
-i18n::init!();
+linkura_i18n::init!();
 
 use linkura_common::log;
 use linkura_downloader::{AlsDownloader, BaseDownloader, MrsDownloader, R2Uploader};

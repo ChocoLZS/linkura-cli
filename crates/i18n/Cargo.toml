@@ -1,5 +1,5 @@
 [package]
-name = "i18n"
+name = "linkura-i18n"
 version = "0.0.0"
 
 edition.workspace = true
