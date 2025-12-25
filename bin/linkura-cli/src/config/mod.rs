@@ -186,7 +186,8 @@ impl Global {
             match config_res.unwrap() {
                 Some(mut config) => {
                     if !args.skip {
-                        let sp = spinner_manager.create_spinner(&t!("linkura.config.checking.version"));
+                        let sp =
+                            spinner_manager.create_spinner(&t!("linkura.config.checking.version"));
                         // check if latest res_version and client_version
                         let (res_version, client_version) =
                             api_client.high_level().get_app_version().unwrap();
@@ -309,7 +310,11 @@ pub fn init(args: Args) -> Result<Global> {
         .context("Failed to save config")?;
     sp.finish_with_message(t!(
         "linkura.config.login.success",
-        path = global.config_manager.get_config_path().display().to_string(),
+        path = global
+            .config_manager
+            .get_config_path()
+            .display()
+            .to_string(),
         token = session_token
     ));
     Ok(global)

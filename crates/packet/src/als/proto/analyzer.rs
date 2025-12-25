@@ -4,7 +4,7 @@
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 
-use super::define::{DataFrame, data_pack, data_frame};
+use super::define::{DataFrame, data_frame, data_pack};
 use crate::als::proto::PacketInfo;
 
 /// Main analyzer for packet statistics
@@ -246,26 +246,47 @@ fn parse_protobuf_fields(data: &[u8]) -> Vec<ProtobufField> {
 
 fn parse_field(cursor: &mut std::io::Cursor<&[u8]>) -> anyhow::Result<ProtobufField> {
     use prost::bytes::Buf;
-    
+
     let tag = read_varint(cursor)?;
     let field_number = (tag >> 3) as u32;
     let wire_type = (tag & 0x7) as u8;
 
     // Skip field data based on wire type
     match wire_type {
-        0 => { read_varint(cursor)?; }
-        1 => { if cursor.remaining() < 8 { return Err(anyhow::anyhow!("Not enough bytes")); } cursor.advance(8); }
-        2 => { let len = read_varint(cursor)?; if cursor.remaining() < len as usize { return Err(anyhow::anyhow!("Not enough bytes")); } cursor.advance(len as usize); }
-        5 => { if cursor.remaining() < 4 { return Err(anyhow::anyhow!("Not enough bytes")); } cursor.advance(4); }
+        0 => {
+            read_varint(cursor)?;
+        }
+        1 => {
+            if cursor.remaining() < 8 {
+                return Err(anyhow::anyhow!("Not enough bytes"));
+            }
+            cursor.advance(8);
+        }
+        2 => {
+            let len = read_varint(cursor)?;
+            if cursor.remaining() < len as usize {
+                return Err(anyhow::anyhow!("Not enough bytes"));
+            }
+            cursor.advance(len as usize);
+        }
+        5 => {
+            if cursor.remaining() < 4 {
+                return Err(anyhow::anyhow!("Not enough bytes"));
+            }
+            cursor.advance(4);
+        }
         _ => return Err(anyhow::anyhow!("Unsupported wire type: {}", wire_type)),
     }
 
-    Ok(ProtobufField { field_number, wire_type })
+    Ok(ProtobufField {
+        field_number,
+        wire_type,
+    })
 }
 
 fn read_varint(cursor: &mut std::io::Cursor<&[u8]>) -> anyhow::Result<u64> {
     use prost::bytes::Buf;
-    
+
     let mut result = 0u64;
     let mut shift = 0;
 

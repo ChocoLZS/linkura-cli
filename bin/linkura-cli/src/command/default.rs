@@ -16,7 +16,7 @@ pub fn run(ctx: &Global) {
         trailers.iter().for_each(|value| {
             print_trailer_info(value);
         });
-        
+
         let first_trailer = trailers.first();
         if let Some(trailer) = first_trailer {
             print_latest_trailer_info(ctx, trailer);

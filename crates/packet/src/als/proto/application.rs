@@ -5,9 +5,9 @@ use anyhow::{Context, Result};
 use std::fs::File;
 use std::path::Path;
 
-use super::reader::{PacketReaderTrait, PacketReader, MixedPacketReader, LegacyPacketReader};
 use super::analyzer::{PacketAnalyzer, PacketFilter};
 use super::formatter::{OutputWriter, PacketFormatter, StatsFormatter};
+use super::reader::{LegacyPacketReader, MixedPacketReader, PacketReader, PacketReaderTrait};
 
 pub fn analyze(
     input_path: &str,
@@ -58,8 +58,8 @@ pub fn analyze_file(
     reader_factory: &dyn Fn(File) -> Box<dyn PacketReaderTrait>,
 ) -> Result<()> {
     let mut writer = OutputWriter::new(output_path)?;
-    let file = File::open(file_path)
-        .with_context(|| format!("Failed to open file: {}", file_path))?;
+    let file =
+        File::open(file_path).with_context(|| format!("Failed to open file: {}", file_path))?;
 
     writer.writeln(&format!("=== Analyzing: {} ===", file_path))?;
     writer.writeln(&format!("Max packets: {}", max_packets))?;
@@ -85,7 +85,10 @@ pub fn analyze_file(
 
         // Check if we should stop
         if filter.is_past_end(&packet.timestamp) {
-            writer.writeln(&format!("Reached end time filter at packet #{}", packet_count))?;
+            writer.writeln(&format!(
+                "Reached end time filter at packet #{}",
+                packet_count
+            ))?;
             break;
         }
 
@@ -94,7 +97,11 @@ pub fn analyze_file(
         processed_count += 1;
 
         // Format each packet
-        PacketFormatter::new(&mut objects_map).format_packet(&mut writer, processed_count, &packet)?;
+        PacketFormatter::new(&mut objects_map).format_packet(
+            &mut writer,
+            processed_count,
+            &packet,
+        )?;
 
         // Check limit
         if processed_count >= max_packets {
@@ -172,7 +179,7 @@ fn analyze_single_file(
     file_path: &Path,
     max_packets: usize,
     filter: &PacketFilter,
-    reader_factory: &dyn Fn(File) -> Box<dyn PacketReaderTrait>
+    reader_factory: &dyn Fn(File) -> Box<dyn PacketReaderTrait>,
 ) -> Result<PacketAnalyzer> {
     let file = File::open(file_path)
         .with_context(|| format!("Failed to open file: {}", file_path.display()))?;
@@ -182,7 +189,6 @@ fn analyze_single_file(
 
     let mut count = 0;
     for packet in reader.read_packets()? {
-
         if !filter.should_include(&packet.timestamp) {
             continue;
         }

@@ -6,10 +6,7 @@ use std::{
     path::Path,
 };
 
-use super::proto::{
-    PacketInfo,
-    define::data_frame,
-};
+use super::proto::{PacketInfo, define::data_frame};
 
 pub struct AudioRawPacket {
     pub timestamp: DateTime<Utc>,
@@ -42,14 +39,19 @@ impl AudioBuilder {
         let data_pack = &packet.data_pack;
         // 如果InstantiateObject 和 UpdateObject 同时出现，忽略当前包
         if data_pack.frames.iter().any(|f| f.message.is_some()) {
-            let has_instantiate = data_pack.frames.iter().any(|f| {
-                matches!(f.message, Some(data_frame::Message::InstantiateObject(_)))
-            });
-            let has_update = data_pack.frames.iter().any(|f| {
-                matches!(f.message, Some(data_frame::Message::UpdateObject(_)))
-            });
+            let has_instantiate = data_pack
+                .frames
+                .iter()
+                .any(|f| matches!(f.message, Some(data_frame::Message::InstantiateObject(_))));
+            let has_update = data_pack
+                .frames
+                .iter()
+                .any(|f| matches!(f.message, Some(data_frame::Message::UpdateObject(_))));
             if has_instantiate && has_update {
-                tracing::trace!("Packet contains both InstantiateObject and UpdateObject messages, skipping packet at timestamp: {}", packet.timestamp);
+                tracing::trace!(
+                    "Packet contains both InstantiateObject and UpdateObject messages, skipping packet at timestamp: {}",
+                    packet.timestamp
+                );
                 if has_instantiate {
                     for frame in &data_pack.frames {
                         if let Some(message) = &frame.message {
@@ -71,7 +73,11 @@ impl AudioBuilder {
             if name.contains("Voice") {
                 let object_id = obj.object_id;
                 self.add_source(object_id);
-                tracing::trace!("Found audio source with object id: {} and prefab name: {}", object_id, name);
+                tracing::trace!(
+                    "Found audio source with object id: {} and prefab name: {}",
+                    object_id,
+                    name
+                );
             }
         } else {
             return;
@@ -109,7 +115,11 @@ impl AudioBuilder {
         // handle things here
         for (object_id, packets) in &self.audio_packets {
             let mut dec = opus::Decoder::new(48000, opus::Channels::Stereo)?;
-            tracing::debug!("Writing audio for object id: {} with {} packets", object_id, packets.len());
+            tracing::debug!(
+                "Writing audio for object id: {} with {} packets",
+                object_id,
+                packets.len()
+            );
             let spec = WavSpec {
                 channels: opus::Channels::Stereo as u16,
                 sample_rate: 48000,
@@ -118,14 +128,14 @@ impl AudioBuilder {
             };
             let file_path = output_dir.as_ref().join(format!("audio_{}.wav", object_id));
             let mut writer = hound::WavWriter::create(&file_path, spec)?;
-            
+
             for packet in packets {
                 if packet.payload.is_empty() {
                     continue;
                 }
 
                 let mut decode_buffer = vec![0i16; 5760]; // Magic number: max frame size
-                    
+
                 match dec.decode(&packet.payload, &mut decode_buffer[..960 * 2], false) {
                     Ok(samples) => {
                         for &sample in &decode_buffer[..samples * 2] {

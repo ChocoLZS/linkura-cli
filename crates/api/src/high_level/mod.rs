@@ -1,6 +1,9 @@
 use std::fmt;
 
-use crate::{get_appstore_version, get_google_play_version, macros::{define_api_struct, use_common_crate}};
+use crate::{
+    get_appstore_version, get_google_play_version,
+    macros::{define_api_struct, use_common_crate},
+};
 use reqwest::header;
 use serde_json::json;
 
@@ -35,7 +38,7 @@ impl ResponseDebug {
         let status = res.status();
         let headers = res.headers().clone();
         let body = res.text().await?;
-        
+
         Ok(Self {
             url,
             status,
@@ -43,14 +46,14 @@ impl ResponseDebug {
             body,
         })
     }
-    
+
     /// Create a ResponseDebug from a blocking reqwest::Response (consumes the response)
     pub fn from_blocking_response(res: reqwest::blocking::Response) -> Result<Self> {
         let url = res.url().to_string();
         let status = res.status();
         let headers = res.headers().clone();
         let body = res.text()?;
-        
+
         Ok(Self {
             url,
             status,
@@ -111,7 +114,10 @@ impl<'a> HighLevelApi<'a> {
 
         let headers = res.headers().clone();
         if res.status() != reqwest::StatusCode::OK {
-            tracing::error!("Linkura api request failed: {:?}", ResponseDebug::from_blocking_response(res)?);
+            tracing::error!(
+                "Linkura api request failed: {:?}",
+                ResponseDebug::from_blocking_response(res)?
+            );
         }
         let res_version = headers.get("x-res-version").map(|v| {
             let version = v.to_str().unwrap_or_default();
@@ -236,7 +242,11 @@ impl<'a> HighLevelApi<'a> {
         if res.status() != reqwest::StatusCode::OK {
             let status = res.status();
             let error_text = res.text().unwrap_or_default();
-            return Err(anyhow::anyhow!("Get fes live info failed with status {}: {:?}", status, error_text));
+            return Err(anyhow::anyhow!(
+                "Get fes live info failed with status {}: {:?}",
+                status,
+                error_text
+            ));
         }
         let fes_info: serde_json::Value = res.json()?;
         Ok(json!({

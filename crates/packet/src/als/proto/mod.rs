@@ -1,6 +1,6 @@
-pub mod extension;
 pub mod analyzer;
 pub mod application;
+pub mod extension;
 pub mod formatter;
 pub mod reader;
 
