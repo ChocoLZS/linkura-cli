@@ -21,6 +21,7 @@ tracing-subscriber.workspace = true
 tokio.workspace = true
 async-trait.workspace = true
 url.workspace = true
+rust-i18n.workspace = true
 
 [features]
 default = []

@@ -40,10 +40,9 @@ impl Backend for I18nBackend {
 #[macro_export]
 macro_rules! init {
     () => {
-        linkura_i18n::rust_i18n::i18n!(backend = linkura_i18n::I18nBackend);
+        rust_i18n::i18n!(backend = linkura_i18n::I18nBackend);
     };
 }
 
-pub use rust_i18n;
 pub use rust_i18n::set_locale;
 pub use rust_i18n::t;
