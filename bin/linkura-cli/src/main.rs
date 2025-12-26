@@ -7,7 +7,7 @@ use linkura_common::log;
 use linkura_i18n::t;
 
 mod cli;
-mod command;
+mod commands;
 mod config;
 
 use crate::config::Commands;
@@ -39,13 +39,13 @@ fn main() {
 
     match &global.args.command {
         Some(Commands::API(args)) => {
-            let _ = command::api::run(&global, &args).map_err(|e| {
+            let _ = commands::api::run(&global, &args).map_err(|e| {
                 tracing::error!("Error running API command: {}", e);
                 std::process::exit(1);
             });
         }
         None => {
-            command::default::run(&global);
+            commands::default::run(&global);
         }
         _ => {
             unimplemented!("Unknown command");

@@ -1,4 +1,4 @@
-use crate::{cli::spinner::SpinnerManager, command::api::ArgsAPI};
+use crate::{cli::spinner::SpinnerManager, commands::api::ArgsAPI};
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
