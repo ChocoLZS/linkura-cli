@@ -7,7 +7,7 @@ use super::proto::{
     reader::PacketReaderTrait,
 };
 use crate::als::proto::{
-    extension::UpdateObjectExt,
+    extension::{DateTimeConvert, UpdateObjectExt},
     reader::{LegacyPacketReader, MixedPacketReader, PacketsBufferReader, StandardPacketReader},
 };
 use anyhow::{Context, Ok, Result, anyhow};
@@ -1135,7 +1135,7 @@ impl ConversionContext {
                     }
                     Some(data_frame::Message::UpdateObject(obj)) => {
                         if obj.object_id == datetime_receiver_id {
-                            let date_convert = obj.try_parse_date_time()?;
+                            let date_convert = obj.try_parse_as::<DateTimeConvert>()?;
                             if last_confirmed_timestamp.is_none() {
                                 last_confirmed_timestamp = Some(date_convert.date_time);
                                 last_confirmed_packet_index = index;

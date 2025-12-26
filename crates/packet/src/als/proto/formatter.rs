@@ -12,7 +12,7 @@ use super::analyzer::PacketStats;
 use super::define::{DataPack, data_frame, data_pack, instantiate_object, update_object};
 use crate::als::proto::PacketInfo;
 use crate::als::proto::define::UpdateObject;
-use crate::als::proto::extension::UpdateObjectExt;
+use crate::als::proto::extension::{DateTimeConvert, TimelineCommandPacket, UpdateObjectExt};
 
 impl Display for instantiate_object::Target {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -415,7 +415,15 @@ impl Display for UpdateObjectPayloadAnalyzer<'_> {
             write!(
                 f,
                 "{}",
-                self.object.try_parse_date_time().unwrap_or_default()
+                self.object.try_parse_as::<DateTimeConvert>().unwrap_or_default()
+            )
+        } else if self.prefab_name.ends_with("TimelineReceiver") {
+            write!(
+                f,
+                "{}",
+                self.object
+                    .try_parse_as::<TimelineCommandPacket>()
+                    .unwrap_or_default()
             )
         }
         // do not parse
