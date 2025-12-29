@@ -17,10 +17,7 @@ pub fn run(ctx: &Global) {
             print_trailer_info(value);
         });
 
-        let first_trailer = trailers.first();
-        if let Some(trailer) = first_trailer {
-            print_latest_trailer_info(ctx, trailer);
-        }
+        print_enterable_trailer_info(ctx, trailers);
     }
 
     let archive_res: serde_json::Value = api_client.high_level().get_archive_list(Some(4)).unwrap();
@@ -60,27 +57,7 @@ fn print_latest_trailer_info(ctx: &Global, wm: &serde_json::Value) {
     let live_type = wm.get("live_type").unwrap().as_u64().unwrap();
 
     let name: &str = wm.get("name").unwrap().as_str().unwrap();
-    let description: &str = wm.get("description").unwrap().as_str().unwrap();
-    let start_time: &str = wm.get("live_start_time").unwrap().as_str().unwrap();
     let open_time: &str = wm.get("open_time").unwrap().as_str().unwrap();
-    tracing::info!(
-        "latest {} info: \n{}\n\n{}\nstart_time: {}\nopen_time: {}",
-        if live_type == 2 {
-            "with meets"
-        } else {
-            "fes live"
-        },
-        name,
-        description,
-        chrono::DateTime::parse_from_rfc3339(start_time)
-            .unwrap()
-            .with_timezone(&Local)
-            .format("%Y-%m-%d %H:%M:%S %:z"),
-        chrono::DateTime::parse_from_rfc3339(open_time)
-            .unwrap()
-            .with_timezone(&Local)
-            .format("%Y-%m-%d %H:%M:%S %:z")
-    );
     let now = Utc::now();
     if now < chrono::DateTime::parse_from_rfc3339(open_time).unwrap() {
         tracing::warn!(
@@ -115,7 +92,7 @@ fn print_latest_trailer_info(ctx: &Global, wm: &serde_json::Value) {
             }
             Err(_) => {
                 tracing::warn!(
-                    "Can't get latest with meets info for now! {:?} {}",
+                    "Can't get with meets info for now! {:?} {}",
                     name,
                     id
                 );
@@ -143,10 +120,29 @@ fn print_latest_trailer_info(ctx: &Global, wm: &serde_json::Value) {
                 );
             }
             Err(_) => {
-                tracing::warn!("Can't get latest fes live info for now! {:?} {}", name, id);
+                tracing::warn!("Can't get fes live info for now! {:?} {}", name, id);
             }
         }
     }
+}
+
+fn print_enterable_trailer_info(ctx: &Global, trailers: &Vec<serde_json::Value>) {
+    let now = Utc::now();
+    let mut enterable_trailers: Vec<&serde_json::Value> = Vec::new();
+    for wm in trailers {
+        let open_time: &str = wm.get("open_time").unwrap().as_str().unwrap();
+        if now >= chrono::DateTime::parse_from_rfc3339(open_time).unwrap() {
+            enterable_trailers.push(wm);
+        }
+    }
+    if enterable_trailers.is_empty() {
+        tracing::info!("No enterable trailers found.");
+        return;
+    }
+    tracing::info!("Enterable trailers found: {}", enterable_trailers.len());
+    enterable_trailers.iter().for_each(|wm| {
+        print_latest_trailer_info(ctx, wm);
+    });
 }
 
 fn print_latest_archive_info(ctx: &Global, archive: &serde_json::Value) {

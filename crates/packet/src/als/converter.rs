@@ -59,7 +59,7 @@ impl AlsConverter {
         }
     }
 
-    fn get_file_entries(input_dir: &Path) -> Result<std::collections::VecDeque<DirEntry>> {
+    fn get_file_entries(input_dir: &Path, ext: Option<&str>) -> Result<std::collections::VecDeque<DirEntry>> {
         if !input_dir.is_dir() {
             return Err(anyhow!("Input path is not a directory"));
         }
@@ -70,7 +70,7 @@ impl AlsConverter {
                 entry
                     .path()
                     .extension()
-                    .map(|ext| ext == "bin")
+                    .map(|_ext| _ext == ext.unwrap_or("bin"))
                     .unwrap_or(false)
             })
             .collect::<Vec<_>>();
@@ -126,7 +126,7 @@ impl AlsConverter {
             self.use_audio_processing,
             auto_timestamp,
         );
-        let file_entries = Self::get_file_entries(input_dir)?;
+        let file_entries = Self::get_file_entries(input_dir, None)?;
         let mut packet_buffer = if convert_type == "als-legacy" {
             PacketsBufferReader::new(file_entries, |file| LegacyPacketReader::boxed(file))
         } else {
@@ -148,7 +148,7 @@ impl AlsConverter {
         let output_dir = output_dir.as_ref();
         // Process each audio file in the input directory
         let mut packet_buffer =
-            PacketsBufferReader::new(Self::get_file_entries(input_dir)?, |file| {
+            PacketsBufferReader::new(Self::get_file_entries(input_dir, Some("ts"))?, |file| {
                 StandardPacketReader::boxed(file)
             });
         let mut audio_builder = AudioBuilder::new(output_dir.to_str().map(String::from));
