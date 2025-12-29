@@ -230,14 +230,17 @@ pub struct ArgsAudio {
 
 #[derive(Debug, ClapArgs)]
 pub struct ArgsEdit {
-    #[clap(short('i'), long = "input", value_name = "INPUT_FILE", help = "Input file path")]
-    pub input_file: String,
+    #[clap(short('i'), long = "input", value_name = "INPUT_DIR", help = "Input directory path")]
+    pub input_dir: String,
 
-    #[clap(short('o'), long = "output", value_name = "OUTPUT_FILE", help = "Output file path")]
-    pub output_file: String,
+    #[clap(short('o'), long = "output", value_name = "OUTPUT_DIR", help = "Output directory path")]
+    pub output_dir: String,
 
     #[clap(long = "timeshift", value_name = "MS", help = "Time shift in milliseconds")]
     pub timeshift: Option<i64>,
+
+    #[clap(long = "timeline-ids", value_name = "IDS", help = "List of timeline IDs to modify", use_value_delimiter = true, value_delimiter = ',')]
+    pub timeline_ids: Vec<i64>,
 }
 
 #[derive(Subcommand, Debug)]

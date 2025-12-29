@@ -1,4 +1,5 @@
 use anyhow::{Error, Result};
+use linkura_packet::als::editor::Editor;
 use std::path::Path;
 use tracing::info;
 
@@ -6,30 +7,43 @@ use crate::args::ArgsEdit;
 
 pub fn run(args: ArgsEdit) -> Result<()> {
     info!("✏️ Starting Edit operation");
-    info!("📂 Input file: {}", args.input_file);
-    info!("📁 Output file: {}", args.output_file);
+    info!("📂 Input directory: {}", args.input_dir);
+    info!("📁 Output directory: {}", args.output_dir);
 
-    let input_path = Path::new(&args.input_file);
+    let input_path = Path::new(&args.input_dir);
     if !input_path.exists() {
         return Err(Error::msg(format!(
-            "Input file does not exist: {}",
-            args.input_file
+            "Input directory does not exist: {}",
+            args.input_dir
         )));
+    }
+    if !input_path.is_dir() {
+        return Err(Error::msg(format!(
+            "Input path must be a directory: {}",
+            args.input_dir
+        )));
+    }
+
+    if args.timeline_ids.is_empty() {
+        info!("⚠️ No timeline IDs provided. No specific timeline modifications will be performed.");
+    } else {
+        info!("🎯 Target Timeline IDs: {:?}", args.timeline_ids);
     }
 
     if let Some(ts) = args.timeshift {
         info!("⏱️ Applying timeshift: {} ms", ts);
-        // TODO: Implement actual timeshift logic using AlsConverter or similar
-        // For now, we just acknowledge the command.
-        info!("(Not implemented yet) Would shift timestamps by {} ms", ts);
     }
 
-    // Placeholder: In a real implementation, we would read packets, modify them, and write back.
-    // For now, just copy the file to simulate output generation if not implemented.
-    if !Path::new(&args.output_file).exists() {
-         std::fs::copy(input_path, &args.output_file)?;
-         info!("⚠️ Copied input to output (placeholder implementation).");
-    }
+    // Initialize Editor
+    let mut editor = Editor::new(
+        &args.input_dir,
+        &args.output_dir,
+        args.timeline_ids,
+        args.timeshift,
+    )?;
+
+    // Run processing
+    editor.process()?;
 
     info!("✅ Edit operation completed successfully!");
     Ok(())
