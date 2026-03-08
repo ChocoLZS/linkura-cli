@@ -10,9 +10,9 @@ use std::io::Write;
 
 use super::analyzer::PacketStats;
 use super::define::{DataPack, data_frame, data_pack, instantiate_object, update_object};
-use crate::als::proto::PacketInfo;
 use crate::als::proto::define::UpdateObject;
 use crate::als::proto::extension::UpdateObjectExt;
+use crate::als::proto::{PacketInfo, extension};
 
 impl Display for instantiate_object::Target {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -410,12 +410,34 @@ impl<'a> UpdateObjectPayloadAnalyzer<'a> {
 
 impl Display for UpdateObjectPayloadAnalyzer<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // endwith
-        if self.prefab_name.ends_with("DateTimeReceiver") {
+        if self
+            .prefab_name
+            .contains(extension::prefab_name::DATE_TIME_RECEIVER)
+        {
             write!(
                 f,
                 "{}",
                 self.object.try_parse_date_time().unwrap_or_default()
+            )
+        } else if self
+            .prefab_name
+            .contains(extension::prefab_name::COVER_IMAGE_RECEIVER)
+        {
+            write!(
+                f,
+                "{}",
+                self.object.try_parse_cover_image().unwrap_or_default()
+            )
+        } else if self
+            .prefab_name
+            .contains(extension::prefab_name::SCENE_PROP_MANIPULATOR)
+        {
+            write!(
+                f,
+                "{}",
+                self.object
+                    .try_parse_scene_prop_manipulator()
+                    .unwrap_or_default()
             )
         }
         // do not parse

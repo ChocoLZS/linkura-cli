@@ -1,14 +1,23 @@
 use anyhow::{Error, Result};
+use chrono::{DateTime, Utc};
 use clap::{Args as ClapArgs, Parser, Subcommand};
 use linkura_i18n::t;
-use std::{ops::Deref, path::Path, usize};
+use std::{
+    ops::Deref,
+    path::{Path, PathBuf},
+    usize,
+};
 use tracing::{info, warn};
 
 linkura_i18n::init!();
 
 use linkura_common::log;
 use linkura_downloader::{AlsDownloader, BaseDownloader, MrsDownloader, R2Uploader};
-use linkura_packet::als::{converter::AlsConverter, proto};
+use linkura_packet::als::{
+    converter::AlsConverter,
+    extract::{ExtractConfig, ExtractTargetKind, ImageExtractOptions, run_extract},
+    proto,
+};
 use url::Url;
 
 /** ARG PARSER **/
@@ -218,25 +227,71 @@ pub struct ArgsConvert {
     pub audio_only: bool,
 }
 
-#[cfg(feature = "audio")]
 #[derive(Debug, ClapArgs)]
-/// Extract archive audio from archive files
-pub struct ArgsAudio {
+pub struct ArgsExtract {
     #[clap(
         short('i'),
         long = "input",
-        value_name = "INPUT_FILE",
-        help = "Input archive file path"
+        value_name = "INPUT_DIR",
+        help = "Input standard packet directory",
+        default_value = "data",
+        global(true)
     )]
-    pub input_file: String,
+    pub input_dir: String,
     #[clap(
         short('o'),
         long = "output",
         value_name = "OUTPUT_DIR",
-        help = "Output directory for extracted audio",
-        default_value = "audio"
+        help = "Output directory for extracted data",
+        global(true)
     )]
-    pub output_dir: String,
+    pub output_dir: Option<String>,
+    #[clap(short('c'), long = "count", value_name = "COUNT", help = "Maximum number of packets to process", default_value_t = usize::MAX)]
+    pub packet_count: usize,
+    #[clap(long = "file-count-limit", value_name = "FILE_COUNT", help = "Maximum number of files to process", default_value_t = usize::MAX)]
+    pub file_count_limit: usize,
+    #[clap(
+        long = "data-start-time",
+        value_name = "TIME",
+        help = "Data start time in rfc3339 format (e.g., 2025-08-21T00:00:00Z)"
+    )]
+    pub data_start_time: Option<String>,
+    #[clap(
+        long = "data-end-time",
+        value_name = "TIME",
+        help = "Data end time in rfc3339 format (e.g., 2025-08-21T00:00:00Z)"
+    )]
+    pub data_end_time: Option<String>,
+    #[clap(
+        long = "strict",
+        help = "Fail immediately on packet parse errors",
+        default_value = "false"
+    )]
+    pub strict: bool,
+    #[command(subcommand)]
+    pub target: ExtractSubcommands,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ExtractSubcommands {
+    #[cfg(feature = "audio")]
+    Audio(ArgsExtractAudio),
+    Image(ArgsExtractImage),
+}
+
+#[cfg(feature = "audio")]
+#[derive(Debug, ClapArgs, Default)]
+pub struct ArgsExtractAudio {}
+
+#[derive(Debug, ClapArgs)]
+pub struct ArgsExtractImage {
+    #[clap(
+        long = "metadata-file",
+        value_name = "FILE",
+        help = "Image metadata output filename",
+        default_value = "images.jsonl"
+    )]
+    pub metadata_filename: String,
 }
 
 #[derive(Subcommand, Debug)]
@@ -246,8 +301,7 @@ pub enum Commands {
     Sync(ArgsSync),
     Analyze(ArgsAnalyze),
     Convert(ArgsConvert),
-    #[cfg(feature = "audio")]
-    Audio(ArgsAudio),
+    Extract(ArgsExtract),
 }
 
 #[tokio::main]
@@ -542,37 +596,73 @@ async fn main() -> Result<()> {
             info!("✅ ALS conversion completed successfully!");
             info!("📄 Output files written to: {}", convert_args.output_dir);
         }
-        #[cfg(feature = "audio")]
-        Some(Commands::Audio(audio_args)) => {
-            info!("🔊 Starting audio extraction from archive file");
-            info!("📂 Input file: {}", audio_args.input_file);
-            info!("📁 Output directory: {}", audio_args.output_dir);
-            let input_path = std::path::Path::new(&audio_args.input_file);
-            if !input_path.exists() {
-                return Err(Error::msg(format!(
-                    "Input file does not exist: {}",
-                    audio_args.input_file
-                )));
-            }
-            // Convert async context to sync for the audio extraction
-            let _result = tokio::task::spawn_blocking({
-                let input_file = audio_args.input_file.clone();
-                let output_dir = audio_args.output_dir.clone();
-                move || {
-                    let converter = AlsConverter::new(10, true);
-                    converter.extract_audio_from_standard(&input_file, &output_dir)
+        Some(Commands::Extract(extract_args)) => {
+            let default_output_dir = match &extract_args.target {
+                #[cfg(feature = "audio")]
+                ExtractSubcommands::Audio(_) => "audio",
+                ExtractSubcommands::Image(_) => "image",
+            };
+            let output_dir = extract_args
+                .output_dir
+                .clone()
+                .unwrap_or_else(|| default_output_dir.to_string());
+            let data_start_time =
+                parse_rfc3339_utc("data-start-time", extract_args.data_start_time.as_deref())?;
+            let data_end_time =
+                parse_rfc3339_utc("data-end-time", extract_args.data_end_time.as_deref())?;
+
+            let target_kind = match &extract_args.target {
+                #[cfg(feature = "audio")]
+                ExtractSubcommands::Audio(_) => ExtractTargetKind::Audio(Default::default()),
+                ExtractSubcommands::Image(image_args) => {
+                    ExtractTargetKind::Image(ImageExtractOptions {
+                        metadata_filename: image_args.metadata_filename.clone(),
+                    })
                 }
-            })
-            .await??;
-            info!("✅ Audio extraction completed successfully!");
+            };
+
+            let extract_config = ExtractConfig {
+                input_dir: PathBuf::from(&extract_args.input_dir),
+                output_dir: PathBuf::from(&output_dir),
+                packet_count: extract_args.packet_count,
+                file_count_limit: extract_args.file_count_limit,
+                data_start_time,
+                data_end_time,
+                strict: extract_args.strict,
+            };
+
+            info!("🔍 Starting '{}' extraction", target_kind.name());
+            info!("📂 Input directory: {}", extract_args.input_dir);
+            info!("📁 Output directory: {}", output_dir);
+
+            let summary =
+                tokio::task::spawn_blocking(move || run_extract(extract_config, target_kind))
+                    .await??;
+
             info!(
-                "📄 Output audio files written to: {}",
-                audio_args.output_dir
+                "✅ Extraction completed: target={}, files={}, packets_read={}, packets_processed={}, hits={}, outputs={}, errors={}",
+                summary.target,
+                summary.files_processed,
+                summary.packets_read,
+                summary.packets_processed,
+                summary.target_hits,
+                summary.outputs_written,
+                summary.errors
             );
         }
         None => {}
     }
     Ok(())
+}
+
+fn parse_rfc3339_utc(field_name: &str, value: Option<&str>) -> Result<Option<DateTime<Utc>>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+
+    let parsed = DateTime::parse_from_rfc3339(value)
+        .map_err(|e| Error::msg(format!("Invalid {} '{}': {}", field_name, value, e)))?;
+    Ok(Some(parsed.with_timezone(&Utc)))
 }
 
 fn get_bucket_prefix(url: &str) -> Result<String> {
