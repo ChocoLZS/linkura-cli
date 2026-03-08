@@ -7,7 +7,7 @@ use super::proto::{
     reader::PacketReaderTrait,
 };
 use crate::als::proto::{
-    extension::UpdateObjectExt,
+    extension::{UpdateObjectExt, prefab_name},
     reader::{LegacyPacketReader, MixedPacketReader, PacketsBufferReader, StandardPacketReader},
 };
 use anyhow::{Context, Ok, Result, anyhow};
@@ -59,7 +59,10 @@ impl AlsConverter {
         }
     }
 
-    fn get_file_entries(input_dir: &Path, ext: Option<&str>) -> Result<std::collections::VecDeque<DirEntry>> {
+    fn get_file_entries(
+        input_dir: &Path,
+        ext: Option<&str>,
+    ) -> Result<std::collections::VecDeque<DirEntry>> {
         if !input_dir.is_dir() {
             return Err(anyhow!("Input path is not a directory"));
         }
@@ -1126,11 +1129,14 @@ impl ConversionContext {
                 match &frame.message {
                     Some(data_frame::Message::InstantiateObject(obj)) => {
                         let name = String::from_utf8_lossy(&obj.prefab_name);
-                        if name.contains("TimedAsset/DateTimeReceiver") {
+                        if name.contains(prefab_name::DATE_TIME_RECEIVER) {
                             datetime_receiver_id = obj.object_id;
                         }
-                        if name.contains("VoiceObject/MusicBroadcaster") {
+                        if name.contains(prefab_name::MUSIC_BROADCASTER) {
                             music_broadcasters.insert(obj.object_id);
+                        }
+                        if name.contains(prefab_name::COVER_IMAGE_RECEIVER) {
+                            // Handle cover image receiver
                         }
                     }
                     Some(data_frame::Message::UpdateObject(obj)) => {

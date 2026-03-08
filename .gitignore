@@ -13,3 +13,5 @@ data
 data_*
 python
 audio
+*.jpg
+*.tar.gz
