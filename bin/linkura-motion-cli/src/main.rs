@@ -241,8 +241,8 @@ pub struct ArgsExtract {
     #[clap(
         short('o'),
         long = "output",
-        value_name = "OUTPUT_DIR",
-        help = "Output directory for extracted data",
+        value_name = "OUTPUT_PATH",
+        help = "Output path (audio: directory, image: file; default stdout for image)",
         global(true)
     )]
     pub output_dir: Option<String>,
@@ -286,12 +286,11 @@ pub struct ArgsExtractAudio {}
 #[derive(Debug, ClapArgs)]
 pub struct ArgsExtractImage {
     #[clap(
-        long = "metadata-file",
-        value_name = "FILE",
-        help = "Image metadata output filename",
-        default_value = "images.jsonl"
+        long = "json",
+        help = "Print deduplicated names as JSON array",
+        default_value = "false"
     )]
-    pub metadata_filename: String,
+    pub json: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -597,15 +596,30 @@ async fn main() -> Result<()> {
             info!("📄 Output files written to: {}", convert_args.output_dir);
         }
         Some(Commands::Extract(extract_args)) => {
-            let default_output_dir = match &extract_args.target {
+            let output_path = match &extract_args.target {
                 #[cfg(feature = "audio")]
-                ExtractSubcommands::Audio(_) => "audio",
-                ExtractSubcommands::Image(_) => "image",
+                ExtractSubcommands::Audio(_) => extract_args
+                    .output_dir
+                    .clone()
+                    .unwrap_or_else(|| "audio".to_string()),
+                ExtractSubcommands::Image(_) => extract_args
+                    .output_dir
+                    .clone()
+                    .unwrap_or_else(|| ".".to_string()),
             };
-            let output_dir = extract_args
-                .output_dir
-                .clone()
-                .unwrap_or_else(|| default_output_dir.to_string());
+            let output_desc = match &extract_args.target {
+                #[cfg(feature = "audio")]
+                ExtractSubcommands::Audio(_) => output_path.clone(),
+                ExtractSubcommands::Image(_) => extract_args
+                    .output_dir
+                    .clone()
+                    .unwrap_or_else(|| "[stdout]".to_string()),
+            };
+            let image_output_file = match &extract_args.target {
+                #[cfg(feature = "audio")]
+                ExtractSubcommands::Audio(_) => None,
+                ExtractSubcommands::Image(_) => extract_args.output_dir.as_ref().map(PathBuf::from),
+            };
             let data_start_time =
                 parse_rfc3339_utc("data-start-time", extract_args.data_start_time.as_deref())?;
             let data_end_time =
@@ -616,14 +630,15 @@ async fn main() -> Result<()> {
                 ExtractSubcommands::Audio(_) => ExtractTargetKind::Audio(Default::default()),
                 ExtractSubcommands::Image(image_args) => {
                     ExtractTargetKind::Image(ImageExtractOptions {
-                        metadata_filename: image_args.metadata_filename.clone(),
+                        json: image_args.json,
+                        output_file: image_output_file,
                     })
                 }
             };
 
             let extract_config = ExtractConfig {
                 input_dir: PathBuf::from(&extract_args.input_dir),
-                output_dir: PathBuf::from(&output_dir),
+                output_dir: PathBuf::from(&output_path),
                 packet_count: extract_args.packet_count,
                 file_count_limit: extract_args.file_count_limit,
                 data_start_time,
@@ -633,7 +648,7 @@ async fn main() -> Result<()> {
 
             info!("🔍 Starting '{}' extraction", target_kind.name());
             info!("📂 Input directory: {}", extract_args.input_dir);
-            info!("📁 Output directory: {}", output_dir);
+            info!("📁 Output: {}", output_desc);
 
             let summary =
                 tokio::task::spawn_blocking(move || run_extract(extract_config, target_kind))

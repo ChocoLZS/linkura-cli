@@ -1,9 +1,7 @@
 use anyhow::{Context as AnyhowContext, Result, anyhow};
 use chrono::{DateTime, Utc};
-use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::fs::{DirEntry, File};
-use std::io::{BufWriter, Write};
+use std::fs::DirEntry;
 use std::path::{Path, PathBuf};
 
 use super::proto::PacketInfo;
@@ -42,13 +40,15 @@ pub struct AudioExtractOptions {}
 
 #[derive(Debug, Clone)]
 pub struct ImageExtractOptions {
-    pub metadata_filename: String,
+    pub json: bool,
+    pub output_file: Option<PathBuf>,
 }
 
 impl Default for ImageExtractOptions {
     fn default() -> Self {
         Self {
-            metadata_filename: "images.jsonl".to_string(),
+            json: false,
+            output_file: None,
         }
     }
 }
@@ -142,6 +142,13 @@ impl ExtractContext {
             .map(|x| x.prefab_name.contains(prefab_name::COVER_IMAGE_RECEIVER))
             .unwrap_or(false)
     }
+
+    fn is_scene_prop_object(&self, object_id: i32) -> bool {
+        self.object_registry
+            .get(&object_id)
+            .map(|x| x.prefab_name.contains(prefab_name::SCENE_PROP_MANIPULATOR))
+            .unwrap_or(false)
+    }
 }
 
 trait ExtractTarget {
@@ -201,28 +208,47 @@ impl ExtractTarget for AudioExtractTarget {
     }
 }
 
-#[derive(Debug, Serialize)]
-struct ImageRecord {
-    timestamp: String,
-    object_id: i32,
-    cover_image_name: String,
-    sync_time: f64,
-}
+const COVER_IMAGE_WEB_PREFIX: &str =
+    "http://assets.link-like-lovelive.app/wiht_fes_images";
 
 struct ImageExtractTarget {
-    output_dir: PathBuf,
     options: ImageExtractOptions,
     cover_image_object_ids: HashSet<i32>,
-    records: Vec<ImageRecord>,
+    scene_prop_object_ids: HashSet<i32>,
+    seen_names: HashSet<String>,
+    names: Vec<String>,
 }
 
 impl ImageExtractTarget {
-    fn new(output_dir: PathBuf, options: ImageExtractOptions) -> Self {
+    fn new(options: ImageExtractOptions) -> Self {
         Self {
-            output_dir,
             options,
             cover_image_object_ids: HashSet::new(),
-            records: Vec::new(),
+            scene_prop_object_ids: HashSet::new(),
+            seen_names: HashSet::new(),
+            names: Vec::new(),
+        }
+    }
+
+    fn normalize_name(name: &str) -> Option<String> {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        if trimmed.to_ascii_lowercase().ends_with(".jpg") {
+            let normalized_path = trimmed.trim_start_matches('/');
+            return Some(format!("{}/{}", COVER_IMAGE_WEB_PREFIX, normalized_path));
+        }
+        Some(trimmed.to_string())
+    }
+
+    fn push_name(&mut self, name: &str, ctx: &mut ExtractContext) {
+        let Some(normalized) = Self::normalize_name(name) else {
+            return;
+        };
+        if self.seen_names.insert(normalized.clone()) {
+            self.names.push(normalized);
+            ctx.stats.target_hits += 1;
         }
     }
 }
@@ -240,31 +266,41 @@ impl ExtractTarget for ImageExtractTarget {
                     if prefab_name.contains(prefab_name::COVER_IMAGE_RECEIVER) {
                         self.cover_image_object_ids.insert(obj.object_id);
                     }
+                    if prefab_name.contains(prefab_name::SCENE_PROP_MANIPULATOR) {
+                        self.scene_prop_object_ids.insert(obj.object_id);
+                    }
                 }
                 Some(data_frame::Message::DestroyObject(obj)) => {
                     self.cover_image_object_ids.remove(&obj.object_id);
+                    self.scene_prop_object_ids.remove(&obj.object_id);
                 }
                 Some(data_frame::Message::UpdateObject(obj)) => {
-                    if !(self.cover_image_object_ids.contains(&obj.object_id)
-                        || ctx.is_cover_image_object(obj.object_id))
+                    if self.cover_image_object_ids.contains(&obj.object_id)
+                        || ctx.is_cover_image_object(obj.object_id)
                     {
-                        continue;
+                        match obj.try_parse_cover_image() {
+                            Ok(parsed) => {
+                                self.push_name(&parsed.cover_image_name, ctx);
+                            }
+                            Err(_) => {
+                                // noop;
+                            }
+                        }
                     }
 
-                    let parsed = obj.try_parse_cover_image().with_context(|| {
-                        format!(
-                            "failed to parse cover image payload for object {}",
-                            obj.object_id
-                        )
-                    })?;
-
-                    self.records.push(ImageRecord {
-                        timestamp: packet.timestamp.to_rfc3339(),
-                        object_id: obj.object_id,
-                        cover_image_name: parsed.cover_image_name,
-                        sync_time: parsed.sync_time,
-                    });
-                    ctx.stats.target_hits += 1;
+                    if self.scene_prop_object_ids.contains(&obj.object_id)
+                        || ctx.is_scene_prop_object(obj.object_id)
+                    {
+                        let parsed = obj.try_parse_scene_prop_manipulator().with_context(|| {
+                            format!(
+                                "failed to parse scene prop payload for object {} (method={})",
+                                obj.object_id, obj.method
+                            )
+                        })?;
+                        if let Some(trigger) = parsed.animation_trigger {
+                            self.push_name(&trigger, ctx);
+                        }
+                    }
                 }
                 _ => {}
             }
@@ -273,41 +309,57 @@ impl ExtractTarget for ImageExtractTarget {
     }
 
     fn finish(&mut self, ctx: &mut ExtractContext) -> Result<()> {
-        std::fs::create_dir_all(&self.output_dir).with_context(|| {
-            format!(
-                "failed to create image output directory: {}",
-                self.output_dir.display()
-            )
-        })?;
+        if let Some(output_file) = &self.options.output_file {
+            if let Some(parent) = output_file.parent() {
+                if !parent.as_os_str().is_empty() {
+                    std::fs::create_dir_all(parent).with_context(|| {
+                        format!(
+                            "failed to create output file parent directory: {}",
+                            parent.display()
+                        )
+                    })?;
+                }
+            }
 
-        let output_file = self.output_dir.join(&self.options.metadata_filename);
-        let file = File::create(&output_file)
-            .with_context(|| format!("failed to create output file: {}", output_file.display()))?;
-        let mut writer = BufWriter::new(file);
-
-        for record in &self.records {
-            let line = serde_json::to_string(record)
-                .with_context(|| "failed to serialize image record")?;
-            writeln!(writer, "{line}")?;
+            if self.options.json {
+                let json = serde_json::to_string(&self.names)
+                    .with_context(|| "failed to serialize image names as json")?;
+                std::fs::write(output_file, json.as_bytes()).with_context(|| {
+                    format!("failed to write output file: {}", output_file.display())
+                })?;
+            } else {
+                let mut text = self.names.join("\n");
+                if !text.is_empty() {
+                    text.push('\n');
+                }
+                std::fs::write(output_file, text.as_bytes()).with_context(|| {
+                    format!("failed to write output file: {}", output_file.display())
+                })?;
+            }
+        } else if self.options.json {
+            let json = serde_json::to_string(&self.names)
+                .with_context(|| "failed to serialize image names as json")?;
+            println!("{json}");
+        } else {
+            for name in &self.names {
+                println!("{name}");
+            }
         }
-        writer.flush()?;
-
-        ctx.stats.outputs_written += self.records.len();
+        ctx.stats.outputs_written += self.names.len();
         Ok(())
     }
 }
 
 fn build_target(
     target_kind: &ExtractTargetKind,
-    output_dir: PathBuf,
+    _output_dir: PathBuf,
 ) -> Result<Box<dyn ExtractTarget>> {
     match target_kind {
         #[cfg(feature = "audio")]
-        ExtractTargetKind::Audio(_) => Ok(Box::new(AudioExtractTarget::new(output_dir))),
-        ExtractTargetKind::Image(options) => Ok(Box::new(ImageExtractTarget::new(
-            output_dir,
-            options.clone(),
-        ))),
+        ExtractTargetKind::Audio(_) => Ok(Box::new(AudioExtractTarget::new(_output_dir))),
+        ExtractTargetKind::Image(options) => {
+            Ok(Box::new(ImageExtractTarget::new(options.clone())))
+        }
     }
 }
 
@@ -430,12 +482,19 @@ pub fn run_extract(
         ));
     }
 
-    std::fs::create_dir_all(&config.output_dir).with_context(|| {
-        format!(
-            "failed to create output directory: {}",
-            config.output_dir.display()
-        )
-    })?;
+    let requires_output_dir = match &target_kind {
+        #[cfg(feature = "audio")]
+        ExtractTargetKind::Audio(_) => true,
+        ExtractTargetKind::Image(_) => false,
+    };
+    if requires_output_dir {
+        std::fs::create_dir_all(&config.output_dir).with_context(|| {
+            format!(
+                "failed to create output directory: {}",
+                config.output_dir.display()
+            )
+        })?;
+    }
 
     let mut ctx = ExtractContext::new();
     let mut target = build_target(&target_kind, config.output_dir.clone())?;
