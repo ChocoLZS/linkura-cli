@@ -25,6 +25,7 @@ pub mod prefab_name {
     pub const MUSIC_BROADCASTER: &str = "VoiceObject/MusicBroadcaster";
     pub const COVER_IMAGE_RECEIVER: &str = "CoverImageReceiver";
     pub const SCENE_PROP_MANIPULATOR: &str = "Prefabs/ScenePropManipulator";
+    pub const FOOT_SHADOW_MANIPULATOR: &str = "FootShadowManipulator";
 }
 pub trait UpdateObjectExt {
     /// DateTimeReceiver payload
@@ -32,6 +33,9 @@ pub trait UpdateObjectExt {
     fn try_parse_cover_image(&self) -> Result<extract::CoverImageReceiver, ParseError>;
     fn try_parse_scene_prop_manipulator(&self)
     -> Result<extract::ScenePropManipulator, ParseError>;
+    fn try_parse_foot_shadow_manipulator(
+        &self,
+    ) -> Result<extract::FootShadowManipulator, ParseError>;
 }
 
 impl UpdateObjectExt for UpdateObject {
@@ -158,60 +162,65 @@ impl UpdateObjectExt for UpdateObject {
         match self.method {
             METHOD_PROP_ID => {
                 let prop_id = parse_memorypack_i32(&self.payload)?;
-                Ok(extract::ScenePropManipulator {
-                    method: self.method,
-                    prop_id: Some(prop_id),
-                    world_position: None,
-                    world_rotation: None,
-                    is_visible: None,
-                    animation_trigger: None,
-                })
+                Ok(extract::ScenePropManipulator::from_prop_id(
+                    self.method,
+                    prop_id,
+                ))
             }
             METHOD_WORLD_POSITION => {
                 let world_position = parse_memorypack_vector3(&self.payload)?;
-                Ok(extract::ScenePropManipulator {
-                    method: self.method,
-                    prop_id: None,
-                    world_position: Some(world_position),
-                    world_rotation: None,
-                    is_visible: None,
-                    animation_trigger: None,
-                })
+                Ok(extract::ScenePropManipulator::from_world_position(
+                    self.method,
+                    world_position,
+                ))
             }
             METHOD_WORLD_ROTATION => {
                 let world_rotation = parse_memorypack_quaternion(&self.payload)?;
-                Ok(extract::ScenePropManipulator {
-                    method: self.method,
-                    prop_id: None,
-                    world_position: None,
-                    world_rotation: Some(world_rotation),
-                    is_visible: None,
-                    animation_trigger: None,
-                })
+                Ok(extract::ScenePropManipulator::from_world_rotation(
+                    self.method,
+                    world_rotation,
+                ))
             }
             METHOD_IS_VISIBLE => {
                 let is_visible = parse_memorypack_bool(&self.payload)?;
-                Ok(extract::ScenePropManipulator {
-                    method: self.method,
-                    prop_id: None,
-                    world_position: None,
-                    world_rotation: None,
-                    is_visible: Some(is_visible),
-                    animation_trigger: None,
-                })
+                Ok(extract::ScenePropManipulator::from_is_visible(
+                    self.method,
+                    is_visible,
+                ))
             }
             METHOD_ANIMATION_TRIGGER => {
                 let animation_trigger = parse_memorypack_string(&self.payload)?;
-                Ok(extract::ScenePropManipulator {
-                    method: self.method,
-                    prop_id: None,
-                    world_position: None,
-                    world_rotation: None,
-                    is_visible: None,
-                    animation_trigger: Some(animation_trigger),
-                })
+                Ok(extract::ScenePropManipulator::from_animation_trigger(
+                    self.method,
+                    animation_trigger,
+                ))
             }
             _ => parse_scene_prop_by_shape(self.method, &self.payload),
+        }
+    }
+
+    fn try_parse_foot_shadow_manipulator(
+        &self,
+    ) -> Result<extract::FootShadowManipulator, ParseError> {
+        const METHOD_CHARACTER_ID: i32 = 0;
+        const METHOD_ACTIVATE_COMMAND: i32 = 1;
+
+        match self.method {
+            METHOD_CHARACTER_ID => {
+                let character_id = parse_memorypack_i32(&self.payload)?;
+                Ok(extract::FootShadowManipulator::from_character_id(
+                    self.method,
+                    character_id,
+                ))
+            }
+            METHOD_ACTIVATE_COMMAND => {
+                let activate_command = parse_foot_shadow_activate_command(&self.payload)?;
+                Ok(extract::FootShadowManipulator::from_activate_command(
+                    self.method,
+                    activate_command,
+                ))
+            }
+            _ => parse_foot_shadow_by_shape(self.method, &self.payload),
         }
     }
 }
@@ -222,14 +231,7 @@ fn parse_scene_prop_by_shape(
 ) -> Result<extract::ScenePropManipulator, ParseError> {
     if let Ok(value) = parse_memorypack_bool(payload) {
         if payload.len() == 1 {
-            return Ok(extract::ScenePropManipulator {
-                method,
-                prop_id: None,
-                world_position: None,
-                world_rotation: None,
-                is_visible: Some(value),
-                animation_trigger: None,
-            });
+            return Ok(extract::ScenePropManipulator::from_is_visible(method, value));
         }
     }
 
@@ -252,54 +254,78 @@ fn parse_scene_prop_by_shape(
 
         if looks_like_string {
             if let Ok(value) = parse_memorypack_string(payload) {
-                return Ok(extract::ScenePropManipulator {
-                    method,
-                    prop_id: None,
-                    world_position: None,
-                    world_rotation: None,
-                    is_visible: None,
-                    animation_trigger: Some(value),
-                });
+                return Ok(extract::ScenePropManipulator::from_animation_trigger(
+                    method, value,
+                ));
             }
         }
     }
 
     if let Ok(value) = parse_memorypack_i32(payload) {
         if payload.len() == 4 {
-            return Ok(extract::ScenePropManipulator {
-                method,
-                prop_id: Some(value),
-                world_position: None,
-                world_rotation: None,
-                is_visible: None,
-                animation_trigger: None,
-            });
+            return Ok(extract::ScenePropManipulator::from_prop_id(method, value));
         }
     }
 
     if let Ok(value) = parse_memorypack_vector3(payload) {
         if payload.len() == 12 {
-            return Ok(extract::ScenePropManipulator {
-                method,
-                prop_id: None,
-                world_position: Some(value),
-                world_rotation: None,
-                is_visible: None,
-                animation_trigger: None,
-            });
+            return Ok(extract::ScenePropManipulator::from_world_position(method, value));
         }
     }
 
     if let Ok(value) = parse_memorypack_quaternion(payload) {
         if payload.len() == 16 {
-            return Ok(extract::ScenePropManipulator {
-                method,
-                prop_id: None,
-                world_position: None,
-                world_rotation: Some(value),
-                is_visible: None,
-                animation_trigger: None,
-            });
+            return Ok(extract::ScenePropManipulator::from_world_rotation(method, value));
+        }
+    }
+
+    Err(ParseError::UnknownMethod(method))
+}
+
+fn parse_foot_shadow_activate_command(
+    payload: &[u8],
+) -> Result<extract::FootShadowActivateCommand, ParseError> {
+    if payload.len() < 16 {
+        return Err(ParseError::InvalidPayload {
+            expected: 16,
+            actual: payload.len(),
+        });
+    }
+
+    Ok(extract::FootShadowActivateCommand {
+        is_active: payload[0] != 0,
+        sync_time: f64::from_le_bytes(payload[8..16].try_into().map_err(|_| {
+            ParseError::InvalidPayload {
+                expected: 16,
+                actual: payload.len(),
+            }
+        })?),
+    })
+}
+
+fn parse_foot_shadow_by_shape(
+    method: i32,
+    payload: &[u8],
+) -> Result<extract::FootShadowManipulator, ParseError> {
+    if let Ok(value) = parse_foot_shadow_activate_command(payload) {
+        if payload.len() == 16 {
+            return Ok(extract::FootShadowManipulator::from_activate_command(
+                method, value,
+            ));
+        }
+    }
+
+    if let Ok(value) = parse_memorypack_i32(payload) {
+        if payload.len() == 4 {
+            return Ok(extract::FootShadowManipulator::from_character_id(method, value));
+        }
+    }
+
+    if let Ok(value) = parse_memorypack_bool(payload) {
+        if payload.len() == 1 {
+            return Ok(extract::FootShadowManipulator::from_is_active_only(
+                method, value,
+            ));
         }
     }
 
@@ -527,6 +553,79 @@ pub mod extract {
     }
 
     #[derive(Debug, Clone, Default)]
+    pub struct FootShadowManipulator {
+        pub method: i32,
+        pub character_id: Option<i32>,
+        pub activate_command: Option<FootShadowActivateCommand>,
+        pub is_active_only: Option<bool>,
+    }
+
+    impl FootShadowManipulator {
+        pub(crate) fn from_character_id(method: i32, character_id: i32) -> Self {
+            Self {
+                method,
+                character_id: Some(character_id),
+                ..Self::default()
+            }
+        }
+
+        pub(crate) fn from_activate_command(
+            method: i32,
+            activate_command: FootShadowActivateCommand,
+        ) -> Self {
+            Self {
+                method,
+                activate_command: Some(activate_command),
+                ..Self::default()
+            }
+        }
+
+        pub(crate) fn from_is_active_only(method: i32, is_active_only: bool) -> Self {
+            Self {
+                method,
+                is_active_only: Some(is_active_only),
+                ..Self::default()
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, Default)]
+    pub struct FootShadowActivateCommand {
+        pub is_active: bool,
+        pub sync_time: f64,
+    }
+
+    impl Display for FootShadowManipulator {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            if let Some(value) = self.character_id {
+                return write!(
+                    f,
+                    "FootShadowManipulator(method={}): CharacterId={}",
+                    self.method, value
+                );
+            }
+
+            if let Some(value) = self.activate_command {
+                return write!(
+                    f,
+                    "FootShadowManipulator(method={}): IsActive={}, SyncTime={:.6}",
+                    self.method, value.is_active, value.sync_time
+                );
+            }
+
+            if let Some(value) = self.is_active_only {
+                return write!(
+                    f,
+                    "FootShadowManipulator(method={}): IsActiveOnly={}",
+                    self.method, value
+                );
+            }
+
+            write!(f, "FootShadowManipulator(method={}): <empty>", self.method)
+        }
+    }
+
+    #[derive(Debug, Clone, Default)]
     pub struct ScenePropManipulator {
         pub method: i32,
         pub prop_id: Option<i32>,
@@ -534,6 +633,48 @@ pub mod extract {
         pub world_rotation: Option<Quaternion>,
         pub is_visible: Option<bool>,
         pub animation_trigger: Option<String>,
+    }
+
+    impl ScenePropManipulator {
+        pub(crate) fn from_prop_id(method: i32, prop_id: i32) -> Self {
+            Self {
+                method,
+                prop_id: Some(prop_id),
+                ..Self::default()
+            }
+        }
+
+        pub(crate) fn from_world_position(method: i32, world_position: Vector3) -> Self {
+            Self {
+                method,
+                world_position: Some(world_position),
+                ..Self::default()
+            }
+        }
+
+        pub(crate) fn from_world_rotation(method: i32, world_rotation: Quaternion) -> Self {
+            Self {
+                method,
+                world_rotation: Some(world_rotation),
+                ..Self::default()
+            }
+        }
+
+        pub(crate) fn from_is_visible(method: i32, is_visible: bool) -> Self {
+            Self {
+                method,
+                is_visible: Some(is_visible),
+                ..Self::default()
+            }
+        }
+
+        pub(crate) fn from_animation_trigger(method: i32, animation_trigger: String) -> Self {
+            Self {
+                method,
+                animation_trigger: Some(animation_trigger),
+                ..Self::default()
+            }
+        }
     }
 
     #[derive(Debug, Clone, Copy, Default)]

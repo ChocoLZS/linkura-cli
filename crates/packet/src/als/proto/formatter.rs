@@ -410,38 +410,9 @@ impl<'a> UpdateObjectPayloadAnalyzer<'a> {
 
 impl Display for UpdateObjectPayloadAnalyzer<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self
-            .prefab_name
-            .contains(extension::prefab_name::DATE_TIME_RECEIVER)
-        {
-            write!(
-                f,
-                "{}",
-                self.object.try_parse_date_time().unwrap_or_default()
-            )
-        } else if self
-            .prefab_name
-            .contains(extension::prefab_name::COVER_IMAGE_RECEIVER)
-        {
-            write!(
-                f,
-                "{}",
-                self.object.try_parse_cover_image().unwrap_or_default()
-            )
-        } else if self
-            .prefab_name
-            .contains(extension::prefab_name::SCENE_PROP_MANIPULATOR)
-        {
-            write!(
-                f,
-                "{}",
-                self.object
-                    .try_parse_scene_prop_manipulator()
-                    .unwrap_or_default()
-            )
-        }
-        // do not parse
-        else {
+        if let Some(parsed) = parse_update_payload(self.prefab_name, self.object) {
+            write!(f, "{}", parsed)
+        } else {
             write!(
                 f,
                 "<unparsed payload, length: {} bytes>",
@@ -449,6 +420,41 @@ impl Display for UpdateObjectPayloadAnalyzer<'_> {
             )
         }
     }
+}
+
+fn render_or_default<T>(result: Result<T, extension::ParseError>) -> String
+where
+    T: Display + Default,
+{
+    result.unwrap_or_default().to_string()
+}
+
+type PayloadParser = fn(&UpdateObject) -> String;
+
+const UPDATE_PAYLOAD_PARSERS: [(&str, PayloadParser); 4] = [
+    (
+        extension::prefab_name::DATE_TIME_RECEIVER,
+        |obj| render_or_default(obj.try_parse_date_time()),
+    ),
+    (
+        extension::prefab_name::COVER_IMAGE_RECEIVER,
+        |obj| render_or_default(obj.try_parse_cover_image()),
+    ),
+    (
+        extension::prefab_name::SCENE_PROP_MANIPULATOR,
+        |obj| render_or_default(obj.try_parse_scene_prop_manipulator()),
+    ),
+    (
+        extension::prefab_name::FOOT_SHADOW_MANIPULATOR,
+        |obj| render_or_default(obj.try_parse_foot_shadow_manipulator()),
+    ),
+];
+
+fn parse_update_payload(prefab_name: &str, object: &UpdateObject) -> Option<String> {
+    UPDATE_PAYLOAD_PARSERS
+        .iter()
+        .find(|(needle, _)| prefab_name.contains(*needle))
+        .map(|(_, parser)| parser(object))
 }
 
 // Helper functions
