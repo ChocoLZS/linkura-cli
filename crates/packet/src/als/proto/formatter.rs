@@ -10,8 +10,8 @@ use std::io::Write;
 
 use super::analyzer::PacketStats;
 use super::define::{DataPack, data_frame, data_pack, instantiate_object, update_object};
-use crate::als::proto::define::UpdateObject;
-use crate::als::proto::extension::UpdateObjectExt;
+use crate::als::proto::define::{InstantiateObject, UpdateObject};
+use crate::als::proto::extension::InstantiateObjectExt;
 use crate::als::proto::{PacketInfo, extension};
 
 impl Display for instantiate_object::Target {
@@ -201,6 +201,8 @@ impl<'a> PacketFormatter<'a> {
                 if let Some(target) = &obj.target {
                     writer.writeln(&format!("        Target: {}", target))?;
                 }
+                let init_data_analyzer = InstantiateInitDataAnalyzer::new(&prefab_name, obj);
+                writer.writeln(&format!("        Parsed InitData: {}", init_data_analyzer))?;
                 writer.writeln(&format!(
                     "        Init data size: {} bytes",
                     obj.init_data.len()
@@ -399,6 +401,33 @@ struct UpdateObjectPayloadAnalyzer<'a> {
     object: &'a UpdateObject,
 }
 
+struct InstantiateInitDataAnalyzer<'a> {
+    prefab_name: &'a str,
+    object: &'a InstantiateObject,
+}
+
+impl<'a> InstantiateInitDataAnalyzer<'a> {
+    pub fn new(prefab_name: &'a str, object: &'a InstantiateObject) -> Self {
+        Self {
+            prefab_name,
+            object,
+        }
+    }
+}
+
+impl Display for InstantiateInitDataAnalyzer<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.object.try_parse_init_data(self.prefab_name) {
+            Ok(parsed) => write!(f, "{}", parsed),
+            Err(_) => write!(
+                f,
+                "<unparsed init_data, length: {} bytes>",
+                self.object.init_data.len()
+            ),
+        }
+    }
+}
+
 impl<'a> UpdateObjectPayloadAnalyzer<'a> {
     pub fn new(prefab_name: &'a str, object: &'a UpdateObject) -> Self {
         Self {
@@ -411,7 +440,10 @@ impl<'a> UpdateObjectPayloadAnalyzer<'a> {
 impl Display for UpdateObjectPayloadAnalyzer<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if let Some(parsed) = parse_update_payload(self.prefab_name, self.object) {
-            write!(f, "{}", parsed)
+            match parsed {
+                Ok(content) => write!(f, "{}", content),
+                Err(err) => write!(f, "<parse_error: {}>", err),
+            }
         } else {
             write!(
                 f,
@@ -422,39 +454,11 @@ impl Display for UpdateObjectPayloadAnalyzer<'_> {
     }
 }
 
-fn render_or_default<T>(result: Result<T, extension::ParseError>) -> String
-where
-    T: Display + Default,
-{
-    result.unwrap_or_default().to_string()
-}
-
-type PayloadParser = fn(&UpdateObject) -> String;
-
-const UPDATE_PAYLOAD_PARSERS: [(&str, PayloadParser); 4] = [
-    (
-        extension::prefab_name::DATE_TIME_RECEIVER,
-        |obj| render_or_default(obj.try_parse_date_time()),
-    ),
-    (
-        extension::prefab_name::COVER_IMAGE_RECEIVER,
-        |obj| render_or_default(obj.try_parse_cover_image()),
-    ),
-    (
-        extension::prefab_name::SCENE_PROP_MANIPULATOR,
-        |obj| render_or_default(obj.try_parse_scene_prop_manipulator()),
-    ),
-    (
-        extension::prefab_name::FOOT_SHADOW_MANIPULATOR,
-        |obj| render_or_default(obj.try_parse_foot_shadow_manipulator()),
-    ),
-];
-
-fn parse_update_payload(prefab_name: &str, object: &UpdateObject) -> Option<String> {
-    UPDATE_PAYLOAD_PARSERS
-        .iter()
-        .find(|(needle, _)| prefab_name.contains(*needle))
-        .map(|(_, parser)| parser(object))
+fn parse_update_payload(
+    prefab_name: &str,
+    object: &UpdateObject,
+) -> Option<Result<String, extension::ParseError>> {
+    extension::parse_update_payload_text(prefab_name, object)
 }
 
 // Helper functions
