@@ -208,8 +208,7 @@ impl ExtractTarget for AudioExtractTarget {
     }
 }
 
-const COVER_IMAGE_WEB_PREFIX: &str =
-    "http://assets.link-like-lovelive.app/wiht_fes_images";
+const COVER_IMAGE_WEB_PREFIX: &str = "http://assets.link-like-lovelive.app/wiht_fes_images";
 
 struct ImageExtractTarget {
     options: ImageExtractOptions,
@@ -357,9 +356,7 @@ fn build_target(
     match target_kind {
         #[cfg(feature = "audio")]
         ExtractTargetKind::Audio(_) => Ok(Box::new(AudioExtractTarget::new(_output_dir))),
-        ExtractTargetKind::Image(options) => {
-            Ok(Box::new(ImageExtractTarget::new(options.clone())))
-        }
+        ExtractTargetKind::Image(options) => Ok(Box::new(ImageExtractTarget::new(options.clone()))),
     }
 }
 

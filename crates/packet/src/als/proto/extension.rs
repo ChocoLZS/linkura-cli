@@ -1,6 +1,4 @@
-use chrono::{DateTime, Utc};
-
-use super::define::UpdateObject;
+use super::define::{InstantiateObject, UpdateObject};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
@@ -20,575 +18,393 @@ pub enum ParseError {
     InvalidObjectId(i32),
 }
 
-pub mod prefab_name {
-    pub const DATE_TIME_RECEIVER: &str = "TimedAsset/DateTimeReceiver";
-    pub const MUSIC_BROADCASTER: &str = "VoiceObject/MusicBroadcaster";
-    pub const COVER_IMAGE_RECEIVER: &str = "CoverImageReceiver";
-    pub const SCENE_PROP_MANIPULATOR: &str = "Prefabs/ScenePropManipulator";
-}
+mod init_specs;
+mod parsers;
+mod prefab_router;
+mod update_handlers;
+
+use init_specs::{property_name_for_kind_opt, summarize_init_property_value_by_kind};
+use parsers::misc::parse_character_model_initial_data_v0;
+use parsers::primitives::parse_memorypack_i32;
+use prefab_router::is_costume_prefab;
+
+pub use prefab_router::{
+    PrefabKind, detect_prefab_kind, normalize_prefab_name, parse_update_payload_text, prefab_name,
+};
+
 pub trait UpdateObjectExt {
     /// DateTimeReceiver payload
     fn try_parse_date_time(&self) -> Result<extract::DateTimeConvert, ParseError>;
     fn try_parse_cover_image(&self) -> Result<extract::CoverImageReceiver, ParseError>;
     fn try_parse_scene_prop_manipulator(&self)
     -> Result<extract::ScenePropManipulator, ParseError>;
+    fn try_parse_foot_shadow_manipulator(
+        &self,
+    ) -> Result<extract::FootShadowManipulator, ParseError>;
+    fn try_parse_expression_communicator(
+        &self,
+    ) -> Result<extract::ExpressionCommunicator, ParseError>;
+    fn try_parse_lip_communicator(&self) -> Result<extract::LipCommunicator, ParseError>;
+    fn try_parse_pose_communicator(&self) -> Result<extract::PoseCommunicator, ParseError>;
+    fn try_parse_visible_communicator(&self) -> Result<extract::VisibleCommunicator, ParseError>;
+    fn try_parse_finger_leap_communicator(
+        &self,
+    ) -> Result<extract::FingerLeapCommunicator, ParseError>;
+    fn try_parse_character_item_manipulator(
+        &self,
+    ) -> Result<extract::CharacterItemManipulator, ParseError>;
+    fn try_parse_virtual_camera_container(
+        &self,
+    ) -> Result<extract::VirtualCameraContainer, ParseError>;
+    fn try_parse_cameraman(&self) -> Result<extract::CameramanReceiver, ParseError>;
+    fn try_parse_motion_communicator(&self) -> Result<extract::MotionCommunicator, ParseError>;
+    fn try_parse_switch_receiver(&self) -> Result<extract::SwitchReceiver, ParseError>;
+    fn try_parse_music_broadcaster(&self) -> Result<extract::MusicBroadcaster, ParseError>;
+}
+
+pub trait InstantiateObjectExt {
+    fn try_parse_init_data(
+        &self,
+        prefab_name: &str,
+    ) -> Result<extract::InstantiateInitData, ParseError>;
 }
 
 impl UpdateObjectExt for UpdateObject {
     fn try_parse_date_time(&self) -> Result<extract::DateTimeConvert, ParseError> {
-        // 16 bytes: 8 bytes for ticks (u64) + 8 bytes for sync_time (f64)
-        if self.payload.len() != 16 {
-            return Err(ParseError::InvalidPayload {
-                expected: 16,
-                actual: self.payload.len(),
-            });
-        }
-
-        // 小端序解析
-        let date_ticks = self.payload[0..8]
-            .try_into()
-            .map(u64::from_le_bytes)
-            .map_err(|_| ParseError::InvalidPayload {
-                expected: 8,
-                actual: self.payload[0..8].len(),
-            })?;
-        let sync_time_seconds = self.payload[8..16]
-            .try_into()
-            .map(f64::from_le_bytes)
-            .map_err(|_| ParseError::InvalidPayload {
-                expected: 8,
-                actual: self.payload[8..16].len(),
-            })?;
-
-        // .NET DateTime Ticks 转换
-        // Ticks从 0001-01-01 00:00:00 开始，每tick = 100纳秒
-        // 提取实际的ticks值（去除高2位的DateTimeKind标志）
-        let actual_ticks = date_ticks & 0x3FFFFFFFFFFFFFFF;
-
-        // .NET epoch: 0001-01-01 00:00:00
-        // 转换为 Unix 时间戳（1970-01-01 00:00:00）
-        // 从 0001-01-01 到 1970-01-01 的 ticks
-        const TICKS_TO_UNIX_EPOCH: i64 = 621355968000000000; // 从0001-01-01到1970-01-01的ticks数
-        const TICKS_PER_SECOND: i64 = 10000000; // 每秒的ticks数 (1秒 = 10,000,000个100纳秒)
-
-        // 计算从Unix epoch开始的秒数和纳秒
-        let unix_seconds = ((actual_ticks as i64) - TICKS_TO_UNIX_EPOCH) / TICKS_PER_SECOND;
-        let unix_nanos = (((actual_ticks as i64) - TICKS_TO_UNIX_EPOCH) % TICKS_PER_SECOND) * 100;
-
-        // 创建 DateTime<Utc>
-        // Asia/Tokyo (JST) is UTC+9
-        // 数据是东九区(UTC+9)时间,需要减去9小时转换为UTC
-        const JST_OFFSET_SECONDS: i64 = 9 * 3600; // 东九区偏移量(秒)
-        let utc_seconds = unix_seconds - JST_OFFSET_SECONDS;
-        let date_time =
-            DateTime::from_timestamp(utc_seconds, unix_nanos as u32).unwrap_or_else(|| Utc::now());
-
-        // SyncTime 从秒转换为小时
-        let sync_time_hours = sync_time_seconds / 3600.0;
-
-        Ok(extract::DateTimeConvert {
-            date_time,
-            sync_time: sync_time_hours,
-        })
+        update_handlers::try_parse_date_time(self)
     }
 
-    /// 用 ida-pro-mcp 看下来，0x4C5BE1C 本身只是 CoverImageCommandFormatter.Serialize 的壳，真正序列化逻辑在它跳转到
-    /// 的 0x4C5BB68 (Inspix.CoverImageCommand$$Serialize)。
+    /// 鐢?ida-pro-mcp 鐪嬩笅鏉ワ紝0x4C5BE1C 鏈韩鍙槸 CoverImageCommandFormatter.Serialize 鐨勫３锛岀湡姝ｅ簭鍒楀寲閫昏緫鍦ㄥ畠璺宠浆鍒?    /// 鐨?0x4C5BB68 (Inspix.CoverImageCommand$$Serialize)銆?    ///
+    /// 缁撹鏄畠鎶?CoverImageCommand 搴忓垪鍖栨垚 MemoryPack 浜岃繘鍒讹紝瀛楁椤哄簭鏄細
     ///
-    /// 结论是它把 CoverImageCommand 序列化成 MemoryPack 二进制，字段顺序是：
+    /// 1. 鍏堝啓瀵硅薄鎴愬憳鏁?2锛? 瀛楄妭锛屽€?0x02锛屾潵鑷?sub_4C5CE2C(writer, 2)锛?    /// 2. 鍐欏瓧绗︿覆 CoverImageName
+    /// - 绌轰覆 -> 00 00 00 00锛坕nt32 0锛?    /// - 闈炵┖ -> 鍐欓暱搴﹀拰鍐呭锛堝父瑙佹槸 UTF-16锛涗篃鏀寔 UTF-8 璺緞锛?    ///
+    /// 3. 鍐?SyncTime 涓?double 鍘熷 8 瀛楄妭锛圛EEE754锛屽皬绔級
     ///
-    /// 1. 先写对象成员数 2（1 字节，值 0x02，来自 sub_4C5CE2C(writer, 2)）
-    /// 2. 写字符串 CoverImageName
-    /// - 空串 -> 00 00 00 00（int32 0）
-    /// - 非空 -> 写长度和内容（常见是 UTF-16；也支持 UTF-8 路径）
-    ///
-    /// 3. 写 SyncTime 为 double 原始 8 字节（IEEE754，小端）
-    ///
-    /// 示例（CoverImageName = "A", SyncTime = 1.5，UTF-16 路径）：
+    /// 绀轰緥锛圕overImageName = "A", SyncTime = 1.5锛孶TF-16 璺緞锛夛細
     ///
     /// 02
     /// 01 00 00 00
     /// 41 00
     /// 00 00 00 00 00 00 F8 3F
     ///
-    /// 含义就是：memberCount=2，字符串 "A"，然后 double(1.5)。
+    /// 鍚箟灏辨槸锛歮emberCount=2锛屽瓧绗︿覆 "A"锛岀劧鍚?double(1.5)銆?
     fn try_parse_cover_image(&self) -> Result<extract::CoverImageReceiver, ParseError> {
-        if self.payload.len() != 47 {
-            // 1 + 4 + 4 + len(name) + 8(sync time)
-            return Err(ParseError::InvalidPayload {
-                expected: 47,
-                actual: self.payload.len(),
-            });
-        }
-        let len = u32::from_le_bytes(self.payload[5..9].try_into().map_err(|_| {
-            ParseError::InvalidPayload {
-                expected: 4,
-                actual: self.payload[5..9].len(),
-            }
-        })?);
-        let cover_image_name =
-            String::from_utf8_lossy(&self.payload[9..9 + len as usize]).to_string();
-        // last 8 bytes
-        let sync_time_seconds = f64::from_le_bytes(
-            self.payload[9 + len as usize..9 + len as usize + 8]
-                .try_into()
-                .map_err(|_| ParseError::InvalidPayload {
-                    expected: 8,
-                    actual: self.payload[9 + len as usize..9 + len as usize + 8].len(),
-                })?,
-        );
-        let sync_time_hours = sync_time_seconds / 3600.0;
-        // Implementation for parsing cover image payload
-        // This is a placeholder - replace with actual parsing logic
-        Ok(extract::CoverImageReceiver {
-            cover_image_name,
-            sync_time: sync_time_hours,
-        })
+        update_handlers::try_parse_cover_image(self)
     }
 
     fn try_parse_scene_prop_manipulator(
         &self,
     ) -> Result<extract::ScenePropManipulator, ParseError> {
-        const METHOD_PROP_ID: i32 = 0;
-        const METHOD_WORLD_POSITION: i32 = 1;
-        const METHOD_WORLD_ROTATION: i32 = 2;
-        const METHOD_IS_VISIBLE: i32 = 3;
-        const METHOD_ANIMATION_TRIGGER: i32 = 10;
+        update_handlers::try_parse_scene_prop_manipulator(self)
+    }
 
-        match self.method {
-            METHOD_PROP_ID => {
-                let prop_id = parse_memorypack_i32(&self.payload)?;
-                Ok(extract::ScenePropManipulator {
-                    method: self.method,
-                    prop_id: Some(prop_id),
-                    world_position: None,
-                    world_rotation: None,
-                    is_visible: None,
-                    animation_trigger: None,
-                })
-            }
-            METHOD_WORLD_POSITION => {
-                let world_position = parse_memorypack_vector3(&self.payload)?;
-                Ok(extract::ScenePropManipulator {
-                    method: self.method,
-                    prop_id: None,
-                    world_position: Some(world_position),
-                    world_rotation: None,
-                    is_visible: None,
-                    animation_trigger: None,
-                })
-            }
-            METHOD_WORLD_ROTATION => {
-                let world_rotation = parse_memorypack_quaternion(&self.payload)?;
-                Ok(extract::ScenePropManipulator {
-                    method: self.method,
-                    prop_id: None,
-                    world_position: None,
-                    world_rotation: Some(world_rotation),
-                    is_visible: None,
-                    animation_trigger: None,
-                })
-            }
-            METHOD_IS_VISIBLE => {
-                let is_visible = parse_memorypack_bool(&self.payload)?;
-                Ok(extract::ScenePropManipulator {
-                    method: self.method,
-                    prop_id: None,
-                    world_position: None,
-                    world_rotation: None,
-                    is_visible: Some(is_visible),
-                    animation_trigger: None,
-                })
-            }
-            METHOD_ANIMATION_TRIGGER => {
-                let animation_trigger = parse_memorypack_string(&self.payload)?;
-                Ok(extract::ScenePropManipulator {
-                    method: self.method,
-                    prop_id: None,
-                    world_position: None,
-                    world_rotation: None,
-                    is_visible: None,
-                    animation_trigger: Some(animation_trigger),
-                })
-            }
-            _ => parse_scene_prop_by_shape(self.method, &self.payload),
-        }
+    fn try_parse_foot_shadow_manipulator(
+        &self,
+    ) -> Result<extract::FootShadowManipulator, ParseError> {
+        update_handlers::try_parse_foot_shadow_manipulator(self)
+    }
+
+    fn try_parse_expression_communicator(
+        &self,
+    ) -> Result<extract::ExpressionCommunicator, ParseError> {
+        update_handlers::try_parse_expression_communicator(self)
+    }
+
+    fn try_parse_lip_communicator(&self) -> Result<extract::LipCommunicator, ParseError> {
+        update_handlers::try_parse_lip_communicator(self)
+    }
+
+    fn try_parse_pose_communicator(&self) -> Result<extract::PoseCommunicator, ParseError> {
+        update_handlers::try_parse_pose_communicator(self)
+    }
+
+    fn try_parse_visible_communicator(&self) -> Result<extract::VisibleCommunicator, ParseError> {
+        update_handlers::try_parse_visible_communicator(self)
+    }
+
+    fn try_parse_finger_leap_communicator(
+        &self,
+    ) -> Result<extract::FingerLeapCommunicator, ParseError> {
+        update_handlers::try_parse_finger_leap_communicator(self)
+    }
+
+    fn try_parse_character_item_manipulator(
+        &self,
+    ) -> Result<extract::CharacterItemManipulator, ParseError> {
+        update_handlers::try_parse_character_item_manipulator(self)
+    }
+
+    fn try_parse_virtual_camera_container(
+        &self,
+    ) -> Result<extract::VirtualCameraContainer, ParseError> {
+        update_handlers::try_parse_virtual_camera_container(self)
+    }
+
+    fn try_parse_cameraman(&self) -> Result<extract::CameramanReceiver, ParseError> {
+        update_handlers::try_parse_cameraman(self)
+    }
+
+    fn try_parse_motion_communicator(&self) -> Result<extract::MotionCommunicator, ParseError> {
+        update_handlers::try_parse_motion_communicator(self)
+    }
+
+    fn try_parse_switch_receiver(&self) -> Result<extract::SwitchReceiver, ParseError> {
+        update_handlers::try_parse_switch_receiver(self)
+    }
+
+    fn try_parse_music_broadcaster(&self) -> Result<extract::MusicBroadcaster, ParseError> {
+        update_handlers::try_parse_music_broadcaster(self)
     }
 }
 
-fn parse_scene_prop_by_shape(
-    method: i32,
-    payload: &[u8],
-) -> Result<extract::ScenePropManipulator, ParseError> {
-    if let Ok(value) = parse_memorypack_bool(payload) {
-        if payload.len() == 1 {
-            return Ok(extract::ScenePropManipulator {
-                method,
-                prop_id: None,
-                world_position: None,
-                world_rotation: None,
-                is_visible: Some(value),
-                animation_trigger: None,
+impl InstantiateObjectExt for InstantiateObject {
+    fn try_parse_init_data(
+        &self,
+        prefab_name: &str,
+    ) -> Result<extract::InstantiateInitData, ParseError> {
+        parse_instantiate_init_data(prefab_name, &self.init_data)
+    }
+}
+
+fn parse_instantiate_init_data(
+    prefab_name: &str,
+    init_data: &[u8],
+) -> Result<extract::InstantiateInitData, ParseError> {
+    let prefab_kind = detect_prefab_kind(prefab_name);
+    let costume_prefab = is_costume_prefab(prefab_name);
+
+    let mut parsed = extract::InstantiateInitData {
+        total_len: init_data.len(),
+        ..Default::default()
+    };
+
+    if init_data.is_empty() {
+        parsed.note = Some("empty init_data".to_string());
+        return Ok(parsed);
+    }
+
+    if init_data.len() < 9 {
+        return Err(ParseError::InvalidPayload {
+            expected: 9,
+            actual: init_data.len(),
+        });
+    }
+
+    let marker = init_data[0];
+    let version = parse_memorypack_i32(&init_data[1..5])?;
+    let declared_body_len = parse_memorypack_i32(&init_data[5..9])?;
+    if declared_body_len < 0 {
+        return Err(ParseError::InvalidPayload {
+            expected: 0,
+            actual: init_data.len(),
+        });
+    }
+
+    let declared_body_len = declared_body_len as usize;
+    let body = &init_data[9..];
+    parsed.marker = Some(marker);
+    parsed.version = Some(version);
+    parsed.declared_body_len = Some(declared_body_len);
+
+    if declared_body_len != body.len() {
+        parsed.note = Some(format!(
+            "declared_body_len={} but actual_body_len={}",
+            declared_body_len,
+            body.len()
+        ));
+    }
+
+    // Legacy envelope observed on costume prefabs.
+    if marker == 2 && version == 0 {
+        parse_legacy_init_data_v0(costume_prefab, body, &mut parsed);
+        return Ok(parsed);
+    }
+
+    // Observed dominant shape: marker=2, version=1,
+    // body = [tag=1][property_count:i32][repeated rpc_id:u8 + len:i32 + payload]
+    if marker == 2 && version == 1 {
+        if body.is_empty() {
+            return Ok(parsed);
+        }
+
+        if body.len() < 5 {
+            parsed.note = Some("body too short for property list".to_string());
+            parsed.raw_preview = Some(hex_preview(body, 32));
+            return Ok(parsed);
+        }
+
+        let body_tag = body[0];
+        parsed.body_tag = Some(body_tag);
+        if body_tag != 1 {
+            parsed.note = Some(format!("unsupported body_tag={}", body_tag));
+            parsed.raw_preview = Some(hex_preview(body, 48));
+            return Ok(parsed);
+        }
+
+        let property_count = parse_memorypack_i32(&body[1..5])?;
+        if property_count < 0 {
+            parsed.note = Some(format!("invalid property_count={}", property_count));
+            parsed.raw_preview = Some(hex_preview(body, 48));
+            return Ok(parsed);
+        }
+        parsed.property_count = Some(property_count as usize);
+
+        let mut cursor = 5usize;
+        for _ in 0..property_count {
+            if cursor + 5 > body.len() {
+                parsed.note = Some("property header truncated".to_string());
+                break;
+            }
+
+            let rpc_id = body[cursor];
+            cursor += 1;
+
+            let payload_len = parse_memorypack_i32(&body[cursor..cursor + 4])?;
+            cursor += 4;
+            if payload_len < 0 {
+                parsed.note = Some(format!(
+                    "invalid payload_len={} for rpc={}",
+                    payload_len, rpc_id
+                ));
+                break;
+            }
+            let payload_len = payload_len as usize;
+            if cursor + payload_len > body.len() {
+                parsed.note = Some(format!(
+                    "payload out of range for rpc={}, len={}, remaining={}",
+                    rpc_id,
+                    payload_len,
+                    body.len().saturating_sub(cursor)
+                ));
+                break;
+            }
+
+            let payload = &body[cursor..cursor + payload_len];
+            cursor += payload_len;
+
+            let property_name = property_name_for_kind_opt(prefab_kind, rpc_id)
+                .map(ToString::to_string)
+                .unwrap_or_else(|| format!("Rpc{}", rpc_id));
+            let value_summary =
+                summarize_init_property_value_by_kind(prefab_kind, rpc_id, payload);
+
+            parsed.properties.push(extract::InstantiateProperty {
+                rpc_id,
+                property_name,
+                payload_len,
+                value_summary,
             });
+        }
+
+        if cursor < body.len() {
+            parsed.raw_preview = Some(hex_preview(&body[cursor..], 48));
+        }
+
+        return Ok(parsed);
+    }
+
+    // fallback for alternative init_data layouts (e.g., avatar costume object init blob)
+    parsed.note = Some(format!(
+        "unsupported envelope marker/version = {}/{}",
+        marker, version
+    ));
+    parsed.raw_preview = Some(hex_preview(body, 64));
+    Ok(parsed)
+}
+
+fn hex_preview(payload: &[u8], limit: usize) -> String {
+    let take = payload.len().min(limit);
+    let mut s = payload[..take]
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<Vec<_>>()
+        .join(" ");
+    if payload.len() > take {
+        s.push_str(" ...");
+    }
+    s
+}
+
+fn parse_legacy_init_data_v0(costume_prefab: bool, body: &[u8], parsed: &mut extract::InstantiateInitData) {
+    if body.is_empty() {
+        parsed.note = Some("legacy envelope version=0 with empty body".to_string());
+        return;
+    }
+
+    if body.len() % 4 != 0 {
+        parsed.note = Some("legacy envelope version=0 body is not 4-byte aligned".to_string());
+        parsed.raw_preview = Some(hex_preview(body, 64));
+        return;
+    }
+
+    if costume_prefab {
+        if let Ok(model) = parse_character_model_initial_data_v0(body) {
+            parsed.note =
+                Some("legacy envelope version=0 parsed as CharacterModelInitialData".to_string());
+            parsed.property_count = Some(4);
+            parsed.properties.push(extract::InstantiateProperty {
+                rpc_id: 0,
+                property_name: "CharacterId".to_string(),
+                payload_len: 4,
+                value_summary: format!("i32({})", model.character_id),
+            });
+            parsed.properties.push(extract::InstantiateProperty {
+                rpc_id: 1,
+                property_name: "CostumeId".to_string(),
+                payload_len: 4,
+                value_summary: format!("i32({})", model.costume_id),
+            });
+            parsed.properties.push(extract::InstantiateProperty {
+                rpc_id: 2,
+                property_name: "Position".to_string(),
+                payload_len: 12,
+                value_summary: format!(
+                    "Vector3({:.3}, {:.3}, {:.3})",
+                    model.position.x, model.position.y, model.position.z
+                ),
+            });
+            parsed.properties.push(extract::InstantiateProperty {
+                rpc_id: 3,
+                property_name: "Rotation".to_string(),
+                payload_len: 16,
+                value_summary: format!(
+                    "Quaternion({:.3}, {:.3}, {:.3}, {:.3})",
+                    model.rotation.x, model.rotation.y, model.rotation.z, model.rotation.w
+                ),
+            });
+            return;
         }
     }
 
-    if payload.len() >= 4 {
-        let marker = i32::from_le_bytes(payload[0..4].try_into().map_err(|_| {
-            ParseError::InvalidPayload {
-                expected: 4,
-                actual: payload.len(),
-            }
-        })?);
-        let looks_like_string = if marker == -1 || marker == 0 {
-            payload.len() == 4
-        } else if marker > 0 {
-            payload.len() == 4 + (marker as usize * 2)
-        } else if payload.len() >= 8 {
-            payload.len() == 8 + (!marker) as usize
+    parsed.note = Some("legacy envelope version=0 parsed as 4-byte words".to_string());
+
+    let words = body.len() / 4;
+    parsed.property_count = Some(words);
+    for idx in 0..words {
+        let start = idx * 4;
+        let end = start + 4;
+        let chunk = &body[start..end];
+        let as_u32 = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        let as_i32 = i32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        let as_f32 = f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+
+        let property_name = if idx == 0 && costume_prefab {
+            "CharacterId".to_string()
         } else {
-            false
+            format!("Word{}", idx)
         };
 
-        if looks_like_string {
-            if let Ok(value) = parse_memorypack_string(payload) {
-                return Ok(extract::ScenePropManipulator {
-                    method,
-                    prop_id: None,
-                    world_position: None,
-                    world_rotation: None,
-                    is_visible: None,
-                    animation_trigger: Some(value),
-                });
-            }
-        }
-    }
-
-    if let Ok(value) = parse_memorypack_i32(payload) {
-        if payload.len() == 4 {
-            return Ok(extract::ScenePropManipulator {
-                method,
-                prop_id: Some(value),
-                world_position: None,
-                world_rotation: None,
-                is_visible: None,
-                animation_trigger: None,
-            });
-        }
-    }
-
-    if let Ok(value) = parse_memorypack_vector3(payload) {
-        if payload.len() == 12 {
-            return Ok(extract::ScenePropManipulator {
-                method,
-                prop_id: None,
-                world_position: Some(value),
-                world_rotation: None,
-                is_visible: None,
-                animation_trigger: None,
-            });
-        }
-    }
-
-    if let Ok(value) = parse_memorypack_quaternion(payload) {
-        if payload.len() == 16 {
-            return Ok(extract::ScenePropManipulator {
-                method,
-                prop_id: None,
-                world_position: None,
-                world_rotation: Some(value),
-                is_visible: None,
-                animation_trigger: None,
-            });
-        }
-    }
-
-    Err(ParseError::UnknownMethod(method))
-}
-
-fn parse_memorypack_i32(payload: &[u8]) -> Result<i32, ParseError> {
-    if payload.len() < 4 {
-        return Err(ParseError::InvalidPayload {
-            expected: 4,
-            actual: payload.len(),
+        parsed.properties.push(extract::InstantiateProperty {
+            rpc_id: idx as u8,
+            property_name,
+            payload_len: 4,
+            value_summary: format!("i32({}), u32({}), f32({:.6})", as_i32, as_u32, as_f32),
         });
     }
-
-    Ok(i32::from_le_bytes(payload[0..4].try_into().map_err(
-        |_| ParseError::InvalidPayload {
-            expected: 4,
-            actual: payload.len(),
-        },
-    )?))
 }
 
-fn parse_memorypack_vector3(payload: &[u8]) -> Result<extract::Vector3, ParseError> {
-    if payload.len() < 12 {
-        return Err(ParseError::InvalidPayload {
-            expected: 12,
-            actual: payload.len(),
-        });
-    }
-    Ok(extract::Vector3 {
-        x: f32::from_le_bytes(payload[0..4].try_into().map_err(|_| {
-            ParseError::InvalidPayload {
-                expected: 4,
-                actual: payload.len(),
-            }
-        })?),
-        y: f32::from_le_bytes(payload[4..8].try_into().map_err(|_| {
-            ParseError::InvalidPayload {
-                expected: 8,
-                actual: payload.len(),
-            }
-        })?),
-        z: f32::from_le_bytes(payload[8..12].try_into().map_err(|_| {
-            ParseError::InvalidPayload {
-                expected: 12,
-                actual: payload.len(),
-            }
-        })?),
-    })
-}
+pub mod extract;
 
-fn parse_memorypack_quaternion(payload: &[u8]) -> Result<extract::Quaternion, ParseError> {
-    if payload.len() < 16 {
-        return Err(ParseError::InvalidPayload {
-            expected: 16,
-            actual: payload.len(),
-        });
-    }
-    Ok(extract::Quaternion {
-        x: f32::from_le_bytes(payload[0..4].try_into().map_err(|_| {
-            ParseError::InvalidPayload {
-                expected: 4,
-                actual: payload.len(),
-            }
-        })?),
-        y: f32::from_le_bytes(payload[4..8].try_into().map_err(|_| {
-            ParseError::InvalidPayload {
-                expected: 8,
-                actual: payload.len(),
-            }
-        })?),
-        z: f32::from_le_bytes(payload[8..12].try_into().map_err(|_| {
-            ParseError::InvalidPayload {
-                expected: 12,
-                actual: payload.len(),
-            }
-        })?),
-        w: f32::from_le_bytes(payload[12..16].try_into().map_err(|_| {
-            ParseError::InvalidPayload {
-                expected: 16,
-                actual: payload.len(),
-            }
-        })?),
-    })
-}
 
-fn parse_memorypack_bool(payload: &[u8]) -> Result<bool, ParseError> {
-    if payload.is_empty() {
-        return Err(ParseError::InvalidPayload {
-            expected: 1,
-            actual: 0,
-        });
-    }
-    Ok(payload[0] != 0)
-}
 
-fn parse_memorypack_string(payload: &[u8]) -> Result<String, ParseError> {
-    if payload.len() < 4 {
-        return Err(ParseError::InvalidPayload {
-            expected: 4,
-            actual: payload.len(),
-        });
-    }
-
-    let marker =
-        i32::from_le_bytes(
-            payload[0..4]
-                .try_into()
-                .map_err(|_| ParseError::InvalidPayload {
-                    expected: 4,
-                    actual: payload.len(),
-                })?,
-        );
-
-    if marker == -1 || marker == 0 {
-        if payload.len() != 4 {
-            return Err(ParseError::InvalidPayload {
-                expected: 4,
-                actual: payload.len(),
-            });
-        }
-        return Ok(String::new());
-    }
-
-    if marker > 0 {
-        let utf16_units = marker as usize;
-        let bytes_len = utf16_units * 2;
-        let expected = 4 + bytes_len;
-        if payload.len() < expected {
-            return Err(ParseError::InvalidPayload {
-                expected,
-                actual: payload.len(),
-            });
-        }
-
-        let mut units = Vec::with_capacity(utf16_units);
-        for chunk in payload[4..expected].chunks_exact(2) {
-            units.push(u16::from_le_bytes([chunk[0], chunk[1]]));
-        }
-        return Ok(String::from_utf16_lossy(&units));
-    }
-
-    if payload.len() < 8 {
-        return Err(ParseError::InvalidPayload {
-            expected: 8,
-            actual: payload.len(),
-        });
-    }
-
-    let utf8_len = (!marker) as usize;
-    let expected = 8 + utf8_len;
-    if payload.len() < expected {
-        return Err(ParseError::InvalidPayload {
-            expected,
-            actual: payload.len(),
-        });
-    }
-
-    Ok(String::from_utf8_lossy(&payload[8..expected]).to_string())
-}
-
-pub mod extract {
-    use std::fmt::Display;
-
-    use chrono::{DateTime, Utc};
-
-    #[derive(Debug, Clone)]
-    pub struct DateTimeConvert {
-        pub date_time: DateTime<Utc>, // ticks in c#
-        pub sync_time: f64,
-    }
-
-    impl Display for DateTimeConvert {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            let total_seconds = self.sync_time * 3600.0;
-            let hours = (total_seconds / 3600.0) as i32;
-            let minutes = ((total_seconds % 3600.0) / 60.0) as i32;
-            let seconds = total_seconds % 60.0;
-
-            let sync_duration = chrono::Duration::milliseconds((total_seconds * 1000.0) as i64);
-            let start_time = self.date_time - sync_duration;
-
-            write!(
-                f,
-                "DateTime: {}, SyncTime: {}h{}m{:.2}s, StartTime: {}",
-                self.date_time, hours, minutes, seconds, start_time
-            )
-        }
-    }
-
-    impl Default for DateTimeConvert {
-        fn default() -> Self {
-            DateTimeConvert {
-                date_time: Utc::now(),
-                sync_time: 0.0,
-            }
-        }
-    }
-
-    pub struct CoverImageReceiver {
-        pub cover_image_name: String,
-        pub sync_time: f64,
-    }
-
-    impl Display for CoverImageReceiver {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(
-                f,
-                "CoverImage: {}, SyncTime: {}h{}m{:.2}s",
-                self.cover_image_name,
-                self.sync_time as i32 / 3600,
-                (self.sync_time as i32 % 3600) / 60,
-                self.sync_time % 60.0
-            )
-        }
-    }
-
-    impl Default for CoverImageReceiver {
-        fn default() -> Self {
-            CoverImageReceiver {
-                cover_image_name: String::new(),
-                sync_time: 0.0,
-            }
-        }
-    }
-
-    #[derive(Debug, Clone, Default)]
-    pub struct ScenePropManipulator {
-        pub method: i32,
-        pub prop_id: Option<i32>,
-        pub world_position: Option<Vector3>,
-        pub world_rotation: Option<Quaternion>,
-        pub is_visible: Option<bool>,
-        pub animation_trigger: Option<String>,
-    }
-
-    #[derive(Debug, Clone, Copy, Default)]
-    pub struct Vector3 {
-        pub x: f32,
-        pub y: f32,
-        pub z: f32,
-    }
-
-    #[derive(Debug, Clone, Copy, Default)]
-    pub struct Quaternion {
-        pub x: f32,
-        pub y: f32,
-        pub z: f32,
-        pub w: f32,
-    }
-
-    impl Display for ScenePropManipulator {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            if let Some(value) = self.prop_id {
-                return write!(
-                    f,
-                    "ScenePropManipulator(method={}): PropId={}",
-                    self.method, value
-                );
-            }
-            if let Some(value) = self.world_position {
-                return write!(
-                    f,
-                    "ScenePropManipulator(method={}): WorldPosition=({:.6}, {:.6}, {:.6})",
-                    self.method, value.x, value.y, value.z
-                );
-            }
-            if let Some(value) = self.world_rotation {
-                return write!(
-                    f,
-                    "ScenePropManipulator(method={}): WorldRotation=({:.6}, {:.6}, {:.6}, {:.6})",
-                    self.method, value.x, value.y, value.z, value.w
-                );
-            }
-            if let Some(value) = self.is_visible {
-                return write!(
-                    f,
-                    "ScenePropManipulator(method={}): IsVisible={}",
-                    self.method, value
-                );
-            }
-            if let Some(trigger) = &self.animation_trigger {
-                return write!(
-                    f,
-                    "ScenePropManipulator(method={}): AnimationTrigger={}",
-                    self.method, trigger
-                );
-            }
-            write!(f, "ScenePropManipulator(method={}): <empty>", self.method)
-        }
-    }
-}
