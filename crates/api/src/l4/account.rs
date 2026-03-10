@@ -1,37 +1,40 @@
-use crate::macros::{define_api_struct, use_common_crate};
-use serde_json::json;
+use crate::macros::{define_api_struct, define_post_method, use_common_crate};
 
 use_common_crate!();
 define_api_struct!(AccountApi);
 
 impl<'a> AccountApi<'a> {
-    /// Returns the `device_specific_id`
-    ///
-    /// **Response example**
-    ///
-    /// ```json
-    /// {   
-    ///     "player_id": "114514",
-    ///     "device_specific_id": "1919810",
-    ///     "session_token": "1919810",
-    ///     "player_name": "yaju senpai",
-    ///     "player_level": 114514
-    /// }
-    /// ```
-    pub fn account_connect(&self, id: &str, password: &str) -> Result<Response> {
-        let url = format!("{API_BASE}/account/connect");
-        let res = self
-            .client
-            .post(url)
-            .headers(self.runtime_header.clone())
-            .header("x-idempotency-key", gen_random_idempotency_key())
-            .json(&json!({
-                "provider": 1,
-                "player_id": id,
-                "id_token": password,
-                "platform_type": 1
-            }))
-            .send()?;
-        Ok(res)
-    }
+    // POST /v1/account/connect
+    define_post_method!(
+        connect,
+        "/account/connect",
+        crate::model::AccountConnectRequest
+    );
+
+    // POST /v1/account/delete
+    define_post_method!(delete, "/account/delete");
+
+    // POST /v1/account/delete_connect_data
+    define_post_method!(
+        delete_connect_data,
+        "/account/delete_connect_data",
+        crate::model::AccountDeleteConnectDataRequest
+    );
+
+    // POST /v1/account/get_connect_data
+    define_post_method!(get_connect_data, "/account/get_connect_data");
+
+    // POST /v1/account/get_connect_user
+    define_post_method!(
+        get_connect_user,
+        "/account/get_connect_user",
+        crate::model::AccountGetConnectUserRequest
+    );
+
+    // POST /v1/account/set_connect_data
+    define_post_method!(
+        set_connect_data,
+        "/account/set_connect_data",
+        crate::model::AccountSetConnectDataRequest
+    );
 }
