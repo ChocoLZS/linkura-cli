@@ -1,4 +1,4 @@
-use crate::{cli::spinner::SpinnerManager, command::api::ArgsAPI};
+use crate::{cli::spinner::SpinnerManager, command::api::ArgsAPI, command::mcp::ArgsMcp};
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ use linkura_api::{self, ApiClient, Credential};
 use linkura_i18n::t;
 
 /** ARG PARSER **/
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[clap(version)]
 #[command(
     name = "linkura-cli",
@@ -48,10 +48,12 @@ pub struct Args {
     pub command: Option<Commands>,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
     /// Get api response data
     API(ArgsAPI),
+    /// Start MCP server over stdio
+    Mcp(ArgsMcp),
     /// Get app version & res version
     Version,
 }
@@ -172,7 +174,7 @@ pub struct Global {
 }
 
 impl Global {
-    pub fn new(args: Args) -> Self {
+    pub async fn new(args: Args) -> Self {
         let spinner_manager = SpinnerManager::new(args.quiet);
         let mut api_client = linkura_api::ApiClient::new();
         let mut config_manager = ConfigManager::new(args.config_path.clone());
@@ -182,6 +184,7 @@ impl Global {
         let config = if config_res.is_err() {
             tracing::error!("Failed to load config: {:?}", config_res.err());
             Self::initialize_config(&args, &config_manager, &mut api_client, &spinner_manager)
+                .await
         } else {
             match config_res.unwrap() {
                 Some(mut config) => {
@@ -190,7 +193,7 @@ impl Global {
                             spinner_manager.create_spinner(&t!("linkura.config.checking.version"));
                         // check if latest res_version and client_version
                         let (res_version, client_version) =
-                            api_client.high_level().get_app_version().unwrap();
+                            api_client.high_level().get_app_version().await.unwrap();
                         if let Some(res_version) = res_version {
                             if res_version != config.credential.res_version {
                                 sp.set_message(t!(
@@ -224,7 +227,8 @@ impl Global {
                     &config_manager,
                     &mut api_client,
                     &spinner_manager,
-                ),
+                )
+                .await,
             }
         };
 
@@ -238,7 +242,7 @@ impl Global {
         }
     }
 
-    fn initialize_config(
+    async fn initialize_config(
         args: &Args,
         config_manager: &ConfigManager,
         api_client: &mut ApiClient,
@@ -255,6 +259,7 @@ impl Global {
             args.player_id.clone(),
             args.password.clone(),
         )
+        .await
         .expect("Failed to get credential");
         Config { credential }
     }
@@ -262,9 +267,9 @@ impl Global {
 
 /*  CONFIG END **/
 
-pub fn init(args: Args) -> Result<Global> {
+pub async fn init(args: Args) -> Result<Global> {
     tracing::info!("Initializing config...");
-    let mut global = Global::new(args);
+    let mut global = Global::new(args).await;
     tracing::info!("Config initialized!");
 
     let sp = global
@@ -274,7 +279,8 @@ pub fn init(args: Args) -> Result<Global> {
         let session_token = global.api_client.high_level().device_id_login(
             &global.config.credential.player_id,
             &global.config.credential.device_specific_id,
-        )?;
+        )
+        .await?;
         global.config.credential.session_token = Some(session_token.clone());
         session_token
     } else {
@@ -283,7 +289,7 @@ pub fn init(args: Args) -> Result<Global> {
     global.api_client.set_session_token(&session_token);
     // 测试登录态
     sp.set_message(t!("linkura.config.testing.login"));
-    match global.api_client.high_level().get_plan_list() {
+    match global.api_client.high_level().get_plan_list().await {
         Ok(_) => {}
         Err(_) => {
             sp.set_message(t!("linkura.config.test.failed.retry"));
@@ -296,6 +302,7 @@ pub fn init(args: Args) -> Result<Global> {
                     &global.config.credential.player_id,
                     &global.config.credential.device_specific_id,
                 )
+                .await
                 .map_err(|e| {
                     anyhow::anyhow!(t!("linkura.config.login.failed", error = e.to_string()))
                 })?;
@@ -318,6 +325,55 @@ pub fn init(args: Args) -> Result<Global> {
         token = session_token
     ));
     Ok(global)
+}
+
+pub async fn init_non_interactive(args: Args) -> Result<Global> {
+    tracing::info!("Initializing config for MCP mode...");
+
+    let spinner_manager = SpinnerManager::new(true);
+    let mut api_client = linkura_api::ApiClient::new();
+    let mut config_manager = ConfigManager::new(args.config_path.clone());
+
+    let mut config = config_manager
+        .load_config()?
+        .ok_or_else(|| anyhow::anyhow!("No config found. Initialize credentials before starting MCP mode."))?;
+
+    api_client.update_with_credential(&config.credential);
+
+    let session_token = if let Some(token) = config.credential.session_token.clone() {
+        token
+    } else {
+        let token = api_client.high_level().device_id_login(
+            &config.credential.player_id,
+            &config.credential.device_specific_id,
+        )
+        .await?;
+        config.credential.session_token = Some(token.clone());
+        token
+    };
+
+    api_client.set_session_token(&session_token);
+
+    if api_client.high_level().get_plan_list().await.is_err() {
+        api_client.del_session_token();
+        let token = api_client.high_level().device_id_login(
+            &config.credential.player_id,
+            &config.credential.device_specific_id,
+        )
+        .await?;
+        config.credential.session_token = Some(token.clone());
+        api_client.set_session_token(&token);
+    }
+
+    config_manager.save_config(&config)?;
+
+    Ok(Global {
+        config,
+        config_manager,
+        api_client,
+        args,
+        spinner_manager,
+    })
 }
 
 pub mod interactive;

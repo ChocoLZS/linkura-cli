@@ -5,7 +5,7 @@ use linkura_i18n::t;
 use crate::cli::spinner::SpinnerManager;
 use linkura_api::{self, ApiClient, Credential};
 
-pub fn get_credential_with_simple_prompt(
+pub async fn get_credential_with_simple_prompt(
     client: &mut ApiClient,
     spinner_manager: &SpinnerManager,
     player_id: Option<String>,
@@ -22,7 +22,7 @@ pub fn get_credential_with_simple_prompt(
             .prompt()?,
     };
     let sp = spinner_manager.create_spinner(&t!("linkura.interactive.fetching.login.info"));
-    let (res_version, client_version) = client.high_level().get_app_version()?;
+    let (res_version, client_version) = client.high_level().get_app_version().await?;
     sp.set_message(t!("linkura.interactive.fetch.app.version.success"));
     let res_version = res_version.unwrap_or(linkura_api::BASE_RES_VERSION.to_string());
     let client_version = client_version.unwrap_or(linkura_api::BASE_CLIENT_VERSION.to_string());
@@ -31,7 +31,7 @@ pub fn get_credential_with_simple_prompt(
         res_version, client_version
     );
     client.update_version(&res_version, &client_version);
-    let device_specific_id = client.high_level().password_login(&player_id, &id_token)?;
+    let device_specific_id = client.high_level().password_login(&player_id, &id_token).await?;
     sp.finish_with_message(t!("linkura.interactive.fetch.login.info.success"));
     Ok(Credential {
         res_version,

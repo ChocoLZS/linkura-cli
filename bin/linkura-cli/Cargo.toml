@@ -19,6 +19,7 @@ serde_json.workspace = true
 ctrlc.workspace = true
 tracing.workspace = true
 rust-i18n.workspace = true
+rmcp.workspace = true
 
 indicatif.workspace = true
 inquire = "0.7.5"

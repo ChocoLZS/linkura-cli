@@ -52,15 +52,15 @@ pub fn gen_random_idempotency_key() -> String {
 
 #[derive(Debug)]
 pub struct ApiClient {
-    pub(crate) client: reqwest::blocking::Client,
-    pub(crate) assets_client: reqwest::blocking::Client,
+    pub(crate) client: reqwest::Client,
+    pub(crate) assets_client: reqwest::Client,
     pub(crate) runtime_header: header::HeaderMap,
 }
 
 impl ApiClient {
     pub fn new() -> Self {
         Self {
-            client: reqwest::blocking::Client::builder()
+            client: reqwest::Client::builder()
                 .default_headers({
                     let mut headers = header::HeaderMap::new();
                     headers.insert("x-res-version", BASE_RES_VERSION.parse().unwrap());
@@ -86,7 +86,7 @@ impl ApiClient {
                 .build()
                 .unwrap(),
             runtime_header: header::HeaderMap::new(),
-            assets_client: reqwest::blocking::Client::builder()
+            assets_client: reqwest::Client::builder()
                 .default_headers({
                     let mut headers = header::HeaderMap::new();
                     headers.insert(
@@ -155,31 +155,33 @@ impl ApiClient {
     }
 }
 
-fn _get_appstore_version() -> Result<Option<String>> {
-    let website = reqwest::blocking::Client::new()
+async fn _get_appstore_version() -> Result<Option<String>> {
+    let website = reqwest::Client::new()
         .get(LINKURA_APP_STORE_URL)
         .header(header::USER_AGENT, WEB_UA)
-        .send()?;
+        .send()
+        .await?;
     if website.status() != reqwest::StatusCode::OK {
         tracing::error!("Failed to get app version from website: {:?}", website);
     }
     let re = regex::Regex::new(r#""primarySubtitle":\s*"(\d+\.\d+\.\d+)"#).unwrap();
-    let text = website.text()?;
+    let text = website.text().await?;
     let captures = re.captures(&text);
     Ok(captures
         .and_then(|cap| cap.get(1))
         .map(|m| m.as_str().to_string()))
 }
 
-pub fn get_appstore_version() -> Option<String> {
-    return _get_appstore_version().ok().flatten();
+pub async fn get_appstore_version() -> Option<String> {
+    _get_appstore_version().await.ok().flatten()
 }
 
-fn _get_google_play_version() -> Result<Option<String>> {
-    let website = reqwest::blocking::Client::new()
+async fn _get_google_play_version() -> Result<Option<String>> {
+    let website = reqwest::Client::new()
         .get(LINKURA_GOOGLE_PLAY_URL)
         .header(header::USER_AGENT, WEB_UA)
-        .send()?;
+        .send()
+        .await?;
     if website.status() != reqwest::StatusCode::OK {
         tracing::error!("Failed to get app version from website: {:?}", website);
     }
@@ -187,13 +189,13 @@ fn _get_google_play_version() -> Result<Option<String>> {
         r#"Link！Like！ラブライブ！蓮ノ空スクールアイドルクラブ"[^\n]*\["(\d+\.\d+\.\d+)"\]"#,
     )
     .unwrap();
-    let text = website.text()?;
+    let text = website.text().await?;
     let captures = re.captures(&text);
     Ok(captures
         .and_then(|cap| cap.get(1))
         .map(|m| m.as_str().to_string()))
 }
 
-pub fn get_google_play_version() -> Option<String> {
-    return _get_google_play_version().ok().flatten();
+pub async fn get_google_play_version() -> Option<String> {
+    _get_google_play_version().await.ok().flatten()
 }
