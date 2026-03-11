@@ -1,5 +1,6 @@
 use crate::config::Global;
 use chrono::{Local, Utc};
+use linkura_api::model::FesliveLobbyRequest;
 
 pub fn run(ctx: &Global) {
     let args = &ctx.args;
@@ -110,7 +111,11 @@ fn print_latest_trailer_info(ctx: &Global, wm: &serde_json::Value) {
     }
     if live_type == 1 {
         // enter fes lobby first
-        let _ = api_client.raw().fes_live().lobby(id);
+        let lobby_request = FesliveLobbyRequest {
+            live_id: Some(id.to_string()),
+            ..Default::default()
+        };
+        let _ = api_client.raw().fes_live().lobby(&lobby_request);
         let res: Result<serde_json::Value, anyhow::Error> =
             api_client.high_level().get_fes_live_info(id);
         match res {
