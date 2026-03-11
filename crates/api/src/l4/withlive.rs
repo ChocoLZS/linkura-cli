@@ -1,88 +1,124 @@
-use crate::macros::{define_api_struct, define_post_method, use_common_crate};
+use crate::macros::{define_api_struct, post, post_params, use_common_crate};
 
 use_common_crate!();
 define_api_struct!(WithliveApi);
 
 impl<'a> WithliveApi<'a> {
     // POST /v1/withlive/comment
-    define_post_method!(
+    post!(
         comment,
         "/withlive/comment",
-        crate::model::WithliveCommentRequest
+        crate::model::WithliveCommentRequest,
+        crate::model::WithliveCommentResponse
     );
 
     // POST /v1/withlive/connect_token
-    define_post_method!(
+    post!(
         connect_token,
         "/withlive/connect_token",
-        crate::model::WithliveConnectTokenRequest
+        crate::model::LiveConnectTokenRequest,
+        crate::model::LiveConnectTokenResponse
     );
 
     // POST /v1/withlive/enquetes/answer
-    define_post_method!(
+    post!(
         enquetes_answer,
         "/withlive/enquetes/answer",
-        crate::model::WithliveEnquetesAnswerRequest
+        crate::model::WithliveEnqueteAnswerRequest,
+        crate::model::WithliveEnqueteAnswerResponse
     );
 
     // POST /v1/withlive/enter
-    define_post_method!(enter, "/withlive/enter", crate::model::WithliveEnterRequest);
+    post!(
+        enter,
+        "/withlive/enter",
+        crate::model::WithliveEnterRequest,
+        crate::model::WithliveEnterResponse
+    );
 
     // POST /v1/withlive/get_gift_shop_list
-    define_post_method!(
+    post!(
         get_gift_shop_list,
         "/withlive/get_gift_shop_list",
-        crate::model::WithliveGetGiftShopListRequest
+        crate::model::WithliveGetGiftShopListRequest,
+        crate::model::WithliveGetGiftShopListResponse
     );
 
     // POST /v1/withlive/get_list
-    define_post_method!(get_list, "/withlive/get_list");
+    post!(
+        get_list,
+        "/withlive/get_list",
+        crate::model::WithliveGetListResponse
+    );
 
     // POST /v1/withlive/gift
-    define_post_method!(gift, "/withlive/gift", crate::model::WithliveGiftRequest);
+    post!(
+        gift,
+        "/withlive/gift",
+        crate::model::WithliveGiftRequest,
+        crate::model::WithliveGiftResponse
+    );
 
     // POST /v1/withlive/gift_pt_rankings
-    define_post_method!(
+    post_params!(
         gift_pt_rankings,
         "/withlive/gift_pt_rankings",
-        crate::model::WithliveGiftPtRankingsRequest
+        crate::model::WithliveGiftPtRankingsResponse,
+        live_id: String,
     );
 
     // POST /v1/withlive/live_info
-    define_post_method!(
+    post_params!(
         live_info,
         "/withlive/live_info",
-        crate::model::WithliveLiveInfoRequest
+        crate::model::WithliveLiveInfoResponse,
+        live_id: String,
+        offset_timeline_id: String,
     );
 
     // POST /v1/withlive/live_subinfo
-    define_post_method!(
+    post_params!(
         live_subinfo,
         "/withlive/live_subinfo",
-        crate::model::WithliveLiveSubinfoRequest
+        crate::model::WithliveLiveSubinfoResponse,
+        live_id: String,
     );
 
     // POST /v1/withlive/message_card
-    define_post_method!(
+    post!(
         message_card,
         "/withlive/message_card",
-        crate::model::WithliveMessageCardRequest
+        crate::model::WithliveMessageCardRequest,
+        crate::model::WithliveMessageCardResponse
     );
 
     // POST /v1/withlive/prize
-    define_post_method!(prize, "/withlive/prize", crate::model::WithlivePrizeRequest);
+    post_params!(
+        prize,
+        "/withlive/prize",
+        crate::model::WithlivePrizeResponse,
+        live_id: String,
+        present_box_id: String,
+    );
 
     // POST /v1/withlive/result_ranking
-    define_post_method!(
+    post!(
         result_ranking,
         "/withlive/result_ranking",
-        crate::model::WithliveResultRankingRequest
+        crate::model::WithliveResultRankingRequest,
+        crate::model::WithliveResultRankingResponse
     );
 
     // POST /v1/withlive/set_star
-    define_post_method!(
+    post!(
         set_star,
         "/withlive/set_star",
-        crate::model::WithliveSetStarRequest
+        crate::model::WithliveSetStarRequest,
+        crate::model::WithliveSetStarResponse
     );
 }
+
+
+
+
+

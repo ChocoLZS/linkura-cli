@@ -3,15 +3,172 @@ use serde_json::{Map, Value};
 
 // Auto-generated from crates/api/docs/openapi_v1_path_mapping.csv
 // Selected high-traffic responses are strongly typed; others remain transparent wrappers.
-macro_rules! define_response_type {
-    ($name:ident) => {
-        #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-        #[serde(rename_all = "snake_case")]
-        pub struct $name {
-            #[serde(flatten)]
-            pub extra: Map<String, Value>,
-        }
-    };
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct BeginnerMissionSetBannerRewardResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct BeginnerMissionSetRewardResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct FesliveClapResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct FesliveEnqueteResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct FeslivePenlightColorResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct FesliveSetPrizeResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaConfirmTicketExpiredTimeResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct HomeNotifyWallpaperSettingResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ItemExchangeGetListNewResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct JewelShopSetMembershipPurchaseResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RegisterSetApproveTermsResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameDeckModifyDeckListResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameDeckSetDeckNameResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameDeckSetResetDeckResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameGrandPrixSetResetResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameGrandPrixSetRetireLiveResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameGrandPrixSetStartLiveResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameLiveSetRetireResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameLiveSetStartResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ShopCheckPurchaseResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct UserDeckNotifyAutoDeckResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct UserPushDeviceResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct UserPushDevicesResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct UserSetSimpleTutorialFinishResponse {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -74,6 +231,82 @@ pub struct AccountGetConnectUserResponse {
 #[serde(rename_all = "snake_case")]
 pub struct AccountSetConnectDataResponse {
     pub result: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+/// dnSpy: Org.OpenAPITools.Api.ActivityRecordApi::ActivityRecordNotifyMonthDisplayedWithHttpInfo() returns ApiResponse<object>
+pub type NotifyMonthDisplayedResponse = Value;
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetTopResponse {
+    pub activity_record_monthly_info_list: Option<Vec<ActivityRecordMonthlyInfo>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ActivityRecordMonthlyInfo {
+    pub adv_series_id: Option<i32>,
+    pub monthly_title: Option<String>,
+    pub monthly_description: Option<String>,
+    pub is_monthly_not_watched: Option<bool>,
+    pub is_current_season: Option<bool>,
+    /// dnSpy type: System.DateTime
+    pub monthly_start_date: Option<String>,
+    /// dnSpy type: System.DateTime
+    pub monthly_end_date: Option<String>,
+    pub adv_info_list: Option<Vec<AdventureInfo>>,
+    pub is_not_displayed_new_part: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct AdventureInfo {
+    pub adv_data_id: Option<i32>,
+    pub title: Option<String>,
+    pub order_id: Option<i64>,
+    pub subtitle: Option<String>,
+    pub description: Option<String>,
+    /// dnSpy enum: Org.OpenAPITools.Model.AdvWatchableStatus
+    pub watchable_status: Option<i32>,
+    pub is_not_watched: Option<bool>,
+    pub open_season_fan_level: Option<i64>,
+    pub watch_reward_list: Option<Vec<WatchReward>>,
+    pub adv_unlock_item_num: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct WatchReward {
+    /// dnSpy enum: Org.OpenAPITools.Model.ItemType
+    pub watch_reward_type: Option<i32>,
+    pub watch_reward_id: Option<i32>,
+    pub watch_reward_num: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct PlayAdvDataResponse {
+    pub watch_reward_list: Option<Vec<WatchReward>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SetWatchableStatusResponse {
+    /// dnSpy enum: Org.OpenAPITools.Model.AdvWatchableStatus
+    pub watchable_status: Option<i32>,
+    pub adv_unlock_item_num: Option<i64>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -3617,6 +3850,20 @@ pub struct Stage {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
+pub struct StageDetail {
+    pub stage_id: Option<i32>,
+    pub is_challenge: Option<bool>,
+    pub is_skip: Option<bool>,
+    pub clear_status: Option<i64>,
+    pub best_love_music_id: Option<i32>,
+    pub stage_reward_list: Option<Vec<StageReward>>,
+    pub stage_challenge_reward_list: Option<Vec<StageReward>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
 pub struct OutQuestLiveDailyGetRecoveryChallengeCountResponse {
     pub challenge_count: Option<i64>,
     pub recovery_count: Option<i64>,
@@ -4019,7 +4266,7 @@ pub struct StaminaUseJewelSetting {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveGetQuestTopResponse {
+pub struct GetQuestTopResponse {
     /// dnSpy enum: Org.OpenAPITools.Model.LiveStatusFlagType
     pub standard_live_status: Option<i32>,
     /// dnSpy enum: Org.OpenAPITools.Model.LiveStatusFlagType
@@ -4061,7 +4308,7 @@ pub struct OutQuestLiveGetQuestTopResponse {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveGetQuestListResponse {
+pub struct GetQuestListResponse {
     /// dnSpy enum: Org.OpenAPITools.Model.LiveStatusFlagType
     pub standard_live_status: Option<i32>,
     /// dnSpy enum: Org.OpenAPITools.Model.LiveStatusFlagType
@@ -4094,7 +4341,7 @@ pub struct OutQuestLiveGetQuestListResponse {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveGetQuestClearStatusListResponse {
+pub struct GetQuestClearStatusListResponse {
     pub quest_clear_status_list: Option<Vec<QuestClearStatusInfo>>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
@@ -4102,7 +4349,7 @@ pub struct OutQuestLiveGetQuestClearStatusListResponse {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveGetLiveSettingResponse {
+pub struct GetLiveSettingResponse {
     pub quest_live_type: Option<i64>,
     pub stage_id: Option<i32>,
     pub deck_data: Option<Vec<Deck>>,
@@ -4119,7 +4366,7 @@ pub struct OutQuestLiveGetLiveSettingResponse {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveGetPlayReportResponse {
+pub struct GetPlayReportResponse {
     pub quest_live_type: Option<i64>,
     pub play_report: Option<String>,
     #[serde(flatten)]
@@ -4128,7 +4375,7 @@ pub struct OutQuestLiveGetPlayReportResponse {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveGetResultResponse {
+pub struct GetResultResponse {
     /// dnSpy enum: Org.OpenAPITools.Model.QuestType
     pub quest_live_type: Option<i32>,
     pub stage_id: Option<i32>,
@@ -4154,7 +4401,7 @@ pub struct OutQuestLiveGetResultResponse {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveGetStaminaRecoveryInfoResponse {
+pub struct GetStaminaRecoveryInfoResponse {
     pub user_stamina: Option<UserStamina>,
     pub item_list: Option<Vec<OutQuestLiveStaminaRecoveryItem>>,
     pub use_jewel_settings: Option<Vec<StaminaUseJewelSetting>>,
@@ -4167,7 +4414,7 @@ pub struct OutQuestLiveGetStaminaRecoveryInfoResponse {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveRecoveryStaminaResponse {
+pub struct RecoveryStaminaResponse {
     pub user_stamina: Option<UserStamina>,
     pub stamina_present: Option<i64>,
     #[serde(flatten)]
@@ -4176,7 +4423,7 @@ pub struct OutQuestLiveRecoveryStaminaResponse {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveSetLiveSettingResponse {
+pub struct GetLiveInfoResponse {
     pub result: Option<bool>,
     pub quest_live_id: Option<String>,
     pub quest_live_type: Option<i64>,
@@ -4767,6 +5014,283 @@ pub struct OutQuestLiveGrandPrixGetTopInfoResponse {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
+pub struct MusicLearningStage {
+    pub learning_live_stages_id: Option<i32>,
+    pub quest_rank: Option<i32>,
+    pub quest_level: Option<i32>,
+    pub is_lock: Option<bool>,
+    pub is_clear: Option<bool>,
+    pub gain_music_exp: Option<i32>,
+    pub page: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct MusicLearningListInfo {
+    pub learning_live_series_id: Option<i32>,
+    pub music_id: Option<i32>,
+    pub earned_music_exp: Option<i32>,
+    pub music_exp_level: Option<i32>,
+    pub is_mastery: Option<bool>,
+    pub stage_list: Option<Vec<MusicLearningStage>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetMusicSelectResponse {
+    pub music_list: Option<Vec<MusicLearningListInfo>>,
+    pub music_point: Option<i64>,
+    pub latest_music_id: Option<i32>,
+    pub character_bonus_list: Option<Vec<CharacterBonus>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct MusicLearningGetResultResponse {
+    pub stage_id: Option<i32>,
+    /// dnSpy enum: Org.OpenAPITools.Model.QuestType
+    pub quest_live_type: Option<i32>,
+    pub is_clear: Option<bool>,
+    pub is_mastery: Option<bool>,
+    pub result_love: Option<i64>,
+    pub best_love: Option<i64>,
+    pub before_best_love: Option<i64>,
+    pub music_id: Option<i32>,
+    pub play_report: Option<String>,
+    pub mastary_level_before: Option<i32>,
+    pub mastary_level_after: Option<i32>,
+    pub mastary_level_experience: Option<i32>,
+    pub mastary_level_total_experience_before: Option<i32>,
+    pub style_point: Option<i32>,
+    pub before_earned_music_exp: Option<i32>,
+    pub earned_music_exp: Option<i32>,
+    pub first_clear_flag: Option<bool>,
+    pub is_limit_over_style_point: Option<bool>,
+    pub is_ex_stage_open: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct MusicLearningSetMusicResponse {
+    pub music_info: Option<MusicLearningListInfo>,
+    pub music_point: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct EventPointReward {
+    /// dnSpy enum: Org.OpenAPITools.Model.ItemType
+    pub item_type: Option<i32>,
+    pub item_id: Option<i32>,
+    pub num: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidStamina {
+    pub stamina_now: Option<i32>,
+    /// dnSpy type: System.DateTime
+    pub stamina_recovered_time: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventPointRewardData {
+    pub raid_event_point_reward_datas_id: Option<i64>,
+    /// dnSpy enum: Org.OpenAPITools.Model.ItemType
+    pub item_type: Option<i32>,
+    pub item_id: Option<i32>,
+    pub num: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventPointReward {
+    pub raid_event_point_rewards_id: Option<i32>,
+    pub required_point: Option<i64>,
+    /// dnSpy enum: Org.OpenAPITools.Model.RaidEventRewardStatus
+    pub reward_status: Option<i32>,
+    pub reward_datas: Option<Vec<RaidEventPointRewardData>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventStagePointReward {
+    pub quest_series_id: Option<i32>,
+    pub point_rewards: Option<Vec<RaidEventPointReward>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventQuestSeries {
+    pub quest_series_id: Option<i32>,
+    pub quest_total_point: Option<i64>,
+    pub personal_quest_total_point: Option<i64>,
+    /// dnSpy enum: Org.OpenAPITools.Model.RaidEventQuestLockStatus
+    pub lock_status: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventQuestStage {
+    pub quest_stage_id: Option<i32>,
+    pub clear_status: Option<i64>,
+    pub is_lock: Option<bool>,
+    pub high_score: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventGetResultResponse {
+    /// dnSpy enum: Org.OpenAPITools.Model.QuestType
+    pub quest_live_type: Option<i32>,
+    pub quest_stage_id: Option<i32>,
+    pub quest_result: Option<bool>,
+    pub result_love: Option<i64>,
+    pub best_love: Option<i64>,
+    pub before_best_love: Option<i64>,
+    pub add_style_point: Option<i64>,
+    pub music_id: Option<i32>,
+    pub reward_list: Option<Vec<Reward>>,
+    pub play_report: Option<String>,
+    pub mastary_level_before: Option<i64>,
+    pub mastary_level_after: Option<i64>,
+    pub mastary_level_experience: Option<i64>,
+    pub mastary_level_total_experience_before: Option<i64>,
+    pub add_point: Option<i64>,
+    pub personal_total_point: Option<i64>,
+    pub event_point_reward_list: Option<Vec<EventPointReward>>,
+    pub first_clear_flag: Option<bool>,
+    pub first_complete_clear_flag: Option<bool>,
+    pub is_limit_over_style_point: Option<bool>,
+    pub raid_event_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventGetStageDataResponse {
+    pub is_skip: Option<bool>,
+    pub clear_status: Option<i64>,
+    pub best_love_music_id: Option<i32>,
+    pub stage_reward_list: Option<Vec<StageReward>>,
+    pub raid_stamina: Option<RaidStamina>,
+    pub music_list: Option<Vec<StageMusic>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventGetStageListResponse {
+    pub stage_list: Option<Vec<RaidEventQuestStage>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventGetStaminaRecoveryInfoResponse {
+    pub raid_stamina: Option<RaidStamina>,
+    pub jewel_st_recovery_count: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventGetTopInfoResponse {
+    /// dnSpy enum: Org.OpenAPITools.Model.RaidEventStatus
+    pub status: Option<i32>,
+    pub raid_stamina: Option<RaidStamina>,
+    pub total_point: Option<i64>,
+    pub personal_total_point: Option<i64>,
+    pub is_not_received_point_reward: Option<bool>,
+    pub stages: Option<Vec<RaidEventQuestSeries>>,
+    pub point_rewards: Option<Vec<RaidEventPointReward>>,
+    pub personal_point_rewards: Option<Vec<RaidEventPointReward>>,
+    pub piece_raid_quest_drop_rate_up_id: Option<i32>,
+    pub charm_raid_quest_drop_rate_up_id: Option<i32>,
+    pub is_join: Option<bool>,
+    pub join_message: Option<String>,
+    pub stage_point_rewards: Option<Vec<RaidEventStagePointReward>>,
+    pub personal_stage_point_rewards: Option<Vec<RaidEventStagePointReward>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventRecoveryStaminaResponse {
+    pub raid_stamina: Option<RaidStamina>,
+    pub jewel_st_recovery_count: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+/// dnSpy: Org.OpenAPITools.Api.OutQuestLiveRaidEventApi::OutQuestLiveRaidEventSetJoinMessageWithHttpInfo() returns ApiResponse<object>
+pub type RaidEventSetJoinMessageResponse = Value;
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventSetRewardResponse {
+    pub point_rewards: Option<Vec<RaidEventPointReward>>,
+    pub stage_point_rewards: Option<Vec<RaidEventStagePointReward>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetStageDataResponse {
+    pub view_stage_id: Option<i32>,
+    pub stage_detail_list: Option<Vec<StageDetail>>,
+    pub user_stamina: Option<UserStamina>,
+    pub music_list: Option<Vec<StageMusic>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetStageSelectResponse {
+    pub stage_list: Option<Vec<Stage>>,
+    pub user_stamina: Option<UserStamina>,
+    pub is_update_grade_live: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+/// dnSpy: Org.OpenAPITools.Api.OutQuestLiveApi::SetAreaSelectViewHistWithHttpInfo() returns ApiResponse<object>
+pub type SetAreaSelectViewHistResponse = Value;
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
 pub struct BoxEventDropItemData {
     pub box_datas_id: Option<i32>,
     pub box_item_datas_id: Option<i64>,
@@ -4860,6 +5384,493 @@ pub struct GpPrizeExchangeSetPurchaseResponse {
     pub extra: Map<String, Value>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ArchiveCommonResponse {
+    pub result: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CardGetListResponse {
+    pub user_card_data_list: Option<Vec<UserCardData>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CheckEvolutionResponse {
+    pub is_possible: Option<bool>,
+    pub user_item_list: Option<Vec<UserTrainingItem>>,
+    pub required_item_list: Option<Vec<RequiredItem>>,
+    pub next_max_style_level: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CheckLimitBreakResponse {
+    pub is_possible: Option<bool>,
+    pub current_limit_break_times: Option<i64>,
+    pub selectable_limit_break_times: Option<i64>,
+    pub user_item_list: Option<Vec<UserTrainingItem>>,
+    pub required_item_list: Option<Vec<RequiredItem>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CheckSkillLevelUpResponse {
+    pub is_possible: Option<bool>,
+    pub current_skill_level: Option<i64>,
+    pub selectable_max_level: Option<i64>,
+    pub user_item_list: Option<Vec<UserTrainingItem>>,
+    pub required_item_list: Option<Vec<RequiredItem>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CheckStyleLevelUpResponse {
+    pub is_possible: Option<bool>,
+    pub current_style_level: Option<i64>,
+    pub selectable_max_level: Option<i64>,
+    pub style_point: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct EvolutionResponse {
+    pub result: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct LimitBreakResponse {
+    pub result: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SkillLevelUpResponse {
+    pub result: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct StyleLevelUpResponse {
+    pub result: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameSkillLevelUpResponse {
+    pub result: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DeckGetCardListResponse {
+    pub user_card_data_list: Option<Vec<UserCardData>>,
+    pub main_d_card_datas_id: Option<String>,
+    pub side1_d_card_datas_id: Option<String>,
+    pub side2_d_card_datas_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DeckGetListResponse {
+    pub deck_list: Option<Vec<Deck>>,
+    pub user_card_data_list: Option<Vec<UserCardData>>,
+    pub rental_deck_list: Option<Vec<RentalDeck>>,
+    pub rental_card_data_list: Option<Vec<RentalCardData>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DeckModifyDeckListResponse {
+    pub deck_list: Option<Vec<Deck>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DeckRemoveSideStyleResponse {
+    pub result: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DeckSetCopyDeckResponse {
+    pub result: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DeckSetCreateResponse {
+    pub result: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DeckSetDeleteResponse {
+    pub result: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DeckSetPositionResponse {
+    pub result: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DeckSetSideStyleResponse {
+    pub result: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetCharacterInfoResponse {
+    pub collection_character_info: Option<CollectionCharacterInfo>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetDetailResponse {
+    pub user_card_data: Option<UserCardData>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetDetailRentalResponse {
+    pub rental_card_data: Option<RentalCardData>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetEmojiListResponse {
+    pub emoji_info_list: Option<Vec<EmojiInfoList>>,
+    pub emoji_list: Option<Vec<i32>>,
+    pub membership_list: Option<Vec<i32>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetGallaryListResponse {
+    pub gallary_info_list: Option<Vec<GetGallaryListResponseGallaryInfoListInner>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetMusicListResponse {
+    pub music_info_list: Option<Vec<GetMusicListResponseMusicInfoListInner>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetStickerListResponse {
+    pub sticker_info_list: Option<Vec<StickerInfo>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SetGallaryDataResponse {
+    pub result: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SetMusicPlayResponse {
+    pub result: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CircleTopGetInfoResponse {
+    pub circle_info: Option<CircleInfo>,
+    pub circle_member_list: Option<Vec<CircleMember>>,
+    pub circle_ranking_info: Option<CircleRankingInfo>,
+    pub item_request_result: Option<ItemRequestResult>,
+    pub emoji_list: Option<Vec<i32>>,
+    pub membership_list: Option<Vec<i32>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetGachaDetailResponse {
+    pub title: Option<String>,
+    pub giftless: Option<bool>,
+    pub paidlimited: Option<bool>,
+    pub notice: Option<String>,
+    pub rates: Option<Vec<Rate>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetSelectCardListResponse {
+    pub cards: Option<Vec<SelectCard>>,
+    pub select_ticket_list: Option<Vec<SelectTicket>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetMembershipPerkDetailResponse {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    /// dnSpy type: System.DateTime
+    pub start_time: Option<String>,
+    /// dnSpy type: System.DateTime
+    pub end_time: Option<String>,
+    pub select_ticket_serieses: Option<Vec<PerkSelectTicketSeries>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetThemeListResponseInner {
+    /// dnSpy type: System.Guid
+    pub id: Option<String>,
+    pub theme: Option<String>,
+    pub image_url: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ReceiveCommonMissionRewardResponse {
+    pub received_common_mission_ids: Option<Vec<i32>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameHomeGetResponse {
+    pub music_list: Option<Vec<RhythmGameMusic>>,
+    pub rhythm_game_deck_list: Option<Vec<RhythmGameDeckInfo>>,
+    pub card_data_list: Option<Vec<UserCardData>>,
+    pub class_mission_list: Option<Vec<RhythmGameClassMissionInfo>>,
+    pub received_total_mission_order: Option<i32>,
+    pub rhythm_game_star_total_count: Option<i32>,
+    pub member_fanlevel_list: Option<Vec<MemberFanlevelInfo>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SetExchangeResponse {
+    pub result: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SetFinishResponse {
+    pub quest_live_type: Option<i64>,
+    pub quest_result: Option<bool>,
+    pub return_resource: Option<i64>,
+    pub applied_campaign_types: Option<Vec<CampaignType>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SetStartResponse {
+    /// dnSpy type: System.DateTime
+    pub quest_start_time: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SetRetireResponse {
+    pub quest_live_type: Option<i64>,
+    pub return_resource: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SkipQuestResponse {
+    pub quest_live_type: Option<i64>,
+    pub quest_live_id: Option<String>,
+    pub user_stamina: Option<UserStamina>,
+    pub add_style_point: Option<i64>,
+    pub skip_reward_list: Option<Vec<SkipRewardList>>,
+    pub total_skip_reward_list: Option<Vec<Reward>>,
+    pub is_limit_over_style_point: Option<bool>,
+    pub mastery_level_before: Option<i64>,
+    pub mastery_level_after: Option<i64>,
+    pub mastery_level_experience: Option<i64>,
+    pub mastery_level_total_experience_before: Option<i64>,
+    pub before_earned_music_exp: Option<i64>,
+    pub earned_music_exp: Option<i64>,
+    pub raid_stamina: Option<RaidStamina>,
+    pub add_once_event_point: Option<i64>,
+    pub event_point_reward_list: Option<Vec<EventPointReward>>,
+    pub event_personal_total_point: Option<i64>,
+    pub applied_campaign_types: Option<Vec<CampaignType>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+pub type ConnectResponse = AccountConnectResponse;
+pub type DeleteConnectDataResponse = AccountDeleteConnectDataResponse;
+pub type GetConnectDataResponse = AccountGetConnectDataResponse;
+pub type GetConnectUserResponse = AccountGetConnectUserResponse;
+pub type SetConnectDataResponse = AccountSetConnectDataResponse;
+pub type GetArchiveListResponse = ArchiveGetArchiveListResponse;
+pub type GetChannelListResponse = ArchiveGetChannelListResponse;
+pub type GetChannelMovieListResponse = ArchiveGetChannelMovieListResponse;
+pub type GetFesArchiveDataResponse = ArchiveGetFesArchiveDataResponse;
+pub type GetFesTimelineDataResponse = ArchiveGetFesTimelineDataResponse;
+pub type GetHomeResponse = ArchiveGetHomeResponse;
+pub type GetSeasonListResponse = ArchiveGetSeasonListResponse;
+pub type GetWithArchiveDataResponse = ArchiveGetWithArchiveDataResponse;
+pub type DailyGetRecoveryChallengeCountResponse = OutQuestLiveDailyGetRecoveryChallengeCountResponse;
+pub type DailyGetReleaseTicketResponse = OutQuestLiveDailyGetReleaseTicketResponse;
+pub type DailyGetStageDataResponse = OutQuestLiveDailyGetStageDataResponse;
+pub type DailyGetStageListResponse = OutQuestLiveDailyGetStageListResponse;
+pub type DailyGetStageSelectResponse = OutQuestLiveDailyGetStageSelectResponse;
+pub type DailyRecoveryChallengeCountResponse = OutQuestLiveDailyRecoveryChallengeCountResponse;
+pub type DailySetReleaseResponse = OutQuestLiveDailySetReleaseResponse;
+pub type DreamGetResultResponse = OutQuestLiveDreamGetResultResponse;
+pub type DreamSetCardResponse = OutQuestLiveDreamSetCardResponse;
+pub type GetMemberSelectResponse = OutQuestLiveDreamGetMemberSelectResponse;
+pub type GradeChallengeGetQuestListResponse = OutQuestLiveGradeChallengeGetQuestListResponse;
+pub type GradeChallengeGetRankingListResponse = OutQuestLiveGradeChallengeGetRankingListResponse;
+pub type GradeChallengeGetResultResponse = OutQuestLiveGradeChallengeGetResultResponse;
+pub type GradeGetLiveListResponse = OutQuestLiveGradeGetLiveListResponse;
+pub type GradeGetQuestListResponse = OutQuestLiveGradeGetQuestListResponse;
+pub type GradeGetRankingListResponse = OutQuestLiveGradeGetRankingListResponse;
+pub type GradeGetRankListResponse = OutQuestLiveGradeGetRankListResponse;
+pub type GradeGetResultResponse = OutQuestLiveGradeGetResultResponse;
+pub type GradeGetStageDataResponse = OutQuestLiveGradeGetStageDataResponse;
+pub type GradeGetStageListResponse = OutQuestLiveGradeGetStageListResponse;
+pub type GradeSetQuestActionResponse = OutQuestLiveGradeSetQuestActionResponse;
+pub type GradeSetQuestAddSkillResponse = OutQuestLiveGradeSetQuestAddSkillResponse;
+pub type GradeSetQuestRetireResponse = OutQuestLiveGradeSetQuestRetireResponse;
+pub type GradeSetQuestStartResponse = OutQuestLiveGradeSetQuestStartResponse;
+pub type GradeSetRewardResponse = OutQuestLiveGradeSetRewardResponse;
+pub type GrandPrixGetHistoryResponse = OutQuestLiveGrandPrixGetHistoryResponse;
+pub type GrandPrixGetRankingListResponse = OutQuestLiveGrandPrixGetRankingListResponse;
+pub type GrandPrixGetResultResponse = OutQuestLiveGrandPrixGetResultResponse;
+pub type GrandPrixGetStageDataResponse = OutQuestLiveGrandPrixGetStageDataResponse;
+pub type GrandPrixGetStageListResponse = OutQuestLiveGrandPrixGetStageListResponse;
+pub type GrandPrixGetStageSelectResponse = OutQuestLiveGrandPrixGetStageSelectResponse;
+pub type GrandPrixGetTopInfoResponse = OutQuestLiveGrandPrixGetTopInfoResponse;
+pub type InQuestLiveGetLiveInfoResponse = GetLiveInfoResponse;
+pub type InQuestLiveSetFinishResponse = SetFinishResponse;
+pub type InQuestLiveSetRetireResponse = SetRetireResponse;
+pub type InQuestLiveSetStartResponse = SetStartResponse;
+pub type InQuestLiveSkipQuestResponse = SkipQuestResponse;
+pub type LiveConnectTokenResponse = FesliveConnectTokenResponse;
+pub type MissionReceiveCommonMissionRewardResponse = ReceiveCommonMissionRewardResponse;
+pub type RhythmGameHomeResponse = RhythmGameHomeGetResponse;
+pub type SerialCodeSetExchangeResponse = SetExchangeResponse;
+pub type UserCardCheckEvolutionResponse = CheckEvolutionResponse;
+pub type UserCardCheckLimitBreakResponse = CheckLimitBreakResponse;
+pub type UserCardCheckSkillLevelUpResponse = CheckSkillLevelUpResponse;
+pub type UserCardCheckStyleLevelUpResponse = CheckStyleLevelUpResponse;
+pub type UserCardEvolutionResponse = EvolutionResponse;
+pub type UserCardGetDetailResponse = GetDetailResponse;
+pub type UserCardGetDetailRentalResponse = GetDetailRentalResponse;
+pub type UserCardGetListResponse = CardGetListResponse;
+pub type UserCardLimitBreakResponse = LimitBreakResponse;
+pub type UserCardRhythmGameSkillLevelUpResponse = RhythmGameSkillLevelUpResponse;
+pub type UserCardSkillLevelUpResponse = SkillLevelUpResponse;
+pub type UserCardStyleLevelUpResponse = StyleLevelUpResponse;
+pub type UserDeckGetCardListResponse = DeckGetCardListResponse;
+pub type UserDeckGetListResponse = DeckGetListResponse;
+pub type UserDeckModifyDeckListResponse = DeckModifyDeckListResponse;
+pub type UserDeckRemoveSideStyleResponse = DeckRemoveSideStyleResponse;
+pub type UserDeckSetCopyDeckResponse = DeckSetCopyDeckResponse;
+pub type UserDeckSetDeckResponse = DeckSetCreateResponse;
+pub type UserDeckSetDeleteDeckResponse = DeckSetDeleteResponse;
+pub type UserDeckSetPositionResponse = DeckSetPositionResponse;
+pub type UserDeckSetSideStyleResponse = DeckSetSideStyleResponse;
+pub type WebviewGachaGetDetailResponse = GetGachaDetailResponse;
+pub type WebviewGachaGetSelectCardListResponse = GetSelectCardListResponse;
+pub type WebviewLiveInfoResponse = WebviewLiveLiveInfoResponse;
+pub type WebviewSchoolIdolConnectPostGetThemeListResponse = Vec<GetThemeListResponseInner>;
+pub type WebviewShopGetMembershipPerkDetailResponse = GetMembershipPerkDetailResponse;
+pub type CollectionGetCharacterInfoResponse = GetCharacterInfoResponse;
+pub type CollectionGetEmojiListResponse = GetEmojiListResponse;
+pub type CollectionGetGallaryListResponse = GetGallaryListResponse;
+pub type CollectionGetMusicListResponse = GetMusicListResponse;
+pub type CollectionGetStickerListResponse = GetStickerListResponse;
+pub type CollectionSetGallaryDataResponse = SetGallaryDataResponse;
+pub type CollectionSetMusicPlayResponse = SetMusicPlayResponse;
+pub type SetFesCameraResponse = ArchiveSetFesCameraResponse;
+pub type UserItemGetListResponse = UserItemsGetListResponse;
+
 pub type FesliveLobbyCommentResponse = FesliveCommentResponse;
 pub type FesliveLobbyGiftResponse = FesliveGiftResponse;
 pub type FesliveLobbyMessageCardResponse = FesliveMessageCardResponse;
@@ -4875,10 +5886,10 @@ pub type FriendSetRequestResponse = FriendSetCommonResponse;
 // AccountApi
 
 // ActivityRecordApi
-define_response_type!(ActivityRecordGetTopResponse);
-define_response_type!(ActivityRecordNotifyMonthDisplayedResponse);
-define_response_type!(ActivityRecordPlayAdvDataResponse);
-define_response_type!(ActivityRecordSetWatchableStatusResponse);
+// GetTopResponse is strongly typed above.
+// NotifyMonthDisplayedResponse is strongly typed above.
+// PlayAdvDataResponse is strongly typed above.
+// SetWatchableStatusResponse is strongly typed above.
 
 // AnnounceApi
 // AnnounceDetailResponse / AnnounceListResponse are strongly typed above.
@@ -4887,9 +5898,7 @@ define_response_type!(ActivityRecordSetWatchableStatusResponse);
 
 // MissionApi
 // BeginnerMissionGetListResponse is strongly typed above.
-define_response_type!(BeginnerMissionSetBannerRewardResponse);
 // BeginnerMissionSetRewardAllResponse is strongly typed above.
-define_response_type!(BeginnerMissionSetRewardResponse);
 
 // BoxEventApi
 // BoxEventGetTopInfoResponse/BoxEventSetDropBoxResponse are strongly typed above.
@@ -4899,27 +5908,19 @@ define_response_type!(BeginnerMissionSetRewardResponse);
 // Circle responses are strongly typed above.
 
 // CollectionApi
-define_response_type!(CollectionGetCharacterInfoResponse);
-define_response_type!(CollectionGetEmojiListResponse);
-define_response_type!(CollectionGetGallaryListResponse);
-define_response_type!(CollectionGetMusicListResponse);
-define_response_type!(CollectionGetStickerListResponse);
-define_response_type!(CollectionSetGallaryDataResponse);
-define_response_type!(CollectionSetMusicPlayResponse);
+// CollectionGetCharacterInfoResponse/CollectionGetEmojiListResponse are strongly typed above.
+// CollectionGetGallaryListResponse/CollectionGetMusicListResponse are strongly typed above.
+// CollectionGetStickerListResponse/CollectionSetGallaryDataResponse are strongly typed above.
+// CollectionSetMusicPlayResponse is strongly typed above.
 
 // CommonApi
 // CommonGetHeaderAnnounsResponse is strongly typed above.
 
 // FesliveApi
-define_response_type!(FesliveClapResponse);
-define_response_type!(FesliveEnqueteResponse);
-define_response_type!(FeslivePenlightColorResponse);
-define_response_type!(FesliveSetPrizeResponse);
 
 // FriendApi
 
 // GachaApi or GachaWebApi
-define_response_type!(GachaConfirmTicketExpiredTimeResponse);
 // GachaGetExchangeCardHavingListResponse/GachaGetExchangeCardListResponse are strongly typed above.
 // GachaGetGuaranteePointListResponse/GachaGetHistoryResponse are strongly typed above.
 // GachaGetLotteryChanceResponse/GachaGetSeriesListResponse are strongly typed above.
@@ -4933,20 +5934,16 @@ define_response_type!(GachaConfirmTicketExpiredTimeResponse);
 // HomeApi
 // HomeGetCustomSettingResponse/HomeGetHomeResponse are strongly typed above.
 // HomeGetLoginBonusResponse/HomeGetWallpaperSettingResponse are strongly typed above.
-define_response_type!(HomeNotifyWallpaperSettingResponse);
 // HomeSetClockSettingResponse/HomeSetCurrentWallpaperSettingResponse are strongly typed above.
 // HomeSetShowRetireResponse/HomeSetWallpaperSettingResponse are strongly typed above.
 
 // InQuestLiveApi
-define_response_type!(InQuestLiveGetLiveInfoResponse);
-define_response_type!(InQuestLiveSetFinishResponse);
-define_response_type!(InQuestLiveSetRetireResponse);
-define_response_type!(InQuestLiveSetStartResponse);
-define_response_type!(InQuestLiveSkipQuestResponse);
+// InQuestLiveGetLiveInfoResponse/InQuestLiveSetFinishResponse are strongly typed above.
+// InQuestLiveSetRetireResponse/InQuestLiveSetStartResponse are strongly typed above.
+// InQuestLiveSkipQuestResponse is strongly typed above.
 
 // ItemExchangeApi
 // ItemExchangeGetLimitBreakMaterialConvertListResponse is strongly typed above.
-define_response_type!(ItemExchangeGetListNewResponse);
 // ItemExchangeGetListResponse is strongly typed above.
 // ItemExchangeSetLimitBreakMaterialConvertResponse/ItemExchangeSetPurchaseResponse are strongly typed above.
 
@@ -4956,12 +5953,11 @@ define_response_type!(ItemExchangeGetListNewResponse);
 // JewelShopApi
 // JewelShopGetBirthdayResponse/JewelShopGetListResponse are strongly typed above.
 // JewelShopGetMembershipListResponse/JewelShopSetBirthdayResponse are strongly typed above.
-define_response_type!(JewelShopSetMembershipPurchaseResponse);
 // JewelShopSetPurchaseResponse is strongly typed above.
 
 // MissionApi
 // MissionGetListResponse is strongly typed above.
-define_response_type!(MissionReceiveCommonMissionRewardResponse);
+// MissionReceiveCommonMissionRewardResponse is strongly typed above.
 
 // OutQuestLiveDailyApi
 // OutQuestLiveDailyGetRecoveryChallengeCountResponse is strongly typed above.
@@ -4979,13 +5975,13 @@ define_response_type!(MissionReceiveCommonMissionRewardResponse);
 // OutQuestLiveDreamSetCardResponse is strongly typed above.
 
 // OutQuestLiveApi
-// OutQuestLiveGetLiveSettingResponse is strongly typed above.
-// OutQuestLiveGetPlayReportResponse is strongly typed above.
-// OutQuestLiveGetQuestClearStatusListResponse is strongly typed above.
-// OutQuestLiveGetQuestListResponse is strongly typed above.
-// OutQuestLiveGetQuestTopResponse is strongly typed above.
-// OutQuestLiveGetResultResponse is strongly typed above.
-// OutQuestLiveGetStaminaRecoveryInfoResponse is strongly typed above.
+// GetLiveSettingResponse is strongly typed above.
+// GetPlayReportResponse is strongly typed above.
+// GetQuestClearStatusListResponse is strongly typed above.
+// GetQuestListResponse is strongly typed above.
+// GetQuestTopResponse is strongly typed above.
+// GetResultResponse is strongly typed above.
+// GetStaminaRecoveryInfoResponse is strongly typed above.
 
 // OutQuestLiveGradeChallengeApi
 // OutQuestLiveGradeChallengeGetQuestListResponse is strongly typed above.
@@ -5016,27 +6012,27 @@ define_response_type!(MissionReceiveCommonMissionRewardResponse);
 // OutQuestLiveGrandPrixGetTopInfoResponse is strongly typed above.
 
 // OutQuestLiveMusicLearningApi
-define_response_type!(OutQuestLiveMusicLearningGetMusicSelectResponse);
-define_response_type!(OutQuestLiveMusicLearningGetResultResponse);
-define_response_type!(OutQuestLiveMusicLearningSetMusicResponse);
+// GetMusicSelectResponse is strongly typed above.
+// MusicLearningGetResultResponse is strongly typed above.
+// MusicLearningSetMusicResponse is strongly typed above.
 
 // OutQuestLiveRaidEventApi
-define_response_type!(OutQuestLiveRaidEventGetResultResponse);
-define_response_type!(OutQuestLiveRaidEventGetStageDataResponse);
-define_response_type!(OutQuestLiveRaidEventGetStageListResponse);
-define_response_type!(OutQuestLiveRaidEventGetStaminaRecoveryInfoResponse);
-define_response_type!(OutQuestLiveRaidEventGetTopInfoResponse);
-define_response_type!(OutQuestLiveRaidEventRecoveryStaminaResponse);
-define_response_type!(OutQuestLiveRaidEventSetJoinMessageResponse);
-define_response_type!(OutQuestLiveRaidEventSetRewardResponse);
+// RaidEventGetResultResponse is strongly typed above.
+// RaidEventGetStageDataResponse is strongly typed above.
+// RaidEventGetStageListResponse is strongly typed above.
+// RaidEventGetStaminaRecoveryInfoResponse is strongly typed above.
+// RaidEventGetTopInfoResponse is strongly typed above.
+// RaidEventRecoveryStaminaResponse is strongly typed above.
+// RaidEventSetJoinMessageResponse is strongly typed above.
+// RaidEventSetRewardResponse is strongly typed above.
 
 // OutQuestLiveApi
-// OutQuestLiveRecoveryStaminaResponse is strongly typed above.
-// OutQuestLiveSetLiveSettingResponse is strongly typed above.
-define_response_type!(OutQuestLiveStandardGetAreaSelectResponse);
-define_response_type!(OutQuestLiveStandardGetStageDataResponse);
-define_response_type!(OutQuestLiveStandardGetStageSelectResponse);
-define_response_type!(OutQuestLiveStandardSetAreaSelectViewHistResponse);
+// RecoveryStaminaResponse is strongly typed above.
+// GetLiveInfoResponse is strongly typed above.
+// GetAreaSelectResponse is strongly typed above.
+// GetStageDataResponse is strongly typed above.
+// GetStageSelectResponse is strongly typed above.
+// SetAreaSelectViewHistResponse is strongly typed above.
 
 // PetalExchangeApi
 // PetalExchangeGetListResponse/PetalExchangeSetPurchaseResponse are strongly typed above.
@@ -5057,30 +6053,21 @@ define_response_type!(OutQuestLiveStandardSetAreaSelectViewHistResponse);
 
 // RegisterApi
 // RegisterApproveTermsResponse/RegisterGetTermsResponse are strongly typed above.
-define_response_type!(RegisterSetApproveTermsResponse);
 // RegisterSetNewUserResponse/RegisterSetUserDataResponse are strongly typed above.
 
 // RhythmGameDeckApi
-define_response_type!(RhythmGameDeckModifyDeckListResponse);
-define_response_type!(RhythmGameDeckSetDeckNameResponse);
-define_response_type!(RhythmGameDeckSetResetDeckResponse);
 
 // RhythmGameGrandPrixApi
 // RhythmGameGrandPrixSetCenterResponse/RhythmGameGrandPrixSetDeckResponse are strongly typed above.
 // RhythmGameGrandPrixSetFinishLiveResponse is strongly typed above.
 // RhythmGameGrandPrixSetPositionResponse is strongly typed above.
-define_response_type!(RhythmGameGrandPrixSetResetResponse);
-define_response_type!(RhythmGameGrandPrixSetRetireLiveResponse);
-define_response_type!(RhythmGameGrandPrixSetStartLiveResponse);
 // RhythmGameGrandPrixTopResponse is strongly typed above.
 
 // RhythmGameApi
-define_response_type!(RhythmGameHomeResponse);
+// RhythmGameHomeResponse is strongly typed above.
 
 // RhythmGameLiveApi
 // RhythmGameLiveSetFinishResponse is strongly typed above.
-define_response_type!(RhythmGameLiveSetRetireResponse);
-define_response_type!(RhythmGameLiveSetStartResponse);
 
 // RhythmGameApi
 // RhythmGameReceiveClassMissionResponse/RhythmGameReceiveTotalMissionResponse are strongly typed above.
@@ -5090,10 +6077,9 @@ define_response_type!(RhythmGameLiveSetStartResponse);
 // SelectTicketExchangeGetListResponse is strongly typed above.
 
 // SerialCodeApi
-define_response_type!(SerialCodeSetExchangeResponse);
+// SerialCodeSetExchangeResponse is strongly typed above.
 
 // ShopApi
-define_response_type!(ShopCheckPurchaseResponse);
 // ShopGetListResponse is strongly typed above.
 
 // SiscaStoreApi
@@ -5109,45 +6095,30 @@ define_response_type!(ShopCheckPurchaseResponse);
 // TutorialSetStepResponse is strongly typed above.
 
 // UserApi
-define_response_type!(UserCardCheckEvolutionResponse);
-define_response_type!(UserCardCheckLimitBreakResponse);
-define_response_type!(UserCardCheckSkillLevelUpResponse);
-define_response_type!(UserCardCheckStyleLevelUpResponse);
-define_response_type!(UserCardEvolutionResponse);
-define_response_type!(UserCardGetDetailRentalResponse);
-define_response_type!(UserCardGetDetailResponse);
-define_response_type!(UserCardGetListResponse);
-define_response_type!(UserCardLimitBreakResponse);
-define_response_type!(UserCardRhythmGameSkillLevelUpResponse);
-define_response_type!(UserCardSkillLevelUpResponse);
-define_response_type!(UserCardStyleLevelUpResponse);
-define_response_type!(UserDeckGetCardListResponse);
-define_response_type!(UserDeckGetListResponse);
-define_response_type!(UserDeckModifyDeckListResponse);
-define_response_type!(UserDeckNotifyAutoDeckResponse);
-define_response_type!(UserDeckRemoveSideStyleResponse);
-define_response_type!(UserDeckSetCopyDeckResponse);
-define_response_type!(UserDeckSetDeckResponse);
-define_response_type!(UserDeckSetDeleteDeckResponse);
-define_response_type!(UserDeckSetPositionResponse);
-define_response_type!(UserDeckSetSideStyleResponse);
+// UserCardCheckEvolutionResponse/UserCardCheckLimitBreakResponse are strongly typed above.
+// UserCardCheckSkillLevelUpResponse/UserCardCheckStyleLevelUpResponse are strongly typed above.
+// UserCardEvolutionResponse/UserCardGetDetailRentalResponse are strongly typed above.
+// UserCardGetDetailResponse/UserCardGetListResponse are strongly typed above.
+// UserCardLimitBreakResponse/UserCardRhythmGameSkillLevelUpResponse are strongly typed above.
+// UserCardSkillLevelUpResponse/UserCardStyleLevelUpResponse are strongly typed above.
+// UserDeckGetCardListResponse/UserDeckGetListResponse are strongly typed above.
+// UserDeckModifyDeckListResponse is strongly typed above.
+// UserDeckRemoveSideStyleResponse/UserDeckSetCopyDeckResponse are strongly typed above.
+// UserDeckSetDeckResponse/UserDeckSetDeleteDeckResponse are strongly typed above.
+// UserDeckSetPositionResponse/UserDeckSetSideStyleResponse are strongly typed above.
 // UserItemGetDetailResponse/UserItemsGetListResponse are strongly typed above.
 // UserJewelGetHistoryResponse is strongly typed above.
-define_response_type!(UserPushDeviceResponse);
-define_response_type!(UserPushDevicesResponse);
 // UserSetContentsReleaseEffectHistoryResponse is strongly typed above.
-define_response_type!(UserSetSimpleTutorialFinishResponse);
 
 // WebviewApi
-define_response_type!(WebviewGachaGetDetailResponse);
-define_response_type!(WebviewGachaGetSelectCardListResponse);
+// WebviewGachaGetDetailResponse/WebviewGachaGetSelectCardListResponse are strongly typed above.
 
 // WebviewLiveApi
 // WebviewLiveEnterResponse/WebviewLiveLiveInfoResponse/WebviewLiveLoginResponse are strongly typed above.
 
 // WebviewApi
-define_response_type!(WebviewSchoolIdolConnectPostGetThemeListResponse);
-define_response_type!(WebviewShopGetMembershipPerkDetailResponse);
+// WebviewSchoolIdolConnectPostGetThemeListResponse is strongly typed above.
+// WebviewShopGetMembershipPerkDetailResponse is strongly typed above.
 
 // WithliveApi
 
@@ -5231,6 +6202,891 @@ define_response_type!(WebviewShopGetMembershipPerkDetailResponse);
 
 // WithliveApi
 
+pub type ProfileUseFanLevelPointStocksResponse = ProfileUseFanlevelPointStocksResponse;
+
+/// dnSpy enum: Org.OpenAPITools.Model.BeginnerMissionStatus
+pub type BeginnerMissionStatus = i32;
+/// dnSpy enum: Org.OpenAPITools.Model.CampaignType
+pub type CampaignType = i32;
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct VoiceData {
+    pub voices_id: Option<i32>,
+    pub priority: Option<i64>,
+    pub is_opened: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct MovieData {
+    pub movies_id: Option<i32>,
+    pub priority: Option<i32>,
+    pub is_opened: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CardInfo {
+    pub card_datas_id: Option<i32>,
+    pub voice_list: Option<Vec<VoiceData>>,
+    pub movie_list: Option<Vec<MovieData>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CardOdds {
+    pub rarity: Option<String>,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub pickup: Option<bool>,
+    pub limited: Option<String>,
+    pub odds: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct EmojiList {
+    pub m_emojis_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ExchangeCard {
+    pub id: Option<i32>,
+    pub rarity: Option<i32>,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct FanLevelInfo {
+    pub character_id: Option<i32>,
+    pub d_season_fan_level: Option<i64>,
+    pub member_fan_level: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaBonusItem {
+    /// dnSpy enum: Org.OpenAPITools.Model.ItemType
+    pub item_type: Option<i32>,
+    pub item_id: Option<i32>,
+    pub item_name: Option<String>,
+    pub item_num: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaBonus {
+    pub grade: Option<i32>,
+    pub prob: Option<i32>,
+    pub gacha_bonus_item_list: Option<Vec<GachaBonusItem>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaBonusItemResult {
+    /// dnSpy enum: Org.OpenAPITools.Model.ItemType
+    pub item_type: Option<i32>,
+    pub item_id: Option<i32>,
+    pub item_num: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaProbCard {
+    pub card_datas_id: Option<i32>,
+    pub card_rarity: Option<String>,
+    pub card_name: Option<String>,
+    pub prob: Option<i32>,
+    pub order_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaProbRarity {
+    pub rarity: Option<String>,
+    pub prob: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaBonusResultHistory {
+    /// dnSpy enum: Org.OpenAPITools.Model.ItemType
+    pub item_type: Option<i32>,
+    pub item_id: Option<i32>,
+    pub item_num: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaResultHistoryInfo {
+    pub order_id: Option<i64>,
+    pub card_datas_id: Option<i32>,
+    pub gacha_bonus_result_history_list: Option<Vec<GachaBonusResultHistory>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GradeLiveSeriesTopClearRank {
+    pub m_grade_quest_series_id: Option<String>,
+    pub top_clear_rank: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct HomeItemExchangeNewArrival {
+    pub category_list_id: Option<i32>,
+    pub is_not_read_new_arrival: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ItemOdds {
+    pub rank: Option<i32>,
+    pub name: Option<String>,
+    pub quantity: Option<i32>,
+    pub odds: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ItemStoreData {
+    /// dnSpy enum: Org.OpenAPITools.Model.ItemType
+    pub item_type: Option<i32>,
+    pub item_id: Option<i32>,
+    pub num: Option<i64>,
+    /// dnSpy enum: Org.OpenAPITools.Model.ItemStoreViewType
+    pub view_type: Option<i32>,
+    pub select_ticket_series_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct LimitBreakExchangeInfo {
+    pub card_series_id: Option<i32>,
+    pub card_datas_id: Option<i32>,
+    pub total_num: Option<i64>,
+    pub limit_break_times: Option<i64>,
+    pub item_num: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct LoginBonusReward {
+    pub name: Option<String>,
+    pub amount: Option<i32>,
+    /// dnSpy enum: Org.OpenAPITools.Model.ItemType
+    pub reward_type: Option<i32>,
+    pub reward_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct LoginBonus {
+    pub count: Option<i32>,
+    pub file_name: Option<String>,
+    pub is_get: Option<bool>,
+    pub is_now_get: Option<bool>,
+    pub rewards: Option<Vec<LoginBonusReward>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct PresentExchangeItem {
+    /// dnSpy enum: Org.OpenAPITools.Model.ItemType
+    pub item_type: Option<i32>,
+    pub item_id: Option<i32>,
+    pub name: Option<String>,
+    pub comment: Option<String>,
+    pub num: Option<i32>,
+    /// dnSpy type: System.DateTime
+    pub get_time: Option<String>,
+    /// dnSpy type: System.Nullable<System.DateTime>
+    pub receipt_limit_time: Option<String>,
+    /// dnSpy type: System.Nullable<System.DateTime>
+    pub receipted_time: Option<String>,
+    /// dnSpy enum: Org.OpenAPITools.Model.LifeTimeType
+    pub life_time_type: Option<i32>,
+    pub life_time_days: Option<i32>,
+    /// dnSpy type: System.Nullable<System.DateTime>
+    pub life_time_date: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RarityOdds {
+    pub name: Option<String>,
+    pub odds: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameDeckCardInfo {
+    pub rhythm_game_deck_cards_id: Option<String>,
+    pub d_card_datas_id: Option<String>,
+    pub slot_no: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CharacterPetalExchangeInfo {
+    pub character_id: Option<i32>,
+    pub limit_break_exchange_list: Option<Vec<LimitBreakExchangeInfo>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CollectionCharacterInfo {
+    pub character_id: Option<i32>,
+    pub name_last: Option<String>,
+    pub name_first: Option<String>,
+    pub latin_alphabet_name_last: Option<String>,
+    pub latin_alphabet_name_first: Option<String>,
+    pub character_voice: Option<String>,
+    pub theme_color: Option<String>,
+    pub card_list: Option<Vec<CardInfo>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ConvertExchangePoint {
+    pub exchange_point_id: Option<i32>,
+    pub user_exchange_point_num: Option<i32>,
+    /// dnSpy enum: Org.OpenAPITools.Model.ItemType
+    pub convert_item_type: Option<i32>,
+    pub convert_item_id: Option<i32>,
+    pub convert_item_num_before: Option<i32>,
+    pub convert_item_num_after: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct EmojiInfoList {
+    pub m_emoji_categories_id: Option<String>,
+    pub is_release: Option<bool>,
+    pub emoji_list: Option<Vec<EmojiList>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaBonusProb {
+    pub title: Option<String>,
+    pub gacha_bonus_list: Option<Vec<GachaBonus>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaBonusResult {
+    pub order_id: Option<i32>,
+    pub grade: Option<i32>,
+    pub gacha_bonus_item_result_list: Option<Vec<GachaBonusItemResult>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaCampaignInfo {
+    pub gacha_series_id: Option<i32>,
+    pub single_campaign_id: Option<i32>,
+    pub consective_campaign_id: Option<i32>,
+    pub remaining_single_campaign_count: Option<i32>,
+    pub remaining_consective_campaign_count: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaExchangeCard {
+    pub card_datas_id: Option<i32>,
+    pub card_rarity: Option<String>,
+    pub card_name: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaExchangeCardHavingInfo {
+    pub card_datas_id: Option<i32>,
+    pub card_rarity: Option<String>,
+    pub card_name: Option<String>,
+    pub is_having: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaGuaranteePoint {
+    pub exchange_point_id: Option<i32>,
+    pub user_guarantee_point_num_before: Option<i64>,
+    pub user_guarantee_point_num_after: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaGuaranteePointExchangeItem {
+    pub exchange_point_rate_id: Option<i32>,
+    pub remaining_exchange_num: Option<i32>,
+    pub is_having: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaProb {
+    pub title: Option<String>,
+    pub gacha_prob_rarity_list: Option<Vec<GachaProbRarity>>,
+    pub gacha_prob_card_list: Option<Vec<GachaProbCard>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaReceiptItem {
+    /// dnSpy enum: Org.OpenAPITools.Model.ItemType
+    pub get_item_type: Option<i32>,
+    pub get_id: Option<i32>,
+    pub get_num: Option<i64>,
+    pub is_new: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaResult {
+    pub order_id: Option<i32>,
+    pub card_datas_id: Option<i32>,
+    pub is_new: Option<bool>,
+    pub coin_num: Option<i64>,
+    pub material_limitbreak_item_id: Option<i32>,
+    pub material_limitbreak_num: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaResultHistory {
+    pub gacha_series_id: Option<i32>,
+    /// dnSpy type: System.DateTime
+    pub gacha_date_time: Option<String>,
+    /// dnSpy enum: Org.OpenAPITools.Model.GachaPriceType
+    pub gacha_price_type: Option<i32>,
+    pub gacha_price_num: Option<i64>,
+    pub gacha_result_history_info_list: Option<Vec<GachaResultHistoryInfo>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaSeries {
+    pub gacha_series_id: Option<i32>,
+    pub user_exchange_point_num: Option<i32>,
+    pub user_series_exec_count: Option<i32>,
+    pub received_gacha_prize_list: Option<Vec<i64>>,
+    pub user_single_ticket_num: Option<i32>,
+    pub user_consective_ticket_num: Option<i32>,
+    pub is_single_enable: Option<bool>,
+    pub is_consective_enable: Option<bool>,
+    pub is_paid_enable: Option<bool>,
+    pub single_campaign_id: Option<i32>,
+    pub consective_campaign_id: Option<i32>,
+    pub remaining_single_campaign_count: Option<i32>,
+    pub remaining_consective_campaign_count: Option<i32>,
+    pub remaining_limited_gacha_count: Option<i32>,
+    pub remaining_limited_consective_gacha_count: Option<i32>,
+    pub remaining_limited_paid_gacha_count: Option<i32>,
+    pub card_list: Option<Vec<i32>>,
+    /// dnSpy type: System.Nullable<System.DateTime>
+    pub time_limit_gacha_end_time: Option<String>,
+    pub remaining_rotation_count: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetGallaryListResponseGallaryInfoListInner {
+    pub comics_id: Option<i32>,
+    pub name: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetMusicListResponseMusicInfoListInner {
+    pub musics_id: Option<i32>,
+    pub is_mastery: Option<bool>,
+    pub play_count: Option<i64>,
+    /// dnSpy type: System.DateTime
+    pub latest_play_time: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct HomeHighlightedBadgeInfo {
+    pub is_not_watched_adv_from_current_season: Option<bool>,
+    pub is_not_displayed_adv_new_part: Option<bool>,
+    pub has_daily_ticket: Option<bool>,
+    pub has_grand_prix_playable_count: Option<bool>,
+    pub latest_news_id: Option<String>,
+    /// dnSpy type: System.Nullable<System.DateTime>
+    pub feslive_next_start_time: Option<String>,
+    /// dnSpy type: System.Nullable<System.DateTime>
+    pub feslive_next_end_time: Option<String>,
+    /// dnSpy type: System.Nullable<System.DateTime>
+    pub withlive_next_start_time: Option<String>,
+    /// dnSpy type: System.Nullable<System.DateTime>
+    pub withlive_next_end_time: Option<String>,
+    pub is_not_watched_quest_live_from_current_season: Option<bool>,
+    pub is_not_received_grade_reward: Option<bool>,
+    pub is_update_grade_live: Option<bool>,
+    pub is_not_read_gp_prize_exchange_new_arrival: Option<bool>,
+    pub is_not_read_item_exchange_new_arrival: Option<bool>,
+    pub item_exchange_new_arrival_list: Option<Vec<HomeItemExchangeNewArrival>>,
+    pub is_available_convert_limit_break_material: Option<bool>,
+    pub is_not_read_on_sale_select_ticket_exchange_new_arrival: Option<bool>,
+    pub is_not_read_out_sale_select_ticket_exchange_new_arrival: Option<bool>,
+    pub is_not_received_common_mission_reward: Option<bool>,
+    pub is_not_read_sticker_exchange_new_arrival: Option<bool>,
+    pub is_not_read_sisca_store_new_arrival: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct HomeQuestQuitInfo {
+    /// dnSpy enum: Org.OpenAPITools.Model.QuestType
+    pub quest_live_type: Option<i32>,
+    /// dnSpy enum: Org.OpenAPITools.Model.HomeQuestQuitInfoUseType
+    pub use_type: Option<i32>,
+    pub return_resource: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ItemExchangeConvertLimitBreakMaterialInfo {
+    /// dnSpy enum: Org.OpenAPITools.Model.Rarity
+    pub rarity: Option<i32>,
+    pub limit_break_material_num: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ItemExchangeGetItemInfo {
+    pub item_id: Option<i32>,
+    pub get_num: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ItemExchangeInfo {
+    pub item_exchanges_id: Option<i32>,
+    pub user_product_item_num: Option<i64>,
+    pub user_material_item_num: Option<i64>,
+    pub remaining_exchange_num: Option<i64>,
+    pub is_lock: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ItemStore {
+    pub item_store_id: Option<i32>,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub product_id: Option<String>,
+    pub tier: Option<i64>,
+    pub price: Option<i64>,
+    pub limit_num: Option<i64>,
+    pub buyable_num: Option<i64>,
+    /// dnSpy type: System.DateTime
+    pub start_time: Option<String>,
+    /// dnSpy type: System.DateTime
+    pub end_time: Option<String>,
+    pub new_flag: Option<bool>,
+    pub is_visible_end_time: Option<bool>,
+    pub item_list: Option<Vec<ItemStoreData>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct JewelShopItemInfo {
+    pub payment_items_id: Option<i32>,
+    pub name: Option<String>,
+    pub product_id: Option<String>,
+    pub tier: Option<i64>,
+    pub price: Option<i64>,
+    pub item_num: Option<i64>,
+    pub paid_jewel: Option<i64>,
+    pub free_jewel: Option<i64>,
+    pub item_id: Option<i32>,
+    pub limit_num: Option<i64>,
+    pub buyable_num: Option<i64>,
+    /// dnSpy type: System.DateTime
+    pub start_time: Option<String>,
+    /// dnSpy type: System.DateTime
+    pub end_time: Option<String>,
+    pub new_flag: Option<bool>,
+    pub is_visible_end_time: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct LoginBonusPeriod {
+    pub login_bonus_id: Option<i32>,
+    pub name: Option<String>,
+    pub file_name: Option<String>,
+    /// dnSpy type: System.DateTime
+    pub start_time: Option<String>,
+    /// dnSpy type: System.DateTime
+    pub end_time: Option<String>,
+    pub show_order: Option<i32>,
+    pub datas: Option<Vec<LoginBonus>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct MemberFanlevelInfo {
+    pub characters_id: Option<i32>,
+    pub member_fanlevel: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct MembershipListInfo {
+    pub memberships_id: Option<i32>,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub bundle_id: Option<String>,
+    pub product_id: Option<String>,
+    pub tier: Option<i64>,
+    pub price: Option<i64>,
+    /// dnSpy type: System.DateTime
+    pub start_time: Option<String>,
+    /// dnSpy type: System.DateTime
+    pub end_time: Option<String>,
+    pub update_count: Option<i64>,
+    /// dnSpy type: System.Nullable<System.DateTime>
+    pub expire_time: Option<String>,
+    /// dnSpy enum: Org.OpenAPITools.Model.ContractState
+    pub contract_state: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+/// dnSpy enum: Org.OpenAPITools.Model.MembershipStatus
+pub type MembershipStatus = i32;
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct PerkSelectTicketSeries {
+    pub id: Option<i32>,
+    pub exchange_ticket_name: Option<String>,
+    pub exchange_cards: Option<Vec<ExchangeCard>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct Plan {
+    pub name: Option<String>,
+    pub priority: Option<i64>,
+    pub link: Option<String>,
+    pub icon_image_asset_bundle: Option<String>,
+    pub icon_image_resource_file_name: Option<String>,
+    pub bg_image_asset_bundle: Option<String>,
+    pub bg_image_resource_file_name: Option<String>,
+    pub thumbnail_image_url: Option<String>,
+    /// dnSpy type: System.DateTime
+    pub start_time: Option<String>,
+    /// dnSpy type: System.DateTime
+    pub end_time: Option<String>,
+    pub color_code: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct PresentItem {
+    pub d_present_boxes_id: Option<String>,
+    /// dnSpy enum: Org.OpenAPITools.Model.ItemType
+    pub item_type: Option<i32>,
+    pub item_id: Option<i32>,
+    pub live_id: Option<String>,
+    pub name: Option<String>,
+    pub comment: Option<String>,
+    pub num: Option<i32>,
+    /// dnSpy type: System.DateTime
+    pub get_time: Option<String>,
+    /// dnSpy type: System.Nullable<System.DateTime>
+    pub receipt_limit_time: Option<String>,
+    /// dnSpy type: System.Nullable<System.DateTime>
+    pub receipted_time: Option<String>,
+    /// dnSpy enum: Org.OpenAPITools.Model.LifeTimeType
+    pub life_time_type: Option<i32>,
+    pub life_time_days: Option<i32>,
+    /// dnSpy type: System.Nullable<System.DateTime>
+    pub life_time_date: Option<String>,
+    pub exchange_item_data: Option<PresentExchangeItem>,
+    pub error_code: Option<String>,
+    pub error_message: Option<String>,
+    pub error_title: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ProfileInfo {
+    pub player_name: Option<String>,
+    /// dnSpy enum: Org.OpenAPITools.Model.UserType
+    pub user_type: Option<i32>,
+    pub profile_icon_parts_info: Option<String>,
+    pub profile_card_parts_info: Option<String>,
+    pub fan_level: Option<i64>,
+    /// dnSpy type: System.DateTime
+    pub birthday: Option<String>,
+    pub is_birthday_changeable: Option<bool>,
+    /// dnSpy type: System.DateTime
+    pub entry_time: Option<String>,
+    pub player_id: Option<String>,
+    pub comment: Option<String>,
+    /// dnSpy type: System.DateTime
+    pub last_login_date: Option<String>,
+    pub search_guild_key: Option<String>,
+    pub guild_name: Option<String>,
+    pub sticker_num: Option<i64>,
+    pub card_num: Option<i64>,
+    pub dream_style_num: Option<i64>,
+    pub friend_num: Option<i64>,
+    pub friend_max_num: Option<i64>,
+    pub music_num: Option<i64>,
+    pub music_max_num: Option<i64>,
+    pub standard_live_clear_num: Option<i64>,
+    pub standard_live_top_clear_num: Option<i64>,
+    pub standard_live_max_num: Option<i64>,
+    pub standard_live_star_total_num: Option<i64>,
+    pub grade_live_clear_num: Option<i64>,
+    pub grade_live_series_top_clear_rank_list: Option<Vec<GradeLiveSeriesTopClearRank>>,
+    pub grade_live_top_clear_num: Option<i64>,
+    pub grade_live_max_num: Option<i64>,
+    pub fan_level_list: Option<Vec<FanLevelInfo>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct Rate {
+    pub min: Option<i32>,
+    pub max: Option<i32>,
+    pub rarities: Option<Vec<RarityOdds>>,
+    pub cards: Option<Vec<CardOdds>>,
+    pub items: Option<Vec<ItemOdds>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RequiredItem {
+    pub cost_item_id1: Option<i32>,
+    pub cost_num1: Option<i32>,
+    pub cost_item_id2: Option<i32>,
+    pub cost_num2: Option<i32>,
+    pub cost_item_id3: Option<i32>,
+    pub cost_num3: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameDeckInfo {
+    pub rhythm_game_deck_id: Option<String>,
+    pub name: Option<String>,
+    pub deck_no: Option<i32>,
+    pub deck_card_list: Option<Vec<RhythmGameDeckCardInfo>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SelectCard {
+    pub rarity: Option<String>,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub limited: Option<String>,
+    pub quantity: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SelectTicket {
+    pub exchange_ticket_name: Option<String>,
+    pub cards: Option<Vec<SelectCard>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SelectTicketSeries {
+    pub select_ticket_series_id: Option<i32>,
+    pub user_exchange_ticket_num: Option<i32>,
+    pub is_sale_select_ticket: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SkipRewardList {
+    pub reward_list: Option<Vec<Reward>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct StickerInfo {
+    pub stickers_id: Option<i32>,
+    /// dnSpy enum: Org.OpenAPITools.Model.CategoryType
+    pub category_type: Option<i32>,
+    /// dnSpy enum: Org.OpenAPITools.Model.CategoryName
+    pub category_name: Option<i32>,
+    pub name: Option<String>,
+    pub text: Option<String>,
+    pub character_id: Option<i32>,
+    pub is_variant: Option<i32>,
+    pub season_id: Option<i32>,
+    pub requirement_text: Option<String>,
+    pub requirement_num: Option<i64>,
+    pub requirement_progress: Option<i64>,
+    pub variant_requirement_text: Option<String>,
+    pub variant_requirement_num: Option<i64>,
+    pub variant_requirement_progress: Option<i64>,
+    pub is_owned: Option<bool>,
+    pub is_available_variant: Option<bool>,
+    /// dnSpy type: System.Nullable<System.DateTime>
+    pub create_time: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct UserTrainingItem {
+    pub item_id: Option<i32>,
+    pub own_num: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct WallpaperSetting {
+    pub d_home_wall_paper_settings_id: Option<String>,
+    pub wallpaper_setting_info: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
 // FriendApi
 
 // GachaApi or GachaWebApi
@@ -5310,3 +7166,8 @@ define_response_type!(WebviewShopGetMembershipPerkDetailResponse);
 // WebviewApi
 
 // WithliveApi
+
+
+
+
+

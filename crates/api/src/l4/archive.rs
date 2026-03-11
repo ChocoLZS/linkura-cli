@@ -1,106 +1,138 @@
-use crate::macros::{define_api_struct, define_post_method, use_common_crate};
+use crate::macros::{define_api_struct, post, post_params, use_common_crate};
 
 use_common_crate!();
 define_api_struct!(ArchiveApi);
 
 impl<'a> ArchiveApi<'a> {
     // POST /v1/archive/get_archive_list
-    define_post_method!(
+    post!(
         get_archive_list,
         "/archive/get_archive_list",
-        crate::model::ArchiveGetArchiveListRequest
+        crate::model::GetArchiveListRequest,
+        crate::model::GetArchiveListResponse
     );
 
     // POST /v1/archive/get_channel_list
-    define_post_method!(get_channel_list, "/archive/get_channel_list");
+    post!(
+        get_channel_list,
+        "/archive/get_channel_list",
+        crate::model::GetChannelListResponse
+    );
 
     // POST /v1/archive/get_channel_movie_list
-    define_post_method!(
+    post!(
         get_channel_movie_list,
         "/archive/get_channel_movie_list",
-        crate::model::ArchiveGetChannelMovieListRequest
+        crate::model::GetChannelMovieListRequest,
+        crate::model::GetChannelMovieListResponse
     );
 
     // POST /v1/archive/get_fes_archive_data
-    define_post_method!(
+    post!(
         get_fes_archive_data,
         "/archive/get_fes_archive_data",
-        crate::model::ArchiveGetFesArchiveDataRequest
+        crate::model::GetFesArchiveDataRequest,
+        crate::model::GetFesArchiveDataResponse
     );
 
     // POST /v1/archive/get_fes_timeline_data
-    define_post_method!(
+    post!(
         get_fes_timeline_data,
         "/archive/get_fes_timeline_data",
-        crate::model::ArchiveGetFesTimelineDataRequest
+        crate::model::GetFesTimelineDataRequest,
+        crate::model::GetFesTimelineDataResponse
     );
 
     // POST /v1/archive/get_home
-    define_post_method!(get_home, "/archive/get_home");
+    post!(
+        get_home,
+        "/archive/get_home",
+        crate::model::GetHomeResponse
+    );
 
     // POST /v1/archive/get_season_list
-    define_post_method!(get_season_list, "/archive/get_season_list");
+    post!(
+        get_season_list,
+        "/archive/get_season_list",
+        crate::model::GetSeasonListResponse
+    );
 
     // POST /v1/archive/get_with_archive_data
-    define_post_method!(
+    post!(
         get_with_archive_data,
         "/archive/get_with_archive_data",
-        crate::model::ArchiveGetWithArchiveDataRequest
+        crate::model::GetWithArchiveDataRequest,
+        crate::model::GetWithArchiveDataResponse
     );
 
     // POST /v1/archive/set_cancel_recommend_channel
-    define_post_method!(
+    post!(
         set_cancel_recommend_channel,
         "/archive/set_cancel_recommend_channel",
-        crate::model::ArchiveSetCancelRecommendChannelRequest
+        crate::model::SetCancelRecommendChannelRequest,
+        crate::model::ArchiveCommonResponse
     );
 
     // POST /v1/archive/set_fes_camera
-    define_post_method!(
+    post!(
         set_fes_camera,
         "/archive/set_fes_camera",
-        crate::model::ArchiveSetFesCameraRequest
+        crate::model::SetFesCameraRequest,
+        crate::model::SetFesCameraResponse
     );
 
     // POST /v1/archive/set_purchase_ticket
-    define_post_method!(
+    post!(
         set_purchase_ticket,
         "/archive/set_purchase_ticket",
-        crate::model::ArchiveSetPurchaseTicketRequest
+        crate::model::SetPurchaseTicketRequest,
+        crate::model::ArchiveCommonResponse
     );
 
     // POST /v1/archive/set_recommend_channel
-    define_post_method!(
+    post!(
         set_recommend_channel,
         "/archive/set_recommend_channel",
-        crate::model::ArchiveSetRecommendChannelRequest
+        crate::model::SetRecommendChannelRequest,
+        crate::model::ArchiveCommonResponse
     );
 
     // POST /v1/archive/withlive_gift
-    define_post_method!(
+    post!(
         withlive_gift,
         "/archive/withlive_gift",
-        crate::model::ArchiveWithliveGiftRequest
+        crate::model::ArchiveWithliveGiftRequest,
+        crate::model::ArchiveWithliveGiftResponse
     );
 
     // POST /v1/archive/withlive_info
-    define_post_method!(
+    post_params!(
         withlive_info,
         "/archive/withlive_info",
-        crate::model::ArchiveWithliveInfoRequest
+        crate::model::ArchiveWithliveInfoResponse,
+        live_id: String,
+        play_time_second: Option<i32>,
+        timeline_unixtime: Option<i64>,
     );
 
     // POST /v1/archive/withlive_prize
-    define_post_method!(
+    post_params!(
         withlive_prize,
         "/archive/withlive_prize",
-        crate::model::ArchiveWithlivePrizeRequest
+        crate::model::ArchiveWithlivePrizeResponse,
+        present_box_id: String,
     );
 
     // POST /v1/archive/withlive_stars
-    define_post_method!(
+    post!(
         withlive_stars,
         "/archive/withlive_stars",
-        crate::model::ArchiveWithliveStarsRequest
+        crate::model::ArchiveWithliveStarsPostRequest,
+        serde_json::Value
     );
 }
+
+
+
+
+

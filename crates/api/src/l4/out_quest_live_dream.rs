@@ -1,34 +1,40 @@
-use crate::macros::{define_api_struct, define_post_method, use_common_crate};
+use crate::macros::{define_api_struct, post, use_common_crate};
 
 use_common_crate!();
 define_api_struct!(OutQuestLiveDreamApi);
 
 impl<'a> OutQuestLiveDreamApi<'a> {
     // POST /v1/out_quest_live/dream/get_member_select
-    define_post_method!(
+    post!(
         get_member_select,
         "/out_quest_live/dream/get_member_select",
-        crate::model::OutQuestLiveDreamGetMemberSelectRequest
+        crate::model::GetMemberSelectResponse
     );
 
     // POST /v1/out_quest_live/dream/get_result
-    define_post_method!(
+    post!(
         get_result,
         "/out_quest_live/dream/get_result",
-        crate::model::OutQuestLiveDreamGetResultRequest
+        crate::model::DreamGetResultRequest,
+        crate::model::DreamGetResultResponse
     );
 
     // POST /v1/out_quest_live/dream/notify_member_release_confirm
-    define_post_method!(
+    post!(
         notify_member_release_confirm,
         "/out_quest_live/dream/notify_member_release_confirm",
-        crate::model::OutQuestLiveDreamNotifyMemberReleaseConfirmRequest
+        serde_json::Value
     );
 
     // POST /v1/out_quest_live/dream/set_card
-    define_post_method!(
+    post!(
         set_card,
         "/out_quest_live/dream/set_card",
-        crate::model::OutQuestLiveDreamSetCardRequest
+        crate::model::DreamSetCardRequest,
+        crate::model::DreamSetCardResponse
     );
 }
+
+
+
+

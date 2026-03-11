@@ -1,55 +1,64 @@
-use crate::macros::{define_api_struct, define_post_method, use_common_crate};
+use crate::macros::{define_api_struct, post, use_common_crate};
 
 use_common_crate!();
 define_api_struct!(OutQuestLiveDailyApi);
 
 impl<'a> OutQuestLiveDailyApi<'a> {
     // POST /v1/out_quest_live/daily/get_recovery_challenge_count
-    define_post_method!(
+    post!(
         get_recovery_challenge_count,
         "/out_quest_live/daily/get_recovery_challenge_count",
-        crate::model::OutQuestLiveDailyGetRecoveryChallengeCountRequest
+        crate::model::DailyGetRecoveryChallengeCountResponse
     );
 
     // POST /v1/out_quest_live/daily/get_release_ticket
-    define_post_method!(
+    post!(
         get_release_ticket,
         "/out_quest_live/daily/get_release_ticket",
-        crate::model::OutQuestLiveDailyGetReleaseTicketRequest
+        crate::model::DailySeriesCommonRequest,
+        crate::model::DailyGetReleaseTicketResponse
     );
 
     // POST /v1/out_quest_live/daily/get_stage_data
-    define_post_method!(
+    post!(
         get_stage_data,
         "/out_quest_live/daily/get_stage_data",
-        crate::model::OutQuestLiveDailyGetStageDataRequest
+        crate::model::DailyGetStageDataRequest,
+        crate::model::DailyGetStageDataResponse
     );
 
     // POST /v1/out_quest_live/daily/get_stage_list
-    define_post_method!(
+    post!(
         get_stage_list,
         "/out_quest_live/daily/get_stage_list",
-        crate::model::OutQuestLiveDailyGetStageListRequest
+        crate::model::DailyGetStageListRequest,
+        crate::model::DailyGetStageListResponse
     );
 
     // POST /v1/out_quest_live/daily/get_stage_select
-    define_post_method!(
+    post!(
         get_stage_select,
         "/out_quest_live/daily/get_stage_select",
-        crate::model::OutQuestLiveDailyGetStageSelectRequest
+        crate::model::DailyGetStageSelectResponse
     );
 
     // POST /v1/out_quest_live/daily/recovery_challenge_count
-    define_post_method!(
+    post!(
         recovery_challenge_count,
         "/out_quest_live/daily/recovery_challenge_count",
-        crate::model::OutQuestLiveDailyRecoveryChallengeCountRequest
+        crate::model::DailyRecoveryChallengeCountRequest,
+        crate::model::DailyRecoveryChallengeCountResponse
     );
 
     // POST /v1/out_quest_live/daily/set_release
-    define_post_method!(
+    post!(
         set_release,
         "/out_quest_live/daily/set_release",
-        crate::model::OutQuestLiveDailySetReleaseRequest
+        crate::model::DailySeriesCommonRequest,
+        crate::model::DailySetReleaseResponse
     );
 }
+
+
+
+

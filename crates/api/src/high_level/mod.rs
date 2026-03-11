@@ -4,11 +4,9 @@ use crate::{
     get_appstore_version, get_google_play_version,
     macros::{define_api_struct, use_common_crate},
     model::{
-        AccountConnectRequest, AccountConnectResponse, ArchiveGetArchiveListRequest,
-        ArchiveGetArchiveListResponse, ArchiveGetFesArchiveDataRequest, ArchiveGetHomeResponse,
-        ArchiveGetWithArchiveDataRequest, FesliveConnectTokenRequest, FesliveConnectTokenResponse,
-        FesliveEnterRequest, UserLoginRequest, UserLoginResponse, WithliveConnectTokenRequest,
-        WithliveConnectTokenResponse, WithliveEnterRequest,
+        AccountConnectRequest, ArchiveGetArchiveListRequest, ArchiveGetFesArchiveDataRequest,
+        ArchiveGetWithArchiveDataRequest, FesliveConnectTokenRequest, FesliveEnterRequest,
+        LiveConnectTokenRequest, UserLoginRequest, WithliveEnterRequest,
     },
 };
 use reqwest::header;
@@ -155,11 +153,7 @@ impl<'a> HighLevelApi<'a> {
             platform_type: Some(1),
             ..Default::default()
         };
-        let res = self.raw().account().connect(&request)?;
-        if res.status() != reqwest::StatusCode::OK {
-            return Err(anyhow::anyhow!("Login failed: {:?}", res));
-        }
-        let body: AccountConnectResponse = res.json()?;
+        let body = self.raw().account().connect(&request)?;
         let device_specific_id = body.device_specific_id.unwrap_or_default();
         if device_specific_id.is_empty() {
             return Err(anyhow::anyhow!("Login failed, device_specific_id is empty"));
@@ -185,11 +179,7 @@ impl<'a> HighLevelApi<'a> {
             version: Some(1),
             ..Default::default()
         };
-        let res = self.raw().user().login(&request)?;
-        if res.status() != reqwest::StatusCode::OK {
-            return Err(anyhow::anyhow!("Login failed: {:?}", res));
-        }
-        let body: UserLoginResponse = res.json()?;
+        let body = self.raw().user().login(&request)?;
         let session_token = body.session_token.unwrap_or_default();
         if session_token.is_empty() {
             return Err(anyhow::anyhow!("Login failed"));
@@ -198,11 +188,7 @@ impl<'a> HighLevelApi<'a> {
     }
 
     pub fn get_plan_list(&self) -> Result<serde_json::Value> {
-        let res = self.raw().archive().get_home()?;
-        if res.status() != reqwest::StatusCode::OK {
-            return Err(anyhow::anyhow!("Get plan list failed: {:?}", res));
-        }
-        let body: ArchiveGetHomeResponse = res.json()?;
+        let body = self.raw().archive().get_home()?;
         let mut merged = body.live_archive_list.unwrap_or_default();
         merged.extend(body.trailer_archive_list.unwrap_or_default());
         Ok(serde_json::to_value(merged)?)
@@ -216,11 +202,7 @@ impl<'a> HighLevelApi<'a> {
             sort: Some("live_start_time".to_string()),
             ..Default::default()
         };
-        let res = self.raw().archive().get_archive_list(&request)?;
-        if res.status() != reqwest::StatusCode::OK {
-            return Err(anyhow::anyhow!("Get archive list failed: {:?}", res));
-        }
-        let body: ArchiveGetArchiveListResponse = res.json()?;
+        let body = self.raw().archive().get_archive_list(&request)?;
         Ok(serde_json::to_value(body.archive_list.unwrap_or_default())?)
     }
 
@@ -229,24 +211,16 @@ impl<'a> HighLevelApi<'a> {
             live_id: Some(id.to_string()),
             ..Default::default()
         };
-        let res = self.raw().with_live().enter(&request)?;
-        if res.status() != reqwest::StatusCode::OK {
-            return Err(anyhow::anyhow!("Get meets info failed: {:?}", res));
-        }
-        let wm_info: serde_json::Value = res.json()?;
-        Ok(wm_info)
+        let body = self.raw().with_live().enter(&request)?;
+        Ok(serde_json::to_value(body)?)
     }
 
     pub fn get_with_meets_connect_token(&self, live_id: &str) -> Result<String> {
-        let request = WithliveConnectTokenRequest {
+        let request = LiveConnectTokenRequest {
             live_id: Some(live_id.to_string()),
             ..Default::default()
         };
-        let res = self.raw().with_live().connect_token(&request)?;
-        if res.status() != reqwest::StatusCode::OK {
-            return Err(anyhow::anyhow!("Get connect token failed: {:?}", res));
-        }
-        let body: WithliveConnectTokenResponse = res.json()?;
+        let body = self.raw().with_live().connect_token(&request)?;
         let connect_token = body
             .audience_token
             .clone()
@@ -259,18 +233,8 @@ impl<'a> HighLevelApi<'a> {
             live_id: Some(id.to_string()),
             ..Default::default()
         };
-        let res = self.raw().fes_live().enter(&request)?;
-        if res.status() != reqwest::StatusCode::OK {
-            let status = res.status();
-            let error_text = res.text().unwrap_or_default();
-            return Err(anyhow::anyhow!(
-                "Get fes live info failed with status {}: {:?}",
-                status,
-                error_text
-            ));
-        }
-        let fes_info: serde_json::Value = res.json()?;
-        Ok(fes_info)
+        let body = self.raw().fes_live().enter(&request)?;
+        Ok(serde_json::to_value(body)?)
     }
 
     pub fn get_fes_live_connect_token(&self, live_id: &str) -> Result<String> {
@@ -278,11 +242,7 @@ impl<'a> HighLevelApi<'a> {
             live_id: Some(live_id.to_string()),
             ..Default::default()
         };
-        let res = self.raw().fes_live().connect_token(&request)?;
-        if res.status() != reqwest::StatusCode::OK {
-            return Err(anyhow::anyhow!("Get connect token failed: {:?}", res));
-        }
-        let body: FesliveConnectTokenResponse = res.json()?;
+        let body = self.raw().fes_live().connect_token(&request)?;
         let connect_token = body
             .audience_token
             .clone()
@@ -296,23 +256,15 @@ impl<'a> HighLevelApi<'a> {
                 archives_id: Some(id.to_string()),
                 ..Default::default()
             };
-            let res = self.raw().archive().get_fes_archive_data(&request)?;
-            if res.status() != reqwest::StatusCode::OK {
-                return Err(anyhow::anyhow!("Get archive details failed: {:?}", res));
-            }
-            let json: serde_json::Value = res.json()?;
-            Ok(json)
+            let body = self.raw().archive().get_fes_archive_data(&request)?;
+            Ok(serde_json::to_value(body)?)
         } else if live_type == 2 {
             let request = ArchiveGetWithArchiveDataRequest {
                 archives_id: Some(id.to_string()),
                 ..Default::default()
             };
-            let res = self.raw().archive().get_with_archive_data(&request)?;
-            if res.status() != reqwest::StatusCode::OK {
-                return Err(anyhow::anyhow!("Get archive details failed: {:?}", res));
-            }
-            let json: serde_json::Value = res.json()?;
-            Ok(json)
+            let body = self.raw().archive().get_with_archive_data(&request)?;
+            Ok(serde_json::to_value(body)?)
         } else {
             Err(anyhow::anyhow!("Unsupported live type: {}", live_type))
         }

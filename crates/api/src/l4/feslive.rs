@@ -1,178 +1,239 @@
-use crate::macros::{define_api_struct, define_post_method, use_common_crate};
+use crate::macros::{define_api_struct, post, post_params, use_common_crate};
 
 use_common_crate!();
 define_api_struct!(FesliveApi);
 
 impl<'a> FesliveApi<'a> {
     // POST /v1/feslive/circle_chat/comment
-    define_post_method!(
+    post!(
         circle_chat_comment,
         "/feslive/circle_chat/comment",
-        crate::model::FesliveCircleChatCommentRequest
+        crate::model::FesliveCircleChatCommentRequest,
+        crate::model::FesliveCircleChatCommentResponse
     );
 
     // POST /v1/feslive/clap
-    define_post_method!(clap, "/feslive/clap", crate::model::FesliveClapRequest);
+    post!(
+        clap,
+        "/feslive/clap",
+        crate::model::FesliveClapRequest,
+        serde_json::Value
+    );
 
     // POST /v1/feslive/comment
-    define_post_method!(
+    post!(
         comment,
         "/feslive/comment",
-        crate::model::FesliveCommentRequest
+        crate::model::FesliveCommentRequest,
+        crate::model::FesliveCommentResponse
     );
 
     // POST /v1/feslive/connect_token
-    define_post_method!(
+    post!(
         connect_token,
         "/feslive/connect_token",
-        crate::model::FesliveConnectTokenRequest
+        crate::model::LiveConnectTokenRequest,
+        crate::model::LiveConnectTokenResponse
     );
 
     // POST /v1/feslive/enquete
-    define_post_method!(
+    post!(
         enquete,
         "/feslive/enquete",
-        crate::model::FesliveEnqueteRequest
+        crate::model::FesliveEnqueteRequest,
+        serde_json::Value
     );
 
     // POST /v1/feslive/enter
-    define_post_method!(enter, "/feslive/enter", crate::model::FesliveEnterRequest);
+    post!(
+        enter,
+        "/feslive/enter",
+        crate::model::FesliveEnterRequest,
+        crate::model::FesliveEnterResponse
+    );
 
     // POST /v1/feslive/get_gift_shop_list
-    define_post_method!(
+    post!(
         get_gift_shop_list,
         "/feslive/get_gift_shop_list",
-        crate::model::FesliveGetGiftShopListRequest
+        crate::model::FesliveGetGiftShopListRequest,
+        crate::model::FesliveGetGiftShopListResponse
     );
 
     // POST /v1/feslive/get_list
-    define_post_method!(get_list, "/feslive/get_list");
+    post!(
+        get_list,
+        "/feslive/get_list",
+        crate::model::FesliveGetListResponse
+    );
 
     // POST /v1/feslive/gift
-    define_post_method!(gift, "/feslive/gift", crate::model::FesliveGiftRequest);
+    post!(
+        gift,
+        "/feslive/gift",
+        crate::model::FesliveGiftRequest,
+        crate::model::FesliveGiftResponse
+    );
 
     // POST /v1/feslive/gift_pt_rankings
-    define_post_method!(
+    post_params!(
         gift_pt_rankings,
         "/feslive/gift_pt_rankings",
-        crate::model::FesliveGiftPtRankingsRequest
+        crate::model::FesliveGiftPtRankingsResponse,
+        live_id: String,
     );
 
     // POST /v1/feslive/grand_prix_ranking
-    define_post_method!(
+    post!(
         grand_prix_ranking,
         "/feslive/grand_prix_ranking",
-        crate::model::FesliveGrandPrixRankingRequest
+        crate::model::FesliveGrandPrixRankingRequest,
+        crate::model::FesliveGrandPrixRankingResponse
     );
 
     // POST /v1/feslive/live_announcement
-    define_post_method!(
+    post_params!(
         live_announcement,
         "/feslive/live_announcement",
-        crate::model::FesliveLiveAnnouncementRequest
+        crate::model::FesliveLiveAnnouncementResponse,
+        live_id: String,
     );
 
     // POST /v1/feslive/live_info
-    define_post_method!(
+    post_params!(
         live_info,
         "/feslive/live_info",
-        crate::model::FesliveLiveInfoRequest
+        crate::model::FesliveLiveInfoResponse,
+        live_id: String,
+        offset_timeline_id: String,
+        offset_circle_chat_id: String,
     );
 
     // POST /v1/feslive/live_subinfo
-    define_post_method!(
+    post_params!(
         live_subinfo,
         "/feslive/live_subinfo",
-        crate::model::FesliveLiveSubinfoRequest
+        crate::model::FesliveLiveSubinfoResponse,
+        live_id: String,
     );
 
     // POST /v1/feslive/lobby
-    define_post_method!(lobby, "/feslive/lobby", crate::model::FesliveLobbyRequest);
+    post!(
+        lobby,
+        "/feslive/lobby",
+        crate::model::FesliveLobbyRequest,
+        crate::model::FesliveLobbyResponse
+    );
 
     // POST /v1/feslive/lobby_announcement
-    define_post_method!(
+    post_params!(
         lobby_announcement,
         "/feslive/lobby_announcement",
-        crate::model::FesliveLobbyAnnouncementRequest
+        crate::model::FesliveLobbyAnnouncementResponse,
+        live_id: String,
     );
 
     // POST /v1/feslive/lobby_comment
-    define_post_method!(
+    post!(
         lobby_comment,
         "/feslive/lobby_comment",
-        crate::model::FesliveLobbyCommentRequest
+        crate::model::FesliveCommentRequest,
+        crate::model::FesliveCommentResponse
     );
 
     // POST /v1/feslive/lobby_gift
-    define_post_method!(
+    post!(
         lobby_gift,
         "/feslive/lobby_gift",
-        crate::model::FesliveLobbyGiftRequest
+        crate::model::FesliveGiftRequest,
+        crate::model::FesliveGiftResponse
     );
 
     // POST /v1/feslive/lobby_info
-    define_post_method!(
+    post_params!(
         lobby_info,
         "/feslive/lobby_info",
-        crate::model::FesliveLobbyInfoRequest
+        crate::model::FesliveLobbyInfoResponse,
+        live_id: String,
+        offset_timeline_id: String,
+        offset_circle_chat_id: String,
     );
 
     // POST /v1/feslive/lobby_message_card
-    define_post_method!(
+    post!(
         lobby_message_card,
         "/feslive/lobby_message_card",
-        crate::model::FesliveLobbyMessageCardRequest
+        crate::model::FesliveMessageCardRequest,
+        crate::model::FesliveMessageCardResponse
     );
 
     // POST /v1/feslive/lobby_subinfo
-    define_post_method!(
+    post_params!(
         lobby_subinfo,
         "/feslive/lobby_subinfo",
-        crate::model::FesliveLobbySubinfoRequest
+        crate::model::FesliveLobbySubinfoResponse,
+        live_id: String,
     );
 
     // POST /v1/feslive/message_card
-    define_post_method!(
+    post!(
         message_card,
         "/feslive/message_card",
-        crate::model::FesliveMessageCardRequest
+        crate::model::FesliveMessageCardRequest,
+        crate::model::FesliveMessageCardResponse
     );
 
     // POST /v1/feslive/out_quest_live_ranking
-    define_post_method!(
+    post!(
         out_quest_live_ranking,
         "/feslive/out_quest_live_ranking",
-        crate::model::FesliveOutQuestLiveRankingRequest
+        crate::model::FesliveOutQuestLiveRankingRequest,
+        crate::model::FesliveOutQuestLiveRankingResponse
     );
 
     // POST /v1/feslive/penlight_color
-    define_post_method!(
+    post!(
         penlight_color,
         "/feslive/penlight_color",
-        crate::model::FeslivePenlightColorRequest
+        crate::model::FeslivePenlightColorRequest,
+        serde_json::Value
     );
 
     // POST /v1/feslive/prize
-    define_post_method!(prize, "/feslive/prize", crate::model::FeslivePrizeRequest);
+    post_params!(
+        prize,
+        "/feslive/prize",
+        crate::model::FeslivePrizeResponse,
+        live_id: String,
+        present_box_id: String,
+    );
 
     // POST /v1/feslive/set_camera
-    define_post_method!(
+    post!(
         set_camera,
         "/feslive/set_camera",
-        crate::model::FesliveSetCameraRequest
+        crate::model::FesliveSetCameraRequest,
+        crate::model::FesliveSetCameraResponse
     );
 
     // POST /v1/feslive/set_flower_stand
-    define_post_method!(
+    post!(
         set_flower_stand,
         "/feslive/set_flower_stand",
-        crate::model::FesliveSetFlowerStandRequest
+        crate::model::SetFlowerStandRequest,
+        crate::model::SetFlowerStandResponse
     );
 
     // POST /v1/feslive/set_prize
-    define_post_method!(
+    post!(
         set_prize,
         "/feslive/set_prize",
-        crate::model::FesliveSetPrizeRequest
+        crate::model::FesliveSetPrizeRequest,
+        serde_json::Value
     );
 }
+
+
+
+
+

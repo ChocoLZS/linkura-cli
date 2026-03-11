@@ -1,40 +1,56 @@
-use crate::macros::{define_api_struct, define_post_method, use_common_crate};
+use crate::macros::{define_api_struct, post, use_common_crate};
 
 use_common_crate!();
 define_api_struct!(AccountApi);
 
 impl<'a> AccountApi<'a> {
     // POST /v1/account/connect
-    define_post_method!(
+    post!(
         connect,
         "/account/connect",
-        crate::model::AccountConnectRequest
+        crate::model::ConnectRequest,
+        crate::model::ConnectResponse
     );
 
     // POST /v1/account/delete
-    define_post_method!(delete, "/account/delete");
+    post!(
+        delete,
+        "/account/delete",
+        serde_json::Value
+    );
 
     // POST /v1/account/delete_connect_data
-    define_post_method!(
+    post!(
         delete_connect_data,
         "/account/delete_connect_data",
-        crate::model::AccountDeleteConnectDataRequest
+        crate::model::DeleteConnectDataRequest,
+        crate::model::DeleteConnectDataResponse
     );
 
     // POST /v1/account/get_connect_data
-    define_post_method!(get_connect_data, "/account/get_connect_data");
+    post!(
+        get_connect_data,
+        "/account/get_connect_data",
+        crate::model::GetConnectDataResponse
+    );
 
     // POST /v1/account/get_connect_user
-    define_post_method!(
+    post!(
         get_connect_user,
         "/account/get_connect_user",
-        crate::model::AccountGetConnectUserRequest
+        crate::model::GetConnectUserRequest,
+        crate::model::GetConnectUserResponse
     );
 
     // POST /v1/account/set_connect_data
-    define_post_method!(
+    post!(
         set_connect_data,
         "/account/set_connect_data",
-        crate::model::AccountSetConnectDataRequest
+        crate::model::SetConnectDataRequest,
+        crate::model::SetConnectDataResponse
     );
 }
+
+
+
+

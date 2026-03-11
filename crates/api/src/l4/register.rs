@@ -1,41 +1,48 @@
-use crate::macros::{define_api_struct, define_post_method, use_common_crate};
+use crate::macros::{define_api_struct, post, use_common_crate};
 
 use_common_crate!();
 define_api_struct!(RegisterApi);
 
 impl<'a> RegisterApi<'a> {
     // POST /v1/register/approve_terms
-    define_post_method!(
+    post!(
         approve_terms,
         "/register/approve_terms",
-        crate::model::RegisterApproveTermsRequest
+        crate::model::RegisterApproveTermsRequest,
+        crate::model::RegisterApproveTermsResponse
     );
 
     // POST /v1/register/get_terms
-    define_post_method!(
+    post!(
         get_terms,
         "/register/get_terms",
-        crate::model::RegisterGetTermsRequest
+        crate::model::RegisterGetTermsResponse
     );
 
     // POST /v1/register/set_approve_terms
-    define_post_method!(
+    post!(
         set_approve_terms,
         "/register/set_approve_terms",
-        crate::model::RegisterSetApproveTermsRequest
+        serde_json::Value
     );
 
     // POST /v1/register/set_new_user
-    define_post_method!(
+    post!(
         set_new_user,
         "/register/set_new_user",
-        crate::model::RegisterSetNewUserRequest
+        crate::model::RegisterSetNewUserRequest,
+        crate::model::RegisterSetNewUserResponse
     );
 
     // POST /v1/register/set_user_data
-    define_post_method!(
+    post!(
         set_user_data,
         "/register/set_user_data",
-        crate::model::RegisterSetUserDataRequest
+        crate::model::RegisterSetUserDataRequest,
+        crate::model::RegisterSetUserDataResponse
     );
 }
+
+
+
+

@@ -1,34 +1,40 @@
-use crate::macros::{define_api_struct, define_post_method, use_common_crate};
+use crate::macros::{define_api_struct, post, use_common_crate};
 
 use_common_crate!();
 define_api_struct!(RhythmGameApi);
 
 impl<'a> RhythmGameApi<'a> {
     // POST /v1/rhythm_game/home
-    define_post_method!(
+    post!(
         home,
         "/rhythm_game/home",
-        crate::model::RhythmGameHomeRequest
+        crate::model::RhythmGameHomeGetResponse
     );
 
     // POST /v1/rhythm_game/receive_class_mission
-    define_post_method!(
+    post!(
         receive_class_mission,
         "/rhythm_game/receive_class_mission",
-        crate::model::RhythmGameReceiveClassMissionRequest
+        crate::model::RhythmGameReceiveClassMissionRequest,
+        crate::model::RhythmGameReceiveClassMissionResponse
     );
 
     // POST /v1/rhythm_game/receive_total_mission
-    define_post_method!(
+    post!(
         receive_total_mission,
         "/rhythm_game/receive_total_mission",
-        crate::model::RhythmGameReceiveTotalMissionRequest
+        crate::model::RhythmGameReceiveTotalMissionResponse
     );
 
     // POST /v1/rhythm_game/set_music
-    define_post_method!(
+    post!(
         set_music,
         "/rhythm_game/set_music",
-        crate::model::RhythmGameSetMusicRequest
+        crate::model::RhythmGameSetMusicRequest,
+        crate::model::RhythmGameSetMusicResponse
     );
 }
+
+
+
+

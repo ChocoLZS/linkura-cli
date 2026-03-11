@@ -1,3 +1,7 @@
+use crate::model::{
+    Deck, ModifyRhythmGameDeck, NotesResultInfo, RhythmGameGrandPrixSetDeckData,
+    RhythmGameGrandPrixSetPositionData, RhythmGamePlayData, UseFanLevelPointStock,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -50,6 +54,30 @@ pub struct AccountSetConnectDataRequest {
     /// dnSpy: Org.OpenAPITools.Model.Provider
     pub provider: Option<i32>,
     pub id_token: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct NotifyMonthDisplayedRequest {
+    pub adv_series_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct PlayAdvDataRequest {
+    pub adv_data_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SetWatchableStatusRequest {
+    pub adv_data_id: Option<i32>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -1596,7 +1624,7 @@ pub struct StaminaRecoveryItem {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveGetLiveSettingRequest {
+pub struct GetLiveSettingRequest {
     pub stage_id: Option<i32>,
     pub is_challenge_mode: Option<bool>,
     pub quest_live_type: Option<i64>,
@@ -1607,7 +1635,7 @@ pub struct OutQuestLiveGetLiveSettingRequest {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveGetPlayReportRequest {
+pub struct GetPlayReportRequest {
     pub quest_live_id: Option<String>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
@@ -1615,7 +1643,7 @@ pub struct OutQuestLiveGetPlayReportRequest {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveGetQuestClearStatusListRequest {
+pub struct GetQuestClearStatusListRequest {
     pub items_id: Option<i32>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
@@ -1623,21 +1651,7 @@ pub struct OutQuestLiveGetQuestClearStatusListRequest {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveGetQuestListRequest {
-    #[serde(flatten)]
-    pub extra: Map<String, Value>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveGetQuestTopRequest {
-    #[serde(flatten)]
-    pub extra: Map<String, Value>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveGetResultRequest {
+pub struct GetResultRequest {
     pub quest_live_id: Option<String>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
@@ -1645,14 +1659,7 @@ pub struct OutQuestLiveGetResultRequest {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveGetStaminaRecoveryInfoRequest {
-    #[serde(flatten)]
-    pub extra: Map<String, Value>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveRecoveryStaminaRequest {
+pub struct RecoveryStaminaRequest {
     /// dnSpy enum: Org.OpenAPITools.Model.UseRecoveryType
     pub use_recovery_type: Option<i32>,
     pub recovery_count: Option<i64>,
@@ -1663,7 +1670,7 @@ pub struct OutQuestLiveRecoveryStaminaRequest {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub struct OutQuestLiveSetLiveSettingRequest {
+pub struct SetLiveSettingRequest {
     pub stage_id: Option<i32>,
     pub deck_id: Option<String>,
     pub deck_data: Option<Deck>,
@@ -1806,6 +1813,168 @@ pub struct OutQuestLiveGradeSetRewardRequest {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
+pub struct OutQuestLiveGrandPrixGetHistoryRequest {
+    pub grand_prix_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct OutQuestLiveGrandPrixGetRankingListRequest {
+    pub grand_prix_id: Option<i32>,
+    /// dnSpy enum: Org.OpenAPITools.Model.GrandPrixRankingType
+    pub ranking_type: Option<i32>,
+    /// dnSpy enum: Org.OpenAPITools.Model.GrandPrixGetRankType
+    pub get_rank_type: Option<i32>,
+    pub target_rank: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct OutQuestLiveGrandPrixGetResultRequest {
+    pub quest_live_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct OutQuestLiveGrandPrixGetStageDataRequest {
+    pub stage_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct OutQuestLiveGrandPrixGetStageListRequest {
+    pub quest_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct OutQuestLiveGrandPrixGetStageSelectRequest {
+    pub grand_prix_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct OutQuestLiveGrandPrixGetTopInfoRequest {
+    pub grand_prix_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct MusicLearningGetResultRequest {
+    pub quest_live_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct MusicLearningSetMusicRequest {
+    pub music_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventGetResultRequest {
+    pub quest_live_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventGetStageDataRequest {
+    pub quest_stage_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventGetStageListRequest {
+    pub quest_series_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventGetStaminaRecoveryInfoRequest {
+    pub raid_event_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventGetTopInfoRequest {
+    pub raid_event_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventRecoveryStaminaRequest {
+    pub raid_event_id: Option<i32>,
+    pub recovery_count: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventSetJoinMessageRequest {
+    pub raid_event_id: Option<i32>,
+    pub message: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RaidEventSetRewardRequest {
+    pub raid_event_id: Option<i32>,
+    pub quest_series_id: Option<i32>,
+    pub total_point: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetStageDataRequest {
+    pub area_id: Option<i32>,
+    pub stage_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetStageSelectRequest {
+    pub area_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
 pub struct WebviewLiveEnterRequest {
     pub live_id: Option<String>,
     pub offset_timeline_id: Option<String>,
@@ -1831,221 +2000,1247 @@ pub struct WebviewLiveLoginRequest {
     pub extra: Map<String, Value>,
 }
 
-// Auto-generated from crates/api/src/l4/* path signatures.
-macro_rules! define_request_type {
-    ($name:ident) => {
-        #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-        #[serde(rename_all = "snake_case")]
-        pub struct $name {
-            #[serde(flatten)]
-            pub extra: Map<String, Value>,
-        }
-
-        impl From<Value> for $name {
-            fn from(value: Value) -> Self {
-                match value {
-                    Value::Object(extra) => Self { extra },
-                    _ => Self::default(),
-                }
-            }
-        }
-    };
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CircleGetChatLogListRequest {
+    pub diff_order_id: Option<i64>,
+    pub is_item_request: Option<bool>,
+    pub already_read_order_id: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
 }
 
-define_request_type!(ActivityRecordGetTopRequest);
-define_request_type!(ActivityRecordNotifyMonthDisplayedRequest);
-define_request_type!(ActivityRecordPlayAdvDataRequest);
-define_request_type!(ActivityRecordSetWatchableStatusRequest);
-define_request_type!(BeginnerMissionGetListRequest);
-define_request_type!(CircleGetChatLogListRequest);
-define_request_type!(CircleGetCircleTopInfoRequest);
-// CircleGetDetailRequest/CircleGetInfoRequest/CircleGetInviteAndJoinInfoRequest are strongly typed above.
-define_request_type!(CircleGetInviteListRequest);
-// CircleGetListRequest/CircleSetApproveInviteRequest/CircleSetApproveJoinRequest are strongly typed above.
-// CircleSetCancelInviteRequest/CircleSetCancelJoinRequest/CircleSetChatMessageRequest are strongly typed above.
-// CircleSetCreateRequest/CircleSetDismissalRequest are strongly typed above.
-define_request_type!(CircleSetDissolutionRequest);
-// CircleSetDonationRequest/CircleSetExpulsionRequest/CircleSetInviteRequest are strongly typed above.
-// CircleSetItemRequestRequest/CircleSetJoinRequest are strongly typed above.
-define_request_type!(CircleSetOutRequest);
-// CircleSetPositionRequest/CircleSetRejectInviteRequest/CircleSetRejectJoinRequest are strongly typed above.
-// CircleSetSettingRequest/CircleSetTransferLeaderRequest are strongly typed above.
-define_request_type!(CollectionGetCharacterInfoRequest);
-define_request_type!(CollectionGetEmojiListRequest);
-define_request_type!(CollectionGetGallaryListRequest);
-define_request_type!(CollectionGetMusicListRequest);
-define_request_type!(CollectionGetStickerListRequest);
-define_request_type!(CollectionSetGallaryDataRequest);
-define_request_type!(CollectionSetMusicPlayRequest);
-define_request_type!(CommonGetHeaderAnnounsRequest);
-// GachaConfirmTicketExpiredTimeRequest/GachaGetExchangeCardHavingListRequest are strongly typed above.
-// GachaGetExchangeCardListRequest/GachaGetGuaranteePointListRequest are strongly typed above.
-define_request_type!(GachaGetHistoryRequest);
-// GachaGetLotteryChanceRequest is strongly typed above.
-define_request_type!(GachaGetSeriesListRequest);
-// GachaSetGuaranteePointExchangeRequest/GachaSetPrizeReceiveRequest are strongly typed above.
-// GachaSetPurchaseRequest/GachaSetSelectTicketExchangeRequest are strongly typed above.
-define_request_type!(HomeGetCustomSettingRequest);
-define_request_type!(HomeGetHomeRequest);
-define_request_type!(HomeGetLoginBonusRequest);
-define_request_type!(HomeGetWallpaperSettingRequest);
-define_request_type!(HomeNotifyWallpaperSettingRequest);
-define_request_type!(HomeSetClockSettingRequest);
-define_request_type!(HomeSetCurrentWallpaperSettingRequest);
-define_request_type!(HomeSetShowRetireRequest);
-define_request_type!(HomeSetWallpaperSettingRequest);
-define_request_type!(InQuestLiveGetLiveInfoRequest);
-define_request_type!(InQuestLiveSetFinishRequest);
-define_request_type!(InQuestLiveSetRetireRequest);
-define_request_type!(InQuestLiveSetStartRequest);
-define_request_type!(InQuestLiveSkipQuestRequest);
-define_request_type!(ItemExchangeGetLimitBreakMaterialConvertListRequest);
-define_request_type!(ItemExchangeGetListNewRequest);
-// ItemExchangeGetListRequest is strongly typed above.
-define_request_type!(ItemExchangeSetLimitBreakMaterialConvertRequest);
-// ItemExchangeSetPurchaseRequest is strongly typed above.
-define_request_type!(ItemStoreGetListRequest);
-define_request_type!(JewelShopGetBirthdayRequest);
-define_request_type!(JewelShopGetListRequest);
-define_request_type!(JewelShopGetMembershipListRequest);
-// JewelShopSetBirthdayRequest is strongly typed above.
-define_request_type!(JewelShopSetMembershipPurchaseRequest);
-// JewelShopSetPurchaseRequest is strongly typed above.
-define_request_type!(MissionGetListRequest);
-define_request_type!(MissionReceiveCommonMissionRewardRequest);
-// OutQuestLiveDailyGetRecoveryChallengeCountRequest is strongly typed above.
-// OutQuestLiveDailyGetReleaseTicketRequest is strongly typed above.
-// OutQuestLiveDailyGetStageDataRequest is strongly typed above.
-// OutQuestLiveDailyGetStageListRequest is strongly typed above.
-// OutQuestLiveDailyGetStageSelectRequest is strongly typed above.
-// OutQuestLiveDailyRecoveryChallengeCountRequest is strongly typed above.
-// OutQuestLiveDailySetReleaseRequest is strongly typed above.
-// OutQuestLiveDreamGetMemberSelectRequest is strongly typed above.
-// OutQuestLiveDreamGetResultRequest is strongly typed above.
-// OutQuestLiveDreamNotifyMemberReleaseConfirmRequest is strongly typed above.
-// OutQuestLiveDreamSetCardRequest is strongly typed above.
-// OutQuestLiveGetLiveSettingRequest is strongly typed above.
-// OutQuestLiveGetPlayReportRequest is strongly typed above.
-// OutQuestLiveGetQuestClearStatusListRequest is strongly typed above.
-// OutQuestLiveGetQuestListRequest is strongly typed above.
-// OutQuestLiveGetQuestTopRequest is strongly typed above.
-// OutQuestLiveGetResultRequest is strongly typed above.
-// OutQuestLiveGetStaminaRecoveryInfoRequest is strongly typed above.
-// OutQuestLiveGradeChallengeGetQuestListRequest is strongly typed above.
-// OutQuestLiveGradeChallengeGetRankingListRequest is strongly typed above.
-// OutQuestLiveGradeChallengeGetResultRequest is strongly typed above.
-// OutQuestLiveGradeGetLiveListRequest is strongly typed above.
-// OutQuestLiveGradeGetQuestListRequest is strongly typed above.
-// OutQuestLiveGradeGetRankingListRequest is strongly typed above.
-// OutQuestLiveGradeGetRankListRequest is strongly typed above.
-// OutQuestLiveGradeGetResultRequest is strongly typed above.
-// OutQuestLiveGradeGetStageDataRequest is strongly typed above.
-// OutQuestLiveGradeGetStageListRequest is strongly typed above.
-// OutQuestLiveGradeSetQuestActionRequest is strongly typed above.
-// OutQuestLiveGradeSetQuestAddSkillRequest is strongly typed above.
-// OutQuestLiveGradeSetQuestRetireRequest is strongly typed above.
-// OutQuestLiveGradeSetQuestStartRequest is strongly typed above.
-// OutQuestLiveGradeSetRewardRequest is strongly typed above.
-define_request_type!(OutQuestLiveGrandPrixGetHistoryRequest);
-define_request_type!(OutQuestLiveGrandPrixGetRankingListRequest);
-define_request_type!(OutQuestLiveGrandPrixGetResultRequest);
-define_request_type!(OutQuestLiveGrandPrixGetStageDataRequest);
-define_request_type!(OutQuestLiveGrandPrixGetStageListRequest);
-define_request_type!(OutQuestLiveGrandPrixGetStageSelectRequest);
-define_request_type!(OutQuestLiveGrandPrixGetTopInfoRequest);
-define_request_type!(OutQuestLiveMusicLearningGetMusicSelectRequest);
-define_request_type!(OutQuestLiveMusicLearningGetResultRequest);
-define_request_type!(OutQuestLiveMusicLearningSetMusicRequest);
-define_request_type!(OutQuestLiveRaidEventGetResultRequest);
-define_request_type!(OutQuestLiveRaidEventGetStageDataRequest);
-define_request_type!(OutQuestLiveRaidEventGetStageListRequest);
-define_request_type!(OutQuestLiveRaidEventGetStaminaRecoveryInfoRequest);
-define_request_type!(OutQuestLiveRaidEventGetTopInfoRequest);
-define_request_type!(OutQuestLiveRaidEventRecoveryStaminaRequest);
-define_request_type!(OutQuestLiveRaidEventSetJoinMessageRequest);
-define_request_type!(OutQuestLiveRaidEventSetRewardRequest);
-// OutQuestLiveRecoveryStaminaRequest is strongly typed above.
-// OutQuestLiveSetLiveSettingRequest is strongly typed above.
-define_request_type!(OutQuestLiveStandardGetAreaSelectRequest);
-define_request_type!(OutQuestLiveStandardGetStageDataRequest);
-define_request_type!(OutQuestLiveStandardGetStageSelectRequest);
-define_request_type!(OutQuestLiveStandardSetAreaSelectViewHistRequest);
-define_request_type!(PetalExchangeGetListRequest);
-// PetalExchangeSetPurchaseRequest is strongly typed above.
-// PresentBoxGetHistoryRequest/PresentBoxGetListRequest are strongly typed above.
-// PresentBoxItemDetailRequest/PresentBoxSetItemAllRequest are strongly typed above.
-// PresentBoxSetItemRequest is strongly typed above.
-// ProfileDeleteMyDesignRequest/ProfileGetFanLevelInfoRequest/ProfileGetInfoRequest are strongly typed above.
-define_request_type!(ProfileGetMuteListRequest);
-define_request_type!(ProfileGetMyDesignCardListRequest);
-define_request_type!(ProfileGetMyDesignIconListRequest);
-// ProfileGetMyDesignIconRequest is strongly typed above.
-define_request_type!(ProfileGetProfileCardRequest);
-define_request_type!(ProfileGetProfileIconRequest);
-// ProfileSetBirthdayRequest/ProfileSetCommentRequest/ProfileSetMuteCancelRequest are strongly typed above.
-// ProfileSetMuteRequest/ProfileSetMyDesignCardRequest/ProfileSetMyDesignIconRequest are strongly typed above.
-// ProfileSetMyDesignNameRequest/ProfileSetNameRequest/ProfileSetProfileCardRequest are strongly typed above.
-// ProfileSetProfileIconRequest/ProfileSetReportRequest/ProfileUseFanlevelPointStocksRequest are strongly typed above.
-// RegisterApproveTermsRequest is strongly typed above.
-define_request_type!(RegisterGetTermsRequest);
-define_request_type!(RegisterSetApproveTermsRequest);
-// RegisterSetNewUserRequest/RegisterSetUserDataRequest are strongly typed above.
-// RhythmGameDeckModifyDeckListRequest/RhythmGameDeckSetDeckNameRequest are strongly typed above.
-define_request_type!(RhythmGameDeckSetResetDeckRequest);
-// RhythmGameGrandPrixSetCenterRequest/RhythmGameGrandPrixSetDeckRequest are strongly typed above.
-// RhythmGameGrandPrixSetFinishLiveRequest/RhythmGameGrandPrixSetPositionRequest are strongly typed above.
-// RhythmGameGrandPrixSetResetRequest is strongly typed above.
-define_request_type!(RhythmGameGrandPrixSetRetireLiveRequest);
-// RhythmGameGrandPrixSetStartLiveRequest/RhythmGameGrandPrixTopRequest are strongly typed above.
-define_request_type!(RhythmGameHomeRequest);
-// RhythmGameLiveSetFinishRequest is strongly typed above.
-define_request_type!(RhythmGameLiveSetRetireRequest);
-// RhythmGameLiveSetStartRequest is strongly typed above.
-// RhythmGameReceiveClassMissionRequest is strongly typed above.
-define_request_type!(RhythmGameReceiveTotalMissionRequest);
-// RhythmGameSetMusicRequest is strongly typed above.
-define_request_type!(SelectTicketExchangeGetListRequest);
-define_request_type!(SerialCodeSetExchangeRequest);
-// ShopCheckPurchaseRequest is strongly typed above.
-define_request_type!(ShopGetListRequest);
-define_request_type!(SiscaStoreGetListRequest);
-// SiscaStoreSetPurchaseRequest is strongly typed above.
-define_request_type!(StepUpBeginnerMissionGetListRequest);
-// StepUpBeginnerMissionSetRewardRequest is strongly typed above.
-define_request_type!(StickerExchangeGetListRequest);
-// StickerExchangeSetPurchaseRequest is strongly typed above.
-// TutorialSetStepRequest is strongly typed above.
-define_request_type!(UserCardCheckEvolutionRequest);
-define_request_type!(UserCardCheckLimitBreakRequest);
-define_request_type!(UserCardCheckSkillLevelUpRequest);
-define_request_type!(UserCardCheckStyleLevelUpRequest);
-define_request_type!(UserCardEvolutionRequest);
-define_request_type!(UserCardGetDetailRentalRequest);
-define_request_type!(UserCardGetDetailRequest);
-define_request_type!(UserCardGetListRequest);
-define_request_type!(UserCardLimitBreakRequest);
-define_request_type!(UserCardRhythmGameSkillLevelUpRequest);
-define_request_type!(UserCardSkillLevelUpRequest);
-define_request_type!(UserCardStyleLevelUpRequest);
-define_request_type!(UserDeckGetCardListRequest);
-define_request_type!(UserDeckGetListRequest);
-define_request_type!(UserDeckModifyDeckListRequest);
-define_request_type!(UserDeckNotifyAutoDeckRequest);
-define_request_type!(UserDeckRemoveSideStyleRequest);
-define_request_type!(UserDeckSetCopyDeckRequest);
-define_request_type!(UserDeckSetDeckRequest);
-define_request_type!(UserDeckSetDeleteDeckRequest);
-define_request_type!(UserDeckSetPositionRequest);
-define_request_type!(UserDeckSetSideStyleRequest);
-// UserItemGetDetailRequest is strongly typed above.
-define_request_type!(UserItemsGetListRequest);
-define_request_type!(UserJewelGetHistoryRequest);
-define_request_type!(UserPushDeviceRequest);
-define_request_type!(UserPushDevicesRequest);
-// UserSetContentsReleaseEffectHistoryRequest is strongly typed above.
-// UserSetSimpleTutorialFinishRequest is strongly typed above.
-define_request_type!(WebviewGachaGetDetailRequest);
-define_request_type!(WebviewGachaGetSelectCardListRequest);
-// WebviewLiveEnterRequest/WebviewLiveLiveInfoRequest/WebviewLiveLoginRequest are strongly typed above.
-define_request_type!(WebviewSchoolIdolConnectPostGetThemeListRequest);
-define_request_type!(WebviewShopGetMembershipPerkDetailRequest);
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct WebviewGachaGetDetailRequest {
+    pub gacha_series_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct WebviewGachaGetSelectCardListRequest {
+    pub select_ticket_series_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct WebviewShopMembershipPerkDetailRequest {
+    pub membership_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CardGetListRequest {
+    pub search_conditions: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CheckEvolutionRequest {
+    pub d_card_datas_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CheckLimitBreakRequest {
+    pub d_card_datas_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CheckSkillLevelUpRequest {
+    pub d_card_datas_id: Option<String>,
+    /// dnSpy: Org.OpenAPITools.Model.LevelUpTargetSkillType
+    pub skill_type: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CheckStyleLevelUpRequest {
+    pub d_card_datas_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct EvolutionRequest {
+    pub d_card_datas_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct LimitBreakRequest {
+    pub d_card_datas_id: Option<String>,
+    pub limit_break_step: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SkillLevelUpRequest {
+    pub d_card_datas_id: Option<String>,
+    /// dnSpy: Org.OpenAPITools.Model.LevelUpTargetSkillType
+    pub skill_type: Option<i32>,
+    pub skill_level: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct StyleLevelUpRequest {
+    pub d_card_datas_id: Option<String>,
+    pub style_level: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameSkillLevelUpRequest {
+    pub d_card_datas_id: Option<String>,
+    /// dnSpy: Org.OpenAPITools.Model.LevelUpTargetRhythmGameSkillType
+    pub rhythm_game_skill_type: Option<i32>,
+    pub skill_level: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameDeckSetResetRequest {
+    pub deck_no: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DeckGetCardListRequest {
+    pub generations_id: Option<i32>,
+    pub main_d_card_datas_id: Option<String>,
+    pub side1_d_card_datas_id: Option<String>,
+    pub side2_d_card_datas_id: Option<String>,
+    pub member_order: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DeckModifyDeckListRequest {
+    pub modify_deck_list: Option<Vec<Deck>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DeckSetCreateRequest {
+    pub deck_data: Option<Deck>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DeckSetDeleteRequest {
+    pub d_deck_datas_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DeckSetCopyDeckRequest {
+    pub d_deck_datas_id: Option<String>,
+    pub deck_no: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DeckRemoveSideStyleRequest {
+    pub d_deck_cards_id: Option<String>,
+    pub side_style_no: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DeckSetPositionRequest {
+    pub d_deck_datas_id: Option<String>,
+    pub position_id: Option<i64>,
+    pub slot_no: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DeckSetSideStyleRequest {
+    pub d_deck_cards_id: Option<String>,
+    pub d_user_cards_id: Option<String>,
+    pub side_style_no: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetDetailRequest {
+    pub d_card_datas_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetDetailRentalRequest {
+    pub rental_card_datas_id: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetCharacterInfoRequest {
+    pub character_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetLiveInfoRequest {
+    pub quest_live_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SetGallaryDataRequest {
+    pub comics_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SetMusicPlayRequest {
+    pub musics_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SetExchangeRequest {
+    pub player_id: Option<String>,
+    pub serial_code: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SetRetireRequest {
+    pub quest_live_id: Option<String>,
+    pub character_voices_id_list: Option<Vec<i32>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SkipQuestRequest {
+    pub quest_live_type: Option<i64>,
+    pub stage_id: Option<i32>,
+    pub skip_count: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SetStartRequest {
+    pub quest_live_id: Option<String>,
+    pub init_hand_data: Option<String>,
+    pub is_video_mode: Option<bool>,
+    pub character_voices_id: Option<i32>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SetFinishRequest {
+    pub quest_live_id: Option<String>,
+    pub score: Option<i64>,
+    pub score2: Option<i64>,
+    pub play_report: Option<String>,
+    pub character_voices_id_list: Option<Vec<i32>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct HomeSetClockSettingRequst {
+    pub d_home_clock_settings_id: Option<String>,
+    pub position_x: Option<i64>,
+    pub position_y: Option<i64>,
+    pub is_btn_disp_on: Option<bool>,
+    pub is_disp_on: Option<bool>,
+    pub type_id: Option<i64>,
+    pub collor_id: Option<i64>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct HomeSetCurrentWallpaperSettingRequst {
+    pub d_home_wall_paper_settings_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct HomeSetWallpaperSettingRequst {
+    pub d_home_wall_paper_settings_id: Option<String>,
+    pub wallpaper_setting_info: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct NotifyWallpaperSettingRequst {
+    pub wallpaper_detail_setting_info: Option<String>,
+    pub wallpaper_simple_setting_info: Option<String>,
+    pub is_view_detail_wallpaper: Option<bool>,
+    pub before_clock_setting_info: Option<String>,
+    pub after_clock_setting_info: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct UserPushDevicePutRequest {
+    pub token: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct UserPushDevicesPostRequest {
+    /// dnSpy: Org.OpenAPITools.Model.PushService
+    pub service: Option<i32>,
+    pub token: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct WithliveEnqueteAnswerRequest {
+    pub live_id: Option<String>,
+    pub enquete_id: Option<String>,
+    pub option_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+pub type ArchiveWithliveStarsPostRequest = ArchiveWithliveStarsRequest;
+pub type ConnectRequest = AccountConnectRequest;
+pub type DeleteConnectDataRequest = AccountDeleteConnectDataRequest;
+pub type GetArchiveListRequest = ArchiveGetArchiveListRequest;
+pub type GetChannelMovieListRequest = ArchiveGetChannelMovieListRequest;
+pub type GetConnectUserRequest = AccountGetConnectUserRequest;
+pub type GetFesArchiveDataRequest = ArchiveGetFesArchiveDataRequest;
+pub type GetFesTimelineDataRequest = ArchiveGetFesTimelineDataRequest;
+pub type GetWithArchiveDataRequest = ArchiveGetWithArchiveDataRequest;
+pub type LiveConnectTokenRequest = FesliveConnectTokenRequest;
+pub type DailySeriesCommonRequest = OutQuestLiveDailyGetReleaseTicketRequest;
+pub type DailyGetStageDataRequest = OutQuestLiveDailyGetStageDataRequest;
+pub type DailyGetStageListRequest = OutQuestLiveDailyGetStageListRequest;
+pub type DailyRecoveryChallengeCountRequest = OutQuestLiveDailyRecoveryChallengeCountRequest;
+pub type DreamGetResultRequest = OutQuestLiveDreamGetResultRequest;
+pub type DreamSetCardRequest = OutQuestLiveDreamSetCardRequest;
+pub type GradeChallengeGetQuestListRequest = OutQuestLiveGradeChallengeGetQuestListRequest;
+pub type GradeChallengeGetRankingListRequest = OutQuestLiveGradeChallengeGetRankingListRequest;
+pub type GradeChallengeGetResultRequest = OutQuestLiveGradeChallengeGetResultRequest;
+pub type GradeGetRankingListRequest = OutQuestLiveGradeGetRankingListRequest;
+pub type GradeGetRankListRequest = OutQuestLiveGradeGetRankListRequest;
+pub type GradeGetResultRequest = OutQuestLiveGradeGetResultRequest;
+pub type GradeGetStageDataRequest = OutQuestLiveGradeGetStageDataRequest;
+pub type GradeGetStageListRequest = OutQuestLiveGradeGetStageListRequest;
+pub type GradeSetQuestActionRequest = OutQuestLiveGradeSetQuestActionRequest;
+pub type GradeSetQuestAddSkillRequest = OutQuestLiveGradeSetQuestAddSkillRequest;
+pub type GradeSetQuestRetireRequest = OutQuestLiveGradeSetQuestRetireRequest;
+pub type GradeSetQuestStartRequest = OutQuestLiveGradeSetQuestStartRequest;
+pub type GrandPrixGetHistoryRequest = OutQuestLiveGrandPrixGetHistoryRequest;
+pub type GrandPrixGetRankingListRequest = OutQuestLiveGrandPrixGetRankingListRequest;
+pub type GrandPrixGetResultRequest = OutQuestLiveGrandPrixGetResultRequest;
+pub type GrandPrixGetStageDataRequest = OutQuestLiveGrandPrixGetStageDataRequest;
+pub type GrandPrixGetStageListRequest = OutQuestLiveGrandPrixGetStageListRequest;
+pub type GrandPrixGetStageSelectRequest = OutQuestLiveGrandPrixGetStageSelectRequest;
+pub type GrandPrixGetTopInfoRequest = OutQuestLiveGrandPrixGetTopInfoRequest;
+pub type SetCancelRecommendChannelRequest = ArchiveSetCancelRecommendChannelRequest;
+pub type SetConnectDataRequest = AccountSetConnectDataRequest;
+pub type SetFesCameraRequest = ArchiveSetFesCameraRequest;
+pub type SetFlowerStandRequest = FesliveSetFlowerStandRequest;
+pub type SetPurchaseTicketRequest = ArchiveSetPurchaseTicketRequest;
+pub type SetRecommendChannelRequest = ArchiveSetRecommendChannelRequest;
+pub type CollectionGetCharacterInfoRequest = GetCharacterInfoRequest;
+pub type CollectionSetGallaryDataRequest = SetGallaryDataRequest;
+pub type CollectionSetMusicPlayRequest = SetMusicPlayRequest;
+pub type UserCardGetListRequest = CardGetListRequest;
+pub type UserCardCheckEvolutionRequest = CheckEvolutionRequest;
+pub type UserCardCheckLimitBreakRequest = CheckLimitBreakRequest;
+pub type UserCardCheckSkillLevelUpRequest = CheckSkillLevelUpRequest;
+pub type UserCardCheckStyleLevelUpRequest = CheckStyleLevelUpRequest;
+pub type UserCardEvolutionRequest = EvolutionRequest;
+pub type UserCardGetDetailRequest = GetDetailRequest;
+pub type UserCardGetDetailRentalRequest = GetDetailRentalRequest;
+pub type UserCardLimitBreakRequest = LimitBreakRequest;
+pub type UserCardRhythmGameSkillLevelUpRequest = RhythmGameSkillLevelUpRequest;
+pub type UserCardSkillLevelUpRequest = SkillLevelUpRequest;
+pub type UserCardStyleLevelUpRequest = StyleLevelUpRequest;
+pub type UserDeckGetCardListRequest = DeckGetCardListRequest;
+pub type UserDeckModifyDeckListRequest = DeckModifyDeckListRequest;
+pub type UserDeckRemoveSideStyleRequest = DeckRemoveSideStyleRequest;
+pub type UserDeckSetCopyDeckRequest = DeckSetCopyDeckRequest;
+pub type UserDeckSetDeckRequest = DeckSetCreateRequest;
+pub type UserDeckSetDeleteDeckRequest = DeckSetDeleteRequest;
+pub type UserDeckSetPositionRequest = DeckSetPositionRequest;
+pub type UserDeckSetSideStyleRequest = DeckSetSideStyleRequest;
+pub type RhythmGameDeckSetResetDeckRequest = RhythmGameDeckSetResetRequest;
+pub type InQuestLiveGetLiveInfoRequest = GetLiveInfoRequest;
+pub type InQuestLiveSetFinishRequest = SetFinishRequest;
+pub type InQuestLiveSetRetireRequest = SetRetireRequest;
+pub type InQuestLiveSetStartRequest = SetStartRequest;
+pub type InQuestLiveSkipQuestRequest = SkipQuestRequest;
+pub type HomeNotifyWallpaperSettingRequest = NotifyWallpaperSettingRequst;
+pub type HomeSetClockSettingRequest = HomeSetClockSettingRequst;
+pub type HomeSetCurrentWallpaperSettingRequest = HomeSetCurrentWallpaperSettingRequst;
+pub type HomeSetWallpaperSettingRequest = HomeSetWallpaperSettingRequst;
+pub type SerialCodeSetExchangeRequest = SetExchangeRequest;
+pub type UserPushDeviceRequest = UserPushDevicePutRequest;
+pub type UserPushDevicesRequest = UserPushDevicesPostRequest;
+pub type WebviewLiveInfoRequest = WebviewLiveLiveInfoRequest;
+pub type WebviewShopGetMembershipPerkDetailRequest = WebviewShopMembershipPerkDetailRequest;
+
+// Auto-generated from crates/api/src/l4/* path signatures.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct BeginnerMissionGetListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for BeginnerMissionGetListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CircleGetCircleTopInfoRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for CircleGetCircleTopInfoRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CircleGetInviteListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for CircleGetInviteListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CircleSetDissolutionRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for CircleSetDissolutionRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CircleSetOutRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for CircleSetOutRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CollectionGetEmojiListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for CollectionGetEmojiListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CollectionGetGallaryListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for CollectionGetGallaryListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CollectionGetMusicListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for CollectionGetMusicListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CollectionGetStickerListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for CollectionGetStickerListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct CommonGetHeaderAnnounsRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for CommonGetHeaderAnnounsRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaGetHistoryRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for GachaGetHistoryRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GachaGetSeriesListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for GachaGetSeriesListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct HomeGetCustomSettingRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for HomeGetCustomSettingRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct HomeGetHomeRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for HomeGetHomeRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct HomeGetLoginBonusRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for HomeGetLoginBonusRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct HomeGetWallpaperSettingRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for HomeGetWallpaperSettingRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct HomeSetShowRetireRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for HomeSetShowRetireRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ItemExchangeGetLimitBreakMaterialConvertListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for ItemExchangeGetLimitBreakMaterialConvertListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ItemExchangeGetListNewRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for ItemExchangeGetListNewRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ItemExchangeSetLimitBreakMaterialConvertRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for ItemExchangeSetLimitBreakMaterialConvertRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ItemStoreGetListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for ItemStoreGetListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct JewelShopGetBirthdayRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for JewelShopGetBirthdayRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct JewelShopGetListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for JewelShopGetListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct JewelShopGetMembershipListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for JewelShopGetMembershipListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct JewelShopSetMembershipPurchaseRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for JewelShopSetMembershipPurchaseRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct MissionGetListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for MissionGetListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct MissionReceiveCommonMissionRewardRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for MissionReceiveCommonMissionRewardRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct PetalExchangeGetListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for PetalExchangeGetListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ProfileGetMuteListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for ProfileGetMuteListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ProfileGetMyDesignCardListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for ProfileGetMyDesignCardListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ProfileGetMyDesignIconListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for ProfileGetMyDesignIconListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ProfileGetProfileCardRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for ProfileGetProfileCardRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ProfileGetProfileIconRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for ProfileGetProfileIconRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RegisterGetTermsRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for RegisterGetTermsRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RegisterSetApproveTermsRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for RegisterSetApproveTermsRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameGrandPrixSetRetireLiveRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for RhythmGameGrandPrixSetRetireLiveRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameHomeRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for RhythmGameHomeRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameLiveSetRetireRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for RhythmGameLiveSetRetireRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct RhythmGameReceiveTotalMissionRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for RhythmGameReceiveTotalMissionRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SelectTicketExchangeGetListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for SelectTicketExchangeGetListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ShopGetListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for ShopGetListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SiscaStoreGetListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for SiscaStoreGetListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct StepUpBeginnerMissionGetListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for StepUpBeginnerMissionGetListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct StickerExchangeGetListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for StickerExchangeGetListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct UserDeckGetListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for UserDeckGetListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct UserDeckNotifyAutoDeckRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for UserDeckNotifyAutoDeckRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct UserItemsGetListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for UserItemsGetListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct UserJewelGetHistoryRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for UserJewelGetHistoryRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct WebviewSchoolIdolConnectPostGetThemeListRequest {
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl From<Value> for WebviewSchoolIdolConnectPostGetThemeListRequest {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Object(extra) => Self { extra },
+            _ => Self::default(),
+        }
+    }
+}
+// WebviewShopGetMembershipPerkDetailRequest is strongly typed above.
+
+pub type ProfileUseFanLevelPointStocksRequest = ProfileUseFanlevelPointStocksRequest;
+

@@ -1,153 +1,173 @@
-use crate::macros::{define_api_struct, define_post_method, use_common_crate};
+use crate::macros::{define_api_struct, post, use_common_crate};
 
 use_common_crate!();
 define_api_struct!(ProfileApi);
 
 impl<'a> ProfileApi<'a> {
     // POST /v1/profile/delete_my_design
-    define_post_method!(
+    post!(
         delete_my_design,
         "/profile/delete_my_design",
-        crate::model::ProfileDeleteMyDesignRequest
+        crate::model::ProfileDeleteMyDesignRequest,
+        crate::model::ProfileDeleteMyDesignResponse
     );
 
     // POST /v1/profile/get_fan_level_info
-    define_post_method!(
+    post!(
         get_fan_level_info,
         "/profile/get_fan_level_info",
-        crate::model::ProfileGetFanLevelInfoRequest
+        crate::model::ProfileGetFanLevelInfoRequest,
+        crate::model::ProfileGetFanLevelInfoResponse
     );
 
     // POST /v1/profile/get_info
-    define_post_method!(
+    post!(
         get_info,
         "/profile/get_info",
-        crate::model::ProfileGetInfoRequest
+        crate::model::ProfileGetInfoRequest,
+        crate::model::ProfileGetInfoResponse
     );
 
     // POST /v1/profile/get_mute_list
-    define_post_method!(
+    post!(
         get_mute_list,
         "/profile/get_mute_list",
-        crate::model::ProfileGetMuteListRequest
+        crate::model::ProfileGetMuteListResponse
     );
 
     // POST /v1/profile/get_my_design_card_list
-    define_post_method!(
+    post!(
         get_my_design_card_list,
         "/profile/get_my_design_card_list",
-        crate::model::ProfileGetMyDesignCardListRequest
+        crate::model::ProfileGetMyDesignCardListResponse
     );
 
     // POST /v1/profile/get_my_design_icon
-    define_post_method!(
+    post!(
         get_my_design_icon,
         "/profile/get_my_design_icon",
-        crate::model::ProfileGetMyDesignIconRequest
+        crate::model::ProfileGetMyDesignIconRequest,
+        crate::model::ProfileGetMyDesignIconResponse
     );
 
     // POST /v1/profile/get_my_design_icon_list
-    define_post_method!(
+    post!(
         get_my_design_icon_list,
         "/profile/get_my_design_icon_list",
-        crate::model::ProfileGetMyDesignIconListRequest
+        crate::model::ProfileGetMyDesignIconListResponse
     );
 
     // POST /v1/profile/get_profile_card
-    define_post_method!(
+    post!(
         get_profile_card,
         "/profile/get_profile_card",
-        crate::model::ProfileGetProfileCardRequest
+        crate::model::ProfileGetProfileCardResponse
     );
 
     // POST /v1/profile/get_profile_icon
-    define_post_method!(
+    post!(
         get_profile_icon,
         "/profile/get_profile_icon",
-        crate::model::ProfileGetProfileIconRequest
+        crate::model::ProfileGetProfileIconResponse
     );
 
     // POST /v1/profile/set_birthday
-    define_post_method!(
+    post!(
         set_birthday,
         "/profile/set_birthday",
-        crate::model::ProfileSetBirthdayRequest
+        crate::model::ProfileSetBirthdayRequest,
+        crate::model::ProfileSetBirthdayResponse
     );
 
     // POST /v1/profile/set_comment
-    define_post_method!(
+    post!(
         set_comment,
         "/profile/set_comment",
-        crate::model::ProfileSetCommentRequest
+        crate::model::ProfileSetCommentRequest,
+        crate::model::ProfileSetCommentResponse
     );
 
     // POST /v1/profile/set_mute
-    define_post_method!(
+    post!(
         set_mute,
         "/profile/set_mute",
-        crate::model::ProfileSetMuteRequest
+        crate::model::ProfileSetMuteRequest,
+        crate::model::ProfileSetMuteResponse
     );
 
     // POST /v1/profile/set_mute_cancel
-    define_post_method!(
+    post!(
         set_mute_cancel,
         "/profile/set_mute_cancel",
-        crate::model::ProfileSetMuteCancelRequest
+        crate::model::ProfileSetMuteCancelRequest,
+        crate::model::ProfileSetMuteCancelResponse
     );
 
     // POST /v1/profile/set_my_design_card
-    define_post_method!(
+    post!(
         set_my_design_card,
         "/profile/set_my_design_card",
-        crate::model::ProfileSetMyDesignCardRequest
+        crate::model::ProfileSetMyDesignCardRequest,
+        crate::model::ProfileSetMyDesignCardResponse
     );
 
     // POST /v1/profile/set_my_design_icon
-    define_post_method!(
+    post!(
         set_my_design_icon,
         "/profile/set_my_design_icon",
-        crate::model::ProfileSetMyDesignIconRequest
+        crate::model::ProfileSetMyDesignIconRequest,
+        crate::model::ProfileSetMyDesignIconResponse
     );
 
     // POST /v1/profile/set_my_design_name
-    define_post_method!(
+    post!(
         set_my_design_name,
         "/profile/set_my_design_name",
-        crate::model::ProfileSetMyDesignNameRequest
+        crate::model::ProfileSetMyDesignNameRequest,
+        crate::model::ProfileSetMyDesignNameResponse
     );
 
     // POST /v1/profile/set_name
-    define_post_method!(
+    post!(
         set_name,
         "/profile/set_name",
-        crate::model::ProfileSetNameRequest
+        crate::model::ProfileSetNameRequest,
+        crate::model::ProfileSetNameResponse
     );
 
     // POST /v1/profile/set_profile_card
-    define_post_method!(
+    post!(
         set_profile_card,
         "/profile/set_profile_card",
-        crate::model::ProfileSetProfileCardRequest
+        crate::model::ProfileSetProfileCardRequest,
+        crate::model::ProfileSetProfileCardResponse
     );
 
     // POST /v1/profile/set_profile_icon
-    define_post_method!(
+    post!(
         set_profile_icon,
         "/profile/set_profile_icon",
-        crate::model::ProfileSetProfileIconRequest
+        crate::model::ProfileSetProfileIconRequest,
+        crate::model::ProfileSetProfileIconResponse
     );
 
     // POST /v1/profile/set_report
-    define_post_method!(
+    post!(
         set_report,
         "/profile/set_report",
-        crate::model::ProfileSetReportRequest
+        crate::model::ProfileSetReportRequest,
+        crate::model::ProfileSetReportResponse
     );
 
     // POST /v1/profile/use_fanlevel_point_stocks
-    define_post_method!(
+    post!(
         use_fanlevel_point_stocks,
         "/profile/use_fanlevel_point_stocks",
-        crate::model::ProfileUseFanlevelPointStocksRequest
+        crate::model::ProfileUseFanLevelPointStocksRequest,
+        crate::model::ProfileUseFanLevelPointStocksResponse
     );
 }
+
+
+
+

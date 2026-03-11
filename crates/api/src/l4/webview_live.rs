@@ -1,27 +1,34 @@
-use crate::macros::{define_api_struct, define_post_method, use_common_crate};
+use crate::macros::{define_api_struct, post, use_common_crate};
 
 use_common_crate!();
 define_api_struct!(WebviewLiveApi);
 
 impl<'a> WebviewLiveApi<'a> {
     // POST /v1/webview/live/enter
-    define_post_method!(
+    post!(
         enter,
         "/webview/live/enter",
-        crate::model::WebviewLiveEnterRequest
+        crate::model::WebviewLiveEnterRequest,
+        crate::model::WebviewLiveEnterResponse
     );
 
     // POST /v1/webview/live/live_info
-    define_post_method!(
+    post!(
         live_info,
         "/webview/live/live_info",
-        crate::model::WebviewLiveLiveInfoRequest
+        crate::model::WebviewLiveInfoRequest,
+        crate::model::WebviewLiveInfoResponse
     );
 
     // POST /v1/webview/live/login
-    define_post_method!(
+    post!(
         login,
         "/webview/live/login",
-        crate::model::WebviewLiveLoginRequest
+        crate::model::WebviewLiveLoginRequest,
+        crate::model::WebviewLiveLoginResponse
     );
 }
+
+
+
+

@@ -1,90 +1,103 @@
-use crate::macros::{define_api_struct, define_post_method, use_common_crate};
+use crate::macros::{define_api_struct, post, use_common_crate};
 
 use_common_crate!();
 define_api_struct!(FriendApi);
 
 impl<'a> FriendApi<'a> {
     // POST /v1/friend/get_list
-    define_post_method!(
+    post!(
         get_list,
         "/friend/get_list",
-        crate::model::FriendGetListRequest
+        crate::model::FriendGetListRequest,
+        crate::model::FriendGetListResponse
     );
 
     // POST /v1/friend/get_request_list
-    define_post_method!(
+    post!(
         get_request_list,
         "/friend/get_request_list",
-        crate::model::FriendGetRequestListRequest
+        crate::model::FriendGetRequestListResponse
     );
 
     // POST /v1/friend/search_name
-    define_post_method!(
+    post!(
         search_name,
         "/friend/search_name",
-        crate::model::FriendSearchNameRequest
+        crate::model::FriendSearchNameRequest,
+        crate::model::FriendSearchNameResponse
     );
 
     // POST /v1/friend/search_player_id
-    define_post_method!(
+    post!(
         search_player_id,
         "/friend/search_player_id",
-        crate::model::FriendSearchPlayerIdRequest
+        crate::model::FriendSearchPlayerIdRequest,
+        crate::model::FriendSearchPlayerIdResponse
     );
 
     // POST /v1/friend/search_recommend
-    define_post_method!(
+    post!(
         search_recommend,
         "/friend/search_recommend",
-        crate::model::FriendSearchRecommendRequest
+        crate::model::FriendSearchRecommendResponse
     );
 
     // POST /v1/friend/set_approval_request
-    define_post_method!(
+    post!(
         set_approval_request,
         "/friend/set_approval_request",
-        crate::model::FriendSetApprovalRequestRequest
+        crate::model::FriendSetApprovalRequestRequest,
+        crate::model::FriendSetCommonResponse
     );
 
     // POST /v1/friend/set_approval_request_all
-    define_post_method!(
+    post!(
         set_approval_request_all,
         "/friend/set_approval_request_all",
-        crate::model::FriendSetApprovalRequestAllRequest
+        crate::model::FriendSetApprovalRequestAllRequest,
+        crate::model::FriendSetCommonResponse
     );
 
     // POST /v1/friend/set_break_off
-    define_post_method!(
+    post!(
         set_break_off,
         "/friend/set_break_off",
-        crate::model::FriendSetBreakOffRequest
+        crate::model::FriendSetBreakOffRequest,
+        crate::model::FriendSetCommonResponse
     );
 
     // POST /v1/friend/set_refuse_request_all
-    define_post_method!(
+    post!(
         set_refuse_request_all,
         "/friend/set_refuse_request_all",
-        crate::model::FriendSetRefuseRequestAllRequest
+        crate::model::FriendSetRefuseRequestAllRequest,
+        crate::model::FriendSetCommonResponse
     );
 
     // POST /v1/friend/set_request
-    define_post_method!(
+    post!(
         set_request,
         "/friend/set_request",
-        crate::model::FriendSetRequestRequest
+        crate::model::FriendSetRequestRequest,
+        crate::model::FriendSetCommonResponse
     );
 
     // POST /v1/friend/set_request_cancel
-    define_post_method!(
+    post!(
         set_request_cancel,
         "/friend/set_request_cancel",
-        crate::model::FriendSetRequestCancelRequest
+        crate::model::FriendSetRequestCancelRequest,
+        crate::model::FriendSetCommonResponse
     );
 
     // POST /v1/friend/update_request_view_history
-    define_post_method!(
+    post!(
         update_request_view_history,
         "/friend/update_request_view_history",
-        crate::model::FriendUpdateRequestViewHistoryRequest
+        serde_json::Value
     );
 }
+
+
+
+

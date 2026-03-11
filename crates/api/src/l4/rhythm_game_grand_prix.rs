@@ -1,62 +1,73 @@
-use crate::macros::{define_api_struct, define_post_method, use_common_crate};
+use crate::macros::{define_api_struct, post, use_common_crate};
 
 use_common_crate!();
 define_api_struct!(RhythmGameGrandPrixApi);
 
 impl<'a> RhythmGameGrandPrixApi<'a> {
     // POST /v1/rhythm_game_grand_prix/set_center
-    define_post_method!(
+    post!(
         set_center,
         "/rhythm_game_grand_prix/set_center",
-        crate::model::RhythmGameGrandPrixSetCenterRequest
+        crate::model::RhythmGameGrandPrixSetCenterRequest,
+        crate::model::RhythmGameGrandPrixSetCenterResponse
     );
 
     // POST /v1/rhythm_game_grand_prix/set_deck
-    define_post_method!(
+    post!(
         set_deck,
         "/rhythm_game_grand_prix/set_deck",
-        crate::model::RhythmGameGrandPrixSetDeckRequest
+        crate::model::RhythmGameGrandPrixSetDeckRequest,
+        crate::model::RhythmGameGrandPrixSetDeckResponse
     );
 
     // POST /v1/rhythm_game_grand_prix/set_finish_live
-    define_post_method!(
+    post!(
         set_finish_live,
         "/rhythm_game_grand_prix/set_finish_live",
-        crate::model::RhythmGameGrandPrixSetFinishLiveRequest
+        crate::model::RhythmGameGrandPrixSetFinishLiveRequest,
+        crate::model::RhythmGameGrandPrixSetFinishLiveResponse
     );
 
     // POST /v1/rhythm_game_grand_prix/set_position
-    define_post_method!(
+    post!(
         set_position,
         "/rhythm_game_grand_prix/set_position",
-        crate::model::RhythmGameGrandPrixSetPositionRequest
+        crate::model::RhythmGameGrandPrixSetPositionRequest,
+        crate::model::RhythmGameGrandPrixSetPositionResponse
     );
 
     // POST /v1/rhythm_game_grand_prix/set_reset
-    define_post_method!(
+    post!(
         set_reset,
         "/rhythm_game_grand_prix/set_reset",
-        crate::model::RhythmGameGrandPrixSetResetRequest
+        crate::model::RhythmGameGrandPrixSetResetRequest,
+        serde_json::Value
     );
 
     // POST /v1/rhythm_game_grand_prix/set_retire_live
-    define_post_method!(
+    post!(
         set_retire_live,
         "/rhythm_game_grand_prix/set_retire_live",
-        crate::model::RhythmGameGrandPrixSetRetireLiveRequest
+        serde_json::Value
     );
 
     // POST /v1/rhythm_game_grand_prix/set_start_live
-    define_post_method!(
+    post!(
         set_start_live,
         "/rhythm_game_grand_prix/set_start_live",
-        crate::model::RhythmGameGrandPrixSetStartLiveRequest
+        crate::model::RhythmGameGrandPrixSetStartLiveRequest,
+        serde_json::Value
     );
 
     // POST /v1/rhythm_game_grand_prix/top
-    define_post_method!(
+    post!(
         top,
         "/rhythm_game_grand_prix/top",
-        crate::model::RhythmGameGrandPrixTopRequest
+        crate::model::RhythmGameGrandPrixTopRequest,
+        crate::model::RhythmGameGrandPrixTopResponse
     );
 }
+
+
+
+
