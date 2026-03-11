@@ -4,11 +4,11 @@ use clap::{Args as ClapArgs, Subcommand};
 
 #[derive(Debug, ClapArgs)]
 pub struct ArgsAPI {
-    #[clap(short('s'), long = "save-json", value_name = "SAVE_JSON")]
+    #[clap(short('o'), long = "output", value_name = "OUTPUT")]
     /// if provided, will save the API response to the file
     /// with the given name, otherwise will just print the API response info
     /// to the console.
-    pub save_json: Option<String>,
+    pub output: Option<String>,
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -38,7 +38,7 @@ pub struct ArgsArchiveDetails {
 
 pub fn run(ctx: &Global, args: &ArgsAPI) -> Result<()> {
     let api_client = &ctx.api_client;
-    let save_json = &args.save_json.clone().unwrap_or_default();
+    let save_json = &args.output.clone().unwrap_or_default();
     match &args.command {
         Commands::Archive(archive_args) => {
             let archives = api_client

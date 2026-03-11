@@ -3,9 +3,9 @@ use reqwest::blocking::Response;
 use serde::de::DeserializeOwned;
 
 pub(crate) fn parse_response<T: DeserializeOwned>(res: Response, path: &str) -> Result<T> {
-    if !res.status().is_success() {
-        let status = res.status();
-        let body = res.text().unwrap_or_default();
+    let status = res.status();
+    let body = res.text().unwrap_or_default();
+    if !status.is_success() {
         return Err(anyhow::anyhow!(
             "POST {} failed: {} {}",
             path,
@@ -13,7 +13,23 @@ pub(crate) fn parse_response<T: DeserializeOwned>(res: Response, path: &str) -> 
             body
         ));
     }
-    Ok(res.json::<T>()?)
+    match serde_json::from_str::<T>(&body) {
+        Ok(parsed) => Ok(parsed),
+        Err(err) => {
+            let preview = if body.len() > 8192 {
+                format!("{}... (truncated, {} bytes)", &body[..8192], body.len())
+            } else {
+                body
+            };
+            Err(anyhow::anyhow!(
+                "error decoding response body from {}: {} (status: {}) raw body: {}",
+                path,
+                err,
+                status,
+                preview
+            ))
+        }
+    }
 }
 
 macro_rules! use_common_crate {

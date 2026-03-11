@@ -695,6 +695,28 @@ pub struct LiveTimelineAnimation {
     pub extra: Map<String, Value>,
 }
 
+/// dnSpy enum: Org.OpenAPITools.Model.LiveTimelineType
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LiveTimelineType {
+    Comment,
+    Gift,
+    Messagecard,
+    #[serde(other)]
+    Unknown,
+}
+
+/// dnSpy enum: Org.OpenAPITools.Model.LiveTimelineSenderType
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LiveTimelineSenderType {
+    Player,
+    Character,
+    System,
+    #[serde(other)]
+    Unknown,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub struct LiveTimeline {
@@ -703,11 +725,9 @@ pub struct LiveTimeline {
     pub background_color: Option<String>,
     pub text_color: Option<String>,
     pub animation: Option<LiveTimelineAnimation>,
-    /// dnSpy enum: Org.OpenAPITools.Model.LiveTimelineType
     #[serde(rename = "type")]
-    pub type_field: Option<i32>,
-    /// dnSpy enum: Org.OpenAPITools.Model.LiveTimelineSenderType
-    pub sender_type: Option<i32>,
+    pub type_field: Option<LiveTimelineType>,
+    pub sender_type: Option<LiveTimelineSenderType>,
     pub user_player_id: Option<String>,
     pub user_name: Option<String>,
     pub submit_time: Option<String>,
@@ -733,15 +753,23 @@ pub struct LiveCircleChat {
     pub name_color: Option<String>,
     pub text_color: Option<String>,
     pub background_color: Option<String>,
-    /// dnSpy enum: Org.OpenAPITools.Model.LiveCircleChatType
     #[serde(rename = "type")]
-    pub type_field: Option<i32>,
+    pub type_field: Option<LiveCircleChatType>,
     pub user_player_id: Option<String>,
     pub user_name: Option<String>,
     pub submit_time: Option<String>,
     pub body: Option<String>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
+}
+
+/// dnSpy enum: Org.OpenAPITools.Model.LiveCircleChatType
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LiveCircleChatType {
+    Comment,
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
