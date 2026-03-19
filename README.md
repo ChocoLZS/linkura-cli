@@ -64,6 +64,7 @@ This repository currently contains two main programs:
 ```bash
 git clone https://github.com/ChocoLZS/linkura-cli.git
 cd linkura-cli
+git submodule update --init --recursive
 cargo build -p linkura-cli
 cargo build -p linkura-motion-cli
 ```
