@@ -1,0 +1,3 @@
+[submodule "deps/link-like-diff"]
+	path = deps/link-like-diff
+	url = https://github.com/vertesan/link-like-diff.git

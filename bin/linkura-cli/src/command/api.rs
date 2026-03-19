@@ -1,6 +1,7 @@
 use crate::config::Global;
 use anyhow::Result;
 use clap::{Args as ClapArgs, Subcommand};
+use linkura_api::ArchiveListOptions;
 
 #[derive(Debug, Clone, ClapArgs)]
 pub struct ArgsAPI {
@@ -43,7 +44,10 @@ pub async fn run(ctx: &Global, args: &ArgsAPI) -> Result<()> {
         Commands::Archive(archive_args) => {
             let archives = api_client
                 .high_level()
-                .get_archive_list(archive_args.limit)
+                .get_archive_list(ArchiveListOptions {
+                    limit: archive_args.limit,
+                    ..Default::default()
+                })
                 .await?;
             if !save_json.is_empty() {
                 std::fs::write(save_json, serde_json::to_string_pretty(&archives)?)?;

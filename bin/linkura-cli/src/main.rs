@@ -9,6 +9,7 @@ use linkura_i18n::t;
 mod cli;
 mod command;
 mod config;
+mod generated;
 
 use crate::config::Commands;
 

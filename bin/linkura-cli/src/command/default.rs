@@ -1,5 +1,6 @@
 use crate::config::Global;
 use chrono::{Local, Utc};
+use linkura_api::ArchiveListOptions;
 use linkura_api::model::FesliveLobbyRequest;
 
 pub async fn run(ctx: &Global) {
@@ -23,7 +24,10 @@ pub async fn run(ctx: &Global) {
 
     let archive_res: serde_json::Value = api_client
         .high_level()
-        .get_archive_list(Some(4))
+        .get_archive_list(ArchiveListOptions {
+            limit: Some(4),
+            ..Default::default()
+        })
         .await
         .unwrap();
     let latest_archive_res = archive_res.as_array().unwrap()[0].clone();

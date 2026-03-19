@@ -9,6 +9,7 @@ mod l4;
 mod macros;
 
 pub mod model;
+pub use high_level::ArchiveListOptions;
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Credential {
     /// x-res-version

@@ -24,6 +24,14 @@ pub struct ResponseDebug {
     pub body: String,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct ArchiveListOptions {
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+    pub sort: Option<String>,
+    pub live_type: Option<i32>,
+}
+
 impl fmt::Debug for ResponseDebug {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Response")
@@ -184,12 +192,13 @@ impl<'a> HighLevelApi<'a> {
         Ok(serde_json::to_value(merged)?)
     }
 
-    pub async fn get_archive_list(&self, limit: Option<u32>) -> Result<serde_json::Value> {
+    pub async fn get_archive_list(&self, options: ArchiveListOptions) -> Result<serde_json::Value> {
         let request = ArchiveGetArchiveListRequest {
-            order: Some("desc".to_string()),
+            order: Some(options.order.unwrap_or_else(|| "desc".to_string())),
             characters: Some(Vec::new()),
-            limit: Some(limit.unwrap_or(4) as i32),
-            sort: Some("live_start_time".to_string()),
+            limit: Some(options.limit.unwrap_or(4) as i32),
+            sort: Some(options.sort.unwrap_or_else(|| "live_start_time".to_string())),
+            live_type: options.live_type,
             ..Default::default()
         };
         let body = self.raw().archive().get_archive_list(&request).await?;
