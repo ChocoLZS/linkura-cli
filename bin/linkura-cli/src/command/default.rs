@@ -1,29 +1,32 @@
 use crate::config::Global;
 use chrono::{Local, Utc};
+use linkura_api::ArchiveListOptions;
 use linkura_api::model::FesliveLobbyRequest;
+use linkura_i18n::t;
 
-pub fn run(ctx: &Global) {
-    let args = &ctx.args;
+pub async fn run(ctx: &Global) {
+    let _args = &ctx.args;
 
     let api_client = &ctx.api_client;
-    let wm_res: serde_json::Value = api_client.high_level().get_plan_list().unwrap();
+    let wm_res: serde_json::Value = api_client.high_level().get_plan_list().await.unwrap();
 
-    if let Some(id) = &args.id {
-        let res = api_client.high_level().get_with_meets_info(&id).unwrap();
-        tracing::info!("wm info: {:?}", res);
-    } else {
-        let trailers = wm_res.as_array().unwrap();
-        tracing::trace!("Trailers: {:?}", trailers);
-        trailers.iter().for_each(|value| {
-            print_trailer_info(value);
-        });
+    let trailers = wm_res.as_array().unwrap();
+    tracing::trace!("Trailers: {:?}", trailers);
+    trailers.iter().for_each(|value| {
+        print_trailer_info(value);
+    });
+    print_enterable_trailer_info(ctx, trailers).await;
 
-        print_enterable_trailer_info(ctx, trailers);
-    }
-
-    let archive_res: serde_json::Value = api_client.high_level().get_archive_list(Some(4)).unwrap();
+    let archive_res: serde_json::Value = api_client
+        .high_level()
+        .get_archive_list(ArchiveListOptions {
+            limit: Some(4),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
     let latest_archive_res = archive_res.as_array().unwrap()[0].clone();
-    print_latest_archive_info(ctx, &latest_archive_res);
+    print_latest_archive_info(ctx, &latest_archive_res).await;
 }
 
 fn print_trailer_info(wm: &serde_json::Value) {
@@ -33,26 +36,31 @@ fn print_trailer_info(wm: &serde_json::Value) {
     let start_time: &str = wm.get("live_start_time").unwrap().as_str().unwrap();
     let open_time: &str = wm.get("open_time").unwrap().as_str().unwrap();
     tracing::info!(
-        "{} info: \n{}\n\n{}\nstart_time: {}\nopen_time: {}",
-        if live_type == 2 {
-            "with meets"
-        } else {
-            "fes live"
-        },
-        name,
-        description,
-        chrono::DateTime::parse_from_rfc3339(start_time)
-            .unwrap()
-            .with_timezone(&Local)
-            .format("%Y-%m-%d %H:%M:%S %:z"),
-        chrono::DateTime::parse_from_rfc3339(open_time)
-            .unwrap()
-            .with_timezone(&Local)
-            .format("%Y-%m-%d %H:%M:%S %:z")
+        "{}",
+        t!(
+            "linkura.command.default.trailer.info",
+            live_kind = if live_type == 2 {
+                t!("linkura.command.default.trailer.kind.with_meets")
+            } else {
+                t!("linkura.command.default.trailer.kind.fes_live")
+            },
+            name = name,
+            description = description,
+            start_time = chrono::DateTime::parse_from_rfc3339(start_time)
+                .unwrap()
+                .with_timezone(&Local)
+                .format("%Y-%m-%d %H:%M:%S %:z")
+                .to_string(),
+            open_time = chrono::DateTime::parse_from_rfc3339(open_time)
+                .unwrap()
+                .with_timezone(&Local)
+                .format("%Y-%m-%d %H:%M:%S %:z")
+                .to_string()
+        )
     );
 }
 
-fn print_latest_trailer_info(ctx: &Global, wm: &serde_json::Value) {
+async fn print_latest_trailer_info(ctx: &Global, wm: &serde_json::Value) {
     let api_client = &ctx.api_client;
     let id = wm.get("live_id").unwrap().as_str().unwrap();
     let live_type = wm.get("live_type").unwrap().as_u64().unwrap();
@@ -62,19 +70,23 @@ fn print_latest_trailer_info(ctx: &Global, wm: &serde_json::Value) {
     let now = Utc::now();
     if now < chrono::DateTime::parse_from_rfc3339(open_time).unwrap() {
         tracing::warn!(
-            "The live has not openned yet! {} {}",
-            name,
-            chrono::DateTime::parse_from_rfc3339(open_time)
-                .unwrap()
-                .with_timezone(&Local)
-                .format("%Y-%m-%d %H:%M:%S %:z")
+            "{}",
+            t!(
+                "linkura.command.default.trailer.not_open",
+                name = name,
+                open_time = chrono::DateTime::parse_from_rfc3339(open_time)
+                    .unwrap()
+                    .with_timezone(&Local)
+                    .format("%Y-%m-%d %H:%M:%S %:z")
+                    .to_string()
+            )
         );
         return;
     }
 
     if live_type == 2 {
         let res: Result<serde_json::Value, anyhow::Error> =
-            api_client.high_level().get_with_meets_info(id);
+            api_client.high_level().get_with_meets_info(id).await;
         match res {
             Ok(res) => {
                 let characters = res
@@ -86,26 +98,40 @@ fn print_latest_trailer_info(ctx: &Global, wm: &serde_json::Value) {
                     .map(|v| v["character_id"].as_u64().unwrap())
                     .collect::<Vec<u64>>();
                 tracing::info!(
-                    "with meets info: \ntitle: {}\ndescription: {:?}\nroom: {:?}\nthumbnail: {:?}\nhls_url: {:?}\ncharacters: {:?}\ncostume_ids: {:?}\nlive_location_id: {:?}",
-                    name,
-                    res.get("description").unwrap().as_str().unwrap(),
-                    res.get("room").unwrap().as_object().unwrap(),
-                    res.get("cover_image_url").unwrap().as_str().unwrap(),
-                    res.get("hls")
-                        .unwrap()
-                        .as_object()
-                        .unwrap()
-                        .get("url")
-                        .unwrap()
-                        .as_str()
-                        .unwrap(),
-                    characters,
-                    res.get("costume_ids").unwrap().as_array().unwrap(),
-                    res.get("live_location_id").unwrap().as_u64().unwrap(),
+                    "{}",
+                    t!(
+                        "linkura.command.default.with_meets.info",
+                        title = name,
+                        description = res.get("description").unwrap().as_str().unwrap(),
+                        room = format!("{:?}", res.get("room").unwrap().as_object().unwrap()),
+                        thumbnail = res.get("cover_image_url").unwrap().as_str().unwrap(),
+                        hls_url = res
+                            .get("hls")
+                            .unwrap()
+                            .as_object()
+                            .unwrap()
+                            .get("url")
+                            .unwrap()
+                            .as_str()
+                            .unwrap(),
+                        characters = format!("{:?}", characters),
+                        costume_ids = format!(
+                            "{:?}",
+                            res.get("costume_ids").unwrap().as_array().unwrap()
+                        ),
+                        live_location_id = res.get("live_location_id").unwrap().as_u64().unwrap()
+                    )
                 );
             }
             Err(_) => {
-                tracing::warn!("Can't get with meets info for now! {:?} {}", name, id);
+                tracing::warn!(
+                    "{}",
+                    t!(
+                        "linkura.command.default.with_meets.unavailable",
+                        name = name,
+                        id = id
+                    )
+                );
             }
         }
     }
@@ -115,9 +141,9 @@ fn print_latest_trailer_info(ctx: &Global, wm: &serde_json::Value) {
             live_id: Some(id.to_string()),
             ..Default::default()
         };
-        let _ = api_client.raw().fes_live().lobby(&lobby_request);
+        let _ = api_client.raw().fes_live().lobby(&lobby_request).await;
         let res: Result<serde_json::Value, anyhow::Error> =
-            api_client.high_level().get_fes_live_info(id);
+            api_client.high_level().get_fes_live_info(id).await;
         match res {
             Ok(res) => {
                 let characters = res
@@ -129,24 +155,37 @@ fn print_latest_trailer_info(ctx: &Global, wm: &serde_json::Value) {
                     .map(|v| v["character_id"].as_u64().unwrap())
                     .collect::<Vec<u64>>();
                 tracing::info!(
-                    "fes live info: \ntitle: {}\ndescription: {:?}\nroom: {:?}\ncharacters: {:?}\nhls: {:?}\ncostume_ids: {:?}\nlive_location_id: {:?}",
-                    name,
-                    res.get("description").unwrap().as_str().unwrap(),
-                    res.get("room").unwrap().as_object().unwrap(),
-                    characters,
-                    res.get("hls").unwrap().as_object().unwrap(),
-                    res.get("costume_ids").unwrap().as_array().unwrap(),
-                    res.get("live_location_id").unwrap().as_u64().unwrap(),
+                    "{}",
+                    t!(
+                        "linkura.command.default.fes_live.info",
+                        title = name,
+                        description = res.get("description").unwrap().as_str().unwrap(),
+                        room = format!("{:?}", res.get("room").unwrap().as_object().unwrap()),
+                        characters = format!("{:?}", characters),
+                        hls = format!("{:?}", res.get("hls").unwrap().as_object().unwrap()),
+                        costume_ids = format!(
+                            "{:?}",
+                            res.get("costume_ids").unwrap().as_array().unwrap()
+                        ),
+                        live_location_id = res.get("live_location_id").unwrap().as_u64().unwrap()
+                    )
                 );
             }
             Err(_) => {
-                tracing::warn!("Can't get fes live info for now! {:?} {}", name, id);
+                tracing::warn!(
+                    "{}",
+                    t!(
+                        "linkura.command.default.fes_live.unavailable",
+                        name = name,
+                        id = id
+                    )
+                );
             }
         }
     }
 }
 
-fn print_enterable_trailer_info(ctx: &Global, trailers: &Vec<serde_json::Value>) {
+async fn print_enterable_trailer_info(ctx: &Global, trailers: &Vec<serde_json::Value>) {
     let now = Utc::now();
     let mut enterable_trailers: Vec<&serde_json::Value> = Vec::new();
     for wm in trailers {
@@ -156,16 +195,22 @@ fn print_enterable_trailer_info(ctx: &Global, trailers: &Vec<serde_json::Value>)
         }
     }
     if enterable_trailers.is_empty() {
-        tracing::info!("No enterable trailers found.");
+        tracing::info!("{}", t!("linkura.command.default.enterable.none"));
         return;
     }
-    tracing::info!("Enterable trailers found: {}", enterable_trailers.len());
-    enterable_trailers.iter().for_each(|wm| {
-        print_latest_trailer_info(ctx, wm);
-    });
+    tracing::info!(
+        "{}",
+        t!(
+            "linkura.command.default.enterable.count",
+            count = enterable_trailers.len()
+        )
+    );
+    for wm in enterable_trailers {
+        print_latest_trailer_info(ctx, wm).await;
+    }
 }
 
-fn print_latest_archive_info(ctx: &Global, archive: &serde_json::Value) {
+async fn print_latest_archive_info(ctx: &Global, archive: &serde_json::Value) {
     let title = archive.get("name").unwrap().as_str().unwrap();
     let description = archive.get("description").unwrap().as_str().unwrap();
     let thumbnail = archive
@@ -181,15 +226,19 @@ fn print_latest_archive_info(ctx: &Global, archive: &serde_json::Value) {
             .api_client
             .assets()
             .get_hls_url_from_archive(link)
+            .await
             .unwrap_or_else(|_| String::new());
     }
     tracing::info!(
-        "Latest archive: \n title: {:?}\n description: {:?}\n thumbnail: {:?}\n link: {:?}\n url: {:?}\n video_url: {:?}",
-        title,
-        description,
-        thumbnail,
-        link,
-        real_url,
-        video_url
+        "{}",
+        t!(
+            "linkura.command.default.latest_archive.info",
+            title = title,
+            description = description,
+            thumbnail = thumbnail,
+            link = link,
+            url = real_url,
+            video_url = video_url
+        )
     );
 }

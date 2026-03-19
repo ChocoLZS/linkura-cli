@@ -1,6 +1,6 @@
 [package]
 name = "linkura-cli"
-version = "0.0.10"
+version = "0.1.0"
 edition.workspace = true
 default-run = "linkura-cli"
 
@@ -19,10 +19,17 @@ serde_json.workspace = true
 ctrlc.workspace = true
 tracing.workspace = true
 rust-i18n.workspace = true
+rmcp.workspace = true
+axum.workspace = true
 
 indicatif.workspace = true
 inquire = "0.7.5"
 colored = "3.0.0"
+
+[build-dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_yaml = "0.9"
 
 [[bin]]
 name = "linkura-cli"

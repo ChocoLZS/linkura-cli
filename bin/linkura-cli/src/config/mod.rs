@@ -1,4 +1,4 @@
-use crate::{cli::spinner::SpinnerManager, command::api::ArgsAPI};
+use crate::{cli::spinner::SpinnerManager, command::api::ArgsAPI, command::mcp::ArgsMcp};
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ use linkura_api::{self, ApiClient, Credential};
 use linkura_i18n::t;
 
 /** ARG PARSER **/
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[clap(version)]
 #[command(
     name = "linkura-cli",
@@ -21,38 +21,31 @@ use linkura_i18n::t;
     bin_name = "linkura-cli",
 )]
 pub struct Args {
-    #[clap(short('k'), long)]
+    #[arg(short('k'), long, help = t!("linkura.cli.args.skip.about").to_string())]
     pub skip: bool,
-    #[clap(short('i'), long = "id", value_name = "ID")]
-    pub id: Option<String>,
-    #[clap(short('c'), long = "config", value_name = "CONFIG_PATH")]
+    #[arg(short('c'), long = "config", value_name = "CONFIG_PATH", help = t!("linkura.cli.args.config.about").to_string())]
     pub config_path: Option<String>,
-    #[clap(short('Q'), long = "quiet", action = clap::ArgAction::SetTrue)]
+    #[arg(short('Q'), long = "quiet", action = clap::ArgAction::SetTrue, help = t!("linkura.cli.args.quiet.about").to_string())]
     pub quiet: bool,
-    #[clap(short('l'), long = "loglevel", value_name = "LOG_LEVEL")]
-    /// Sets the log level for the application.
-    ///
-    /// Valid values are, in order of verbosity:
-    ///
-    /// `off`, `error`, `warn`, `info`, `debug`, `trace`
-    ///
-    /// Default is "info".
+    #[arg(short('l'), long = "loglevel", value_name = "LOG_LEVEL", help = t!("linkura.cli.args.loglevel.about").to_string())]
     pub log_level: Option<String>,
 
-    #[clap(long = "player-id", value_name = "PLAYER_ID")]
+    #[clap(long = "player-id", value_name = "PLAYER_ID", help = t!("linkura.cli.args.player_id.about").to_string())]
     pub player_id: Option<String>,
-    #[clap(long = "password", value_name = "PASSWORD")]
+    #[clap(long = "password", value_name = "PASSWORD", help = t!("linkura.cli.args.password.about").to_string())]
     pub password: Option<String>,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
-    /// Get api response data
+    #[command(about = t!("linkura.command.api.about").to_string())]
     API(ArgsAPI),
-    /// Get app version & res version
+    #[command(about = t!("linkura.command.mcp.about").to_string())]
+    Mcp(ArgsMcp),
+    #[command(about = t!("linkura.command.version.about").to_string())]
     Version,
 }
 
@@ -134,9 +127,9 @@ impl ConfigManager {
     }
 
     fn read_config(&self, path: &Path) -> Result<Config> {
-        let content = fs::read_to_string(path).context(format!(
-            "Failed to read config file at {:?}",
-            path.display()
+        let content = fs::read_to_string(path).context(t!(
+            "linkura.config.file.read.failed",
+            path = path.display().to_string()
         ))?;
         Ok(serde_json::from_str(&content)?)
     }
@@ -148,15 +141,23 @@ impl ConfigManager {
         if let Some(parent) = path.parent() {
             if !parent.exists() {
                 fs::create_dir_all(parent).with_context(|| {
-                    format!("Failed to create config directory at {}", parent.display())
+                    t!(
+                        "linkura.config.dir.create.failed",
+                        path = parent.display().to_string()
+                    )
                 })?;
             }
         }
 
-        let content = serde_json::to_string_pretty(config).context("Failed to serialize config")?;
+        let content =
+            serde_json::to_string_pretty(config).context(t!("linkura.config.serialize.failed"))?;
 
-        fs::write(&path, content)
-            .with_context(|| format!("Failed to write config file at {}", path.display()))?;
+        fs::write(&path, content).with_context(|| {
+            t!(
+                "linkura.config.file.write.failed",
+                path = path.display().to_string()
+            )
+        })?;
 
         Ok(())
     }
@@ -172,7 +173,7 @@ pub struct Global {
 }
 
 impl Global {
-    pub fn new(args: Args) -> Self {
+    pub async fn new(args: Args) -> Self {
         let spinner_manager = SpinnerManager::new(args.quiet);
         let mut api_client = linkura_api::ApiClient::new();
         let mut config_manager = ConfigManager::new(args.config_path.clone());
@@ -180,8 +181,15 @@ impl Global {
         let config_res = config_manager.load_config();
 
         let config = if config_res.is_err() {
-            tracing::error!("Failed to load config: {:?}", config_res.err());
+            tracing::error!(
+                "{}",
+                t!(
+                    "linkura.config.load.failed",
+                    error = format!("{:?}", config_res.err())
+                )
+            );
             Self::initialize_config(&args, &config_manager, &mut api_client, &spinner_manager)
+                .await
         } else {
             match config_res.unwrap() {
                 Some(mut config) => {
@@ -190,7 +198,7 @@ impl Global {
                             spinner_manager.create_spinner(&t!("linkura.config.checking.version"));
                         // check if latest res_version and client_version
                         let (res_version, client_version) =
-                            api_client.high_level().get_app_version().unwrap();
+                            api_client.high_level().get_app_version().await.unwrap();
                         if let Some(res_version) = res_version {
                             if res_version != config.credential.res_version {
                                 sp.set_message(t!(
@@ -224,7 +232,8 @@ impl Global {
                     &config_manager,
                     &mut api_client,
                     &spinner_manager,
-                ),
+                )
+                .await,
             }
         };
 
@@ -238,15 +247,18 @@ impl Global {
         }
     }
 
-    fn initialize_config(
+    async fn initialize_config(
         args: &Args,
         config_manager: &ConfigManager,
         api_client: &mut ApiClient,
         spinner_manager: &SpinnerManager,
     ) -> Config {
         tracing::warn!(
-            "No config found, creating a new one to path: {}",
-            config_manager.get_config_path().display()
+            "{}",
+            t!(
+                "linkura.config.no_config.create",
+                path = config_manager.get_config_path().display().to_string()
+            )
         );
         // first time to init interactive
         let credential = interactive::get_credential_with_simple_prompt(
@@ -255,17 +267,18 @@ impl Global {
             args.player_id.clone(),
             args.password.clone(),
         )
-        .expect("Failed to get credential");
+        .await
+        .expect(&t!("linkura.config.credential.fetch.failed"));
         Config { credential }
     }
 }
 
 /*  CONFIG END **/
 
-pub fn init(args: Args) -> Result<Global> {
-    tracing::info!("Initializing config...");
-    let mut global = Global::new(args);
-    tracing::info!("Config initialized!");
+pub async fn init(args: Args) -> Result<Global> {
+    tracing::info!("{}", t!("linkura.config.initialize.start"));
+    let mut global = Global::new(args).await;
+    tracing::info!("{}", t!("linkura.config.initialize.complete"));
 
     let sp = global
         .spinner_manager
@@ -274,7 +287,8 @@ pub fn init(args: Args) -> Result<Global> {
         let session_token = global.api_client.high_level().device_id_login(
             &global.config.credential.player_id,
             &global.config.credential.device_specific_id,
-        )?;
+        )
+        .await?;
         global.config.credential.session_token = Some(session_token.clone());
         session_token
     } else {
@@ -283,7 +297,7 @@ pub fn init(args: Args) -> Result<Global> {
     global.api_client.set_session_token(&session_token);
     // 测试登录态
     sp.set_message(t!("linkura.config.testing.login"));
-    match global.api_client.high_level().get_plan_list() {
+    match global.api_client.high_level().get_plan_list().await {
         Ok(_) => {}
         Err(_) => {
             sp.set_message(t!("linkura.config.test.failed.retry"));
@@ -296,6 +310,7 @@ pub fn init(args: Args) -> Result<Global> {
                     &global.config.credential.player_id,
                     &global.config.credential.device_specific_id,
                 )
+                .await
                 .map_err(|e| {
                     anyhow::anyhow!(t!("linkura.config.login.failed", error = e.to_string()))
                 })?;
@@ -307,7 +322,7 @@ pub fn init(args: Args) -> Result<Global> {
     global
         .config_manager
         .save_config(&global.config)
-        .context("Failed to save config")?;
+        .context(t!("linkura.config.save.failed"))?;
     sp.finish_with_message(t!(
         "linkura.config.login.success",
         path = global
@@ -318,6 +333,55 @@ pub fn init(args: Args) -> Result<Global> {
         token = session_token
     ));
     Ok(global)
+}
+
+pub async fn init_non_interactive(args: Args) -> Result<Global> {
+    tracing::info!("{}", t!("linkura.config.initialize.mcp.start"));
+
+    let spinner_manager = SpinnerManager::new(true);
+    let mut api_client = linkura_api::ApiClient::new();
+    let mut config_manager = ConfigManager::new(args.config_path.clone());
+
+    let mut config = config_manager
+        .load_config()?
+        .ok_or_else(|| anyhow::anyhow!(t!("linkura.config.mcp.no_config")))?;
+
+    api_client.update_with_credential(&config.credential);
+
+    let session_token = if let Some(token) = config.credential.session_token.clone() {
+        token
+    } else {
+        let token = api_client.high_level().device_id_login(
+            &config.credential.player_id,
+            &config.credential.device_specific_id,
+        )
+        .await?;
+        config.credential.session_token = Some(token.clone());
+        token
+    };
+
+    api_client.set_session_token(&session_token);
+
+    if api_client.high_level().get_plan_list().await.is_err() {
+        api_client.del_session_token();
+        let token = api_client.high_level().device_id_login(
+            &config.credential.player_id,
+            &config.credential.device_specific_id,
+        )
+        .await?;
+        config.credential.session_token = Some(token.clone());
+        api_client.set_session_token(&token);
+    }
+
+    config_manager.save_config(&config)?;
+
+    Ok(Global {
+        config,
+        config_manager,
+        api_client,
+        args,
+        spinner_manager,
+    })
 }
 
 pub mod interactive;

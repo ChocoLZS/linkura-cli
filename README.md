@@ -1,43 +1,91 @@
 # linkura-cli
 
-## 免责声明
+[简体中文](docs/zh-CN/README.md) | [日本語](docs/ja/README.md)
 
-1. **用途说明**】
+This repository currently contains two main programs:
+- `linkura-cli`
+- `linkura-motion-cli`
 
-    本仓库所有代码、文档及资源均为**个人学习与研究目的**而创建，仅代表作者个人实践，**不构成任何正式建议或承诺**。
-
-2. **无担保责任**
-
-    - 作者不对代码的准确性、完整性或适用性作任何担保。
-
-    - 使用者应自行承担因使用、修改或分发本仓库内容而产生的所有风险。
-
-3. **法律与合规性**
-
-    - 使用者需确保其用途符合所在地法律法规及开源许可要求。
-
-    - 若内容涉及第三方权益（如知识产权、隐私权等），请立即联系作者删除。
-
-4. **免责范围**
-
-    - 因使用本仓库内容导致的直接或间接损失（如数据丢失、系统故障、法律纠纷等）。
-
-    - 他人基于本仓库内容进行的二次开发或商业行为产生的后果。
-
-## 开发依赖
-
-- protoc
+## Repository Capabilities
 
 ### linkura-cli
 
-无
+1. Fetch recent live streaming information and recent archive information.
+2. Fetch detailed information for a specific archive.
+3. Start an MCP server.
+
+#### MCP Server Capabilities
+
+##### tools
+
+- `list_live_streaming_info`: List current live streaming schedule entries
+- `list_archives`: List archive information
+- `get_archive_detail`: Fetch detailed information for a specific archive
 
 ### linkura-motion-cli
 
-#### features audio
+1. Supports **multi-threaded download** of motion capture data in `iarc` / `md` formats
+2. Supports **multi-threaded upload** of motion capture data to a specified S3-compatible storage server
+3. Supports **analyzing** motion capture packets and outputting analysis results
+4. Supports **extracting** audio from motion capture packets and exporting it in opus format
+5. Supports **converting** **live** motion capture packets into **archive** motion capture packets
 
-> 默认不启用
+## Repository Layout
 
-- libopus
+- `bin/linkura-cli`
+  - Main CLI program
+  - Includes the MCP service implementation
+- `bin/linkura-motion-cli`
+  - Motion capture data related tool
+- `crates/api`
+  - High-level and low-level API wrappers
+- `crates/packet`
+  - Motion capture protocol and packet handling
+- `crates/downloader`
+  - Motion capture data download / upload logic
+- `crates/common`
+  - Shared helper functions and types
+- `crates/i18n`
+  - Internationalization support
+- `deps/`
+  - External metadata required for build-time code generation
 
-- 具体编译依赖可以查看 [opusic-sys](https://github.com/DoumanAsh/opusic-sys/)
+## Build
+
+### Dependencies
+
+- A Rust toolchain compatible with this workspace
+- `protoc`
+- `cmake`
+- When building `linkura-motion-cli` with the `audio` feature enabled, `libopus` is required. For detailed dependency requirements, refer to [opusic-sys](https://github.com/DoumanAsh/opusic-sys/)
+
+### Steps
+
+```bash
+git clone https://github.com/ChocoLZS/linkura-cli.git
+cd linkura-cli
+git submodule update --init --recursive
+cargo build -p linkura-cli
+cargo build -p linkura-motion-cli
+```
+
+Examples:
+
+```bash
+cargo run -p linkura-cli
+```
+
+```bash
+cargo run -p linkura-motion-cli
+```
+
+```bash
+cargo run -p linkura-motion-cli --features audio
+```
+
+## Disclaimer
+
+- This repository is an unofficial project and is not affiliated with the game operator or related rights holders.
+- The repository contents are primarily intended for personal study, research, and tooling development.
+- The author provides no warranty regarding correctness, completeness, long-term compatibility, or fitness for any particular purpose.
+- Users are responsible for ensuring that their usage complies with local laws, platform rules, and third-party rights requirements.

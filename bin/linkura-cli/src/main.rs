@@ -9,12 +9,14 @@ use linkura_i18n::t;
 mod cli;
 mod command;
 mod config;
+mod generated;
 
 use crate::config::Commands;
 
 linkura_i18n::init!();
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = config::Args::parse();
     // Commands that will not need to initialize
     match &args.command {
@@ -22,7 +24,8 @@ fn main() {
             let (res_version, app_version) = ApiClient::new()
                 .high_level()
                 .get_app_version()
-                .expect("Fail to get versions");
+                .await
+                .expect(&t!("linkura.main.version.fetch.failed"));
             // we believe that all versions exist
             println!("{}", app_version.unwrap());
             println!("{}", res_version.unwrap());
@@ -35,20 +38,39 @@ fn main() {
         log::init(args.log_level.clone());
     }
 
-    let global = init(args).expect(&t!("config.initialize.failed"));
-
-    match &global.args.command {
-        Some(Commands::API(args)) => {
-            let _ = command::api::run(&global, &args).map_err(|e| {
-                tracing::error!("Error running API command: {}", e);
+    match args.command.clone() {
+        Some(Commands::API(api_args)) => {
+            let global = init(args)
+                .await
+                .expect(&t!("common.config.initialize.failed"));
+            let _ = command::api::run(&global, &api_args).await.map_err(|e| {
+                tracing::error!(
+                    "{}",
+                    t!("linkura.main.command.api.run.failed", error = e.to_string())
+                );
+                std::process::exit(1);
+            });
+        }
+        Some(Commands::Mcp(mcp_args)) => {
+            let global = config::init_non_interactive(args)
+                .await
+                .expect(&t!("common.config.initialize.failed"));
+            let _ = command::mcp::run(&global, &mcp_args).await.map_err(|e| {
+                tracing::error!(
+                    "{}",
+                    t!("linkura.main.command.mcp.run.failed", error = e.to_string())
+                );
                 std::process::exit(1);
             });
         }
         None => {
-            command::default::run(&global);
+            let global = init(args)
+                .await
+                .expect(&t!("common.config.initialize.failed"));
+            command::default::run(&global).await;
         }
         _ => {
-            unimplemented!("Unknown command");
+            unimplemented!("{}", t!("linkura.main.command.unknown"));
         }
     }
 

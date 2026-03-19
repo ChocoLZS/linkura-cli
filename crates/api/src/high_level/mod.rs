@@ -24,6 +24,14 @@ pub struct ResponseDebug {
     pub body: String,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct ArchiveListOptions {
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+    pub sort: Option<String>,
+    pub live_type: Option<i32>,
+}
+
 impl fmt::Debug for ResponseDebug {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Response")
@@ -51,31 +59,16 @@ impl ResponseDebug {
             body,
         })
     }
-
-    /// Create a ResponseDebug from a blocking reqwest::Response (consumes the response)
-    pub fn from_blocking_response(res: reqwest::blocking::Response) -> Result<Self> {
-        let url = res.url().to_string();
-        let status = res.status();
-        let headers = res.headers().clone();
-        let body = res.text()?;
-
-        Ok(Self {
-            url,
-            status,
-            headers,
-            body,
-        })
-    }
 }
 define_api_struct!(AssetsApi);
 
 impl<'a> AssetsApi<'a> {
-    pub fn get_hls_url_from_archive(&self, url: &str) -> Result<String> {
-        let res = self.assets_client.get(url).send()?;
+    pub async fn get_hls_url_from_archive(&self, url: &str) -> Result<String> {
+        let res = self.assets_client.get(url).send().await?;
         if res.status() != reqwest::StatusCode::OK {
             return Err(anyhow::anyhow!("Get archive failed: {:?}", res));
         }
-        let json: serde_json::Value = res.json()?;
+        let json: serde_json::Value = res.json().await?;
         let hls_url = format!(
             "{}/{}",
             json["path"].as_str().unwrap(),
@@ -95,8 +88,11 @@ impl<'a> HighLevelApi<'a> {
     /// Get client version from
     ///
     /// Returns (x-res-version, `app version from website`)
-    pub fn get_app_version(&self) -> Result<(Option<String>, Option<String>)> {
-        let app_version = get_appstore_version().or_else(|| get_google_play_version());
+    pub async fn get_app_version(&self) -> Result<(Option<String>, Option<String>)> {
+        let app_version = match get_appstore_version().await {
+            Some(version) => Some(version),
+            None => get_google_play_version().await,
+        };
         tracing::info!("Detected app version: {:?}", app_version);
         // empty id login check
         let url = format!("{API_BASE}/user/login");
@@ -115,14 +111,16 @@ impl<'a> HighLevelApi<'a> {
                 "device_specific_id": "",
                 "version": 1
             }))
-            .send()?;
+            .send()
+            .await?;
 
         let headers = res.headers().clone();
         if res.status() != reqwest::StatusCode::OK {
             tracing::error!(
                 "Linkura api request failed: {:?}",
-                ResponseDebug::from_blocking_response(res)?
+                ResponseDebug::from_response(res).await?
             );
+            return Ok((None, app_version));
         }
         let res_version = headers.get("x-res-version").map(|v| {
             let version = v.to_str().unwrap_or_default();
@@ -145,7 +143,7 @@ impl<'a> HighLevelApi<'a> {
     ///     "player_level": 114514
     /// }
     /// ```
-    pub fn password_login(&self, id: &str, password: &str) -> Result<String> {
+    pub async fn password_login(&self, id: &str, password: &str) -> Result<String> {
         let request = AccountConnectRequest {
             provider: Some(1),
             player_id: Some(id.to_string()),
@@ -153,7 +151,7 @@ impl<'a> HighLevelApi<'a> {
             platform_type: Some(1),
             ..Default::default()
         };
-        let body = self.raw().account().connect(&request)?;
+        let body = self.raw().account().connect(&request).await?;
         let device_specific_id = body.device_specific_id.unwrap_or_default();
         if device_specific_id.is_empty() {
             return Err(anyhow::anyhow!("Login failed, device_specific_id is empty"));
@@ -172,14 +170,14 @@ impl<'a> HighLevelApi<'a> {
     ///     ...
     /// }
     /// ```
-    pub fn device_id_login(&self, id: &str, device_id: &str) -> Result<String> {
+    pub async fn device_id_login(&self, id: &str, device_id: &str) -> Result<String> {
         let request = UserLoginRequest {
             player_id: Some(id.to_string()),
             device_specific_id: Some(device_id.to_string()),
             version: Some(1),
             ..Default::default()
         };
-        let body = self.raw().user().login(&request)?;
+        let body = self.raw().user().login(&request).await?;
         let session_token = body.session_token.unwrap_or_default();
         if session_token.is_empty() {
             return Err(anyhow::anyhow!("Login failed"));
@@ -187,40 +185,41 @@ impl<'a> HighLevelApi<'a> {
         Ok(session_token)
     }
 
-    pub fn get_plan_list(&self) -> Result<serde_json::Value> {
-        let body = self.raw().archive().get_home()?;
+    pub async fn get_plan_list(&self) -> Result<serde_json::Value> {
+        let body = self.raw().archive().get_home().await?;
         let mut merged = body.live_archive_list.unwrap_or_default();
         merged.extend(body.trailer_archive_list.unwrap_or_default());
         Ok(serde_json::to_value(merged)?)
     }
 
-    pub fn get_archive_list(&self, limit: Option<u32>) -> Result<serde_json::Value> {
+    pub async fn get_archive_list(&self, options: ArchiveListOptions) -> Result<serde_json::Value> {
         let request = ArchiveGetArchiveListRequest {
-            order: Some("desc".to_string()),
+            order: Some(options.order.unwrap_or_else(|| "desc".to_string())),
             characters: Some(Vec::new()),
-            limit: Some(limit.unwrap_or(4) as i32),
-            sort: Some("live_start_time".to_string()),
+            limit: Some(options.limit.unwrap_or(4) as i32),
+            sort: Some(options.sort.unwrap_or_else(|| "live_start_time".to_string())),
+            live_type: options.live_type,
             ..Default::default()
         };
-        let body = self.raw().archive().get_archive_list(&request)?;
+        let body = self.raw().archive().get_archive_list(&request).await?;
         Ok(serde_json::to_value(body.archive_list.unwrap_or_default())?)
     }
 
-    pub fn get_with_meets_info(&self, id: &str) -> Result<serde_json::Value> {
+    pub async fn get_with_meets_info(&self, id: &str) -> Result<serde_json::Value> {
         let request = WithliveEnterRequest {
             live_id: Some(id.to_string()),
             ..Default::default()
         };
-        let body = self.raw().with_live().enter(&request)?;
+        let body = self.raw().with_live().enter(&request).await?;
         Ok(serde_json::to_value(body)?)
     }
 
-    pub fn get_with_meets_connect_token(&self, live_id: &str) -> Result<String> {
+    pub async fn get_with_meets_connect_token(&self, live_id: &str) -> Result<String> {
         let request = LiveConnectTokenRequest {
             live_id: Some(live_id.to_string()),
             ..Default::default()
         };
-        let body = self.raw().with_live().connect_token(&request)?;
+        let body = self.raw().with_live().connect_token(&request).await?;
         let connect_token = body
             .audience_token
             .clone()
@@ -228,21 +227,21 @@ impl<'a> HighLevelApi<'a> {
         Ok(connect_token)
     }
 
-    pub fn get_fes_live_info(&self, id: &str) -> Result<serde_json::Value> {
+    pub async fn get_fes_live_info(&self, id: &str) -> Result<serde_json::Value> {
         let request = FesliveEnterRequest {
             live_id: Some(id.to_string()),
             ..Default::default()
         };
-        let body = self.raw().fes_live().enter(&request)?;
+        let body = self.raw().fes_live().enter(&request).await?;
         Ok(serde_json::to_value(body)?)
     }
 
-    pub fn get_fes_live_connect_token(&self, live_id: &str) -> Result<String> {
+    pub async fn get_fes_live_connect_token(&self, live_id: &str) -> Result<String> {
         let request = FesliveConnectTokenRequest {
             live_id: Some(live_id.to_string()),
             ..Default::default()
         };
-        let body = self.raw().fes_live().connect_token(&request)?;
+        let body = self.raw().fes_live().connect_token(&request).await?;
         let connect_token = body
             .audience_token
             .clone()
@@ -250,20 +249,20 @@ impl<'a> HighLevelApi<'a> {
         Ok(connect_token)
     }
 
-    pub fn get_archive_details(&self, id: &str, live_type: u8) -> Result<serde_json::Value> {
+    pub async fn get_archive_details(&self, id: &str, live_type: u8) -> Result<serde_json::Value> {
         if live_type == 1 {
             let request = ArchiveGetFesArchiveDataRequest {
                 archives_id: Some(id.to_string()),
                 ..Default::default()
             };
-            let body = self.raw().archive().get_fes_archive_data(&request)?;
+            let body = self.raw().archive().get_fes_archive_data(&request).await?;
             Ok(serde_json::to_value(body)?)
         } else if live_type == 2 {
             let request = ArchiveGetWithArchiveDataRequest {
                 archives_id: Some(id.to_string()),
                 ..Default::default()
             };
-            let body = self.raw().archive().get_with_archive_data(&request)?;
+            let body = self.raw().archive().get_with_archive_data(&request).await?;
             Ok(serde_json::to_value(body)?)
         } else {
             Err(anyhow::anyhow!("Unsupported live type: {}", live_type))
