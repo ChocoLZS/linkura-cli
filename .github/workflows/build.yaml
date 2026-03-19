@@ -41,6 +41,9 @@ jobs:
       - name: Setup | Checkout
         uses: actions/checkout@v5
 
+      - name: Setup | Submodules
+        run: git submodule update --init --recursive
+
       - name: Setup | Rust
         run: |
           rustup set profile minimal
@@ -100,6 +103,9 @@ jobs:
     steps:
       - name: Setup | Checkout
         uses: actions/checkout@v5
+
+      - name: Setup | Submodules
+        run: git submodule update --init --recursive
 
       - name: Setup | Protoc
         uses: arduino/setup-protoc@v3
@@ -172,6 +178,9 @@ jobs:
     steps:
       - name: Setup | Checkout
         uses: actions/checkout@v5
+
+      - name: Setup | Submodules
+        run: git submodule update --init --recursive
 
       - name: Setup | Protoc
         uses: arduino/setup-protoc@v3

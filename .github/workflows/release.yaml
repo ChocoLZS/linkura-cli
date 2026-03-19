@@ -59,6 +59,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Setup | Submodules
+        run: git submodule update --init --recursive
+
       - name: Prepare Release Body
         id: prepare_release_body
         run: |
@@ -98,6 +101,9 @@ jobs:
           - aarch64-linux-android
     steps:
       - uses: actions/checkout@v5
+
+      - name: Setup | Submodules
+        run: git submodule update --init --recursive
 
       - name: Setup | Rust
         run: |
@@ -145,6 +151,9 @@ jobs:
           - aarch64-apple-darwin
     steps:
       - uses: actions/checkout@v5
+
+      - name: Setup | Submodules
+        run: git submodule update --init --recursive
 
       - name: Setup | Protoc
         uses: arduino/setup-protoc@v3
@@ -194,6 +203,9 @@ jobs:
           - x86_64-pc-windows-gnu
     steps:
       - uses: actions/checkout@v5
+
+      - name: Setup | Submodules
+        run: git submodule update --init --recursive
 
       - name: Setup | Protoc
         uses: arduino/setup-protoc@v3
