@@ -27,8 +27,12 @@ pub async fn get_credential_with_simple_prompt(
     let res_version = res_version.unwrap_or(linkura_api::BASE_RES_VERSION.to_string());
     let client_version = client_version.unwrap_or(linkura_api::BASE_CLIENT_VERSION.to_string());
     println!(
-        "App version: {}, Client version: {}",
-        res_version, client_version
+        "{}",
+        t!(
+            "linkura.interactive.app.version",
+            res_version = res_version.clone(),
+            client_version = client_version.clone()
+        )
     );
     client.update_version(&res_version, &client_version);
     let device_specific_id = client.high_level().password_login(&player_id, &id_token).await?;

@@ -34,6 +34,7 @@ fn main() -> Result<()> {
 
     println!("cargo:rerun-if-changed={}", live_locations_path.display());
     println!("cargo:rerun-if-changed={}", costumes_path.display());
+    println!("cargo:rerun-if-changed=../../locales");
     println!("cargo:rerun-if-changed=build.rs");
 
     let live_locations = load_id_to_name_map(&live_locations_path)

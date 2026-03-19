@@ -7,6 +7,7 @@ static SYSTEM_LOCALE: OnceLock<&'static str> = OnceLock::new();
 
 fn detect_system_locale() -> &'static str {
     if let Some(locale) = sys_locale::get_locale() {
+        let locale = locale.to_lowercase();
         if locale.starts_with("zh") {
             "zh"
         } else if locale.starts_with("ja") {

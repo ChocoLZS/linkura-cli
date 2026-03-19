@@ -5,6 +5,54 @@ linkura:
       zh: "林库拉的交互式 API 客户端"
       ja: "リンクラのインタラクティブな API クライアント"
       en: "Interactive cli api client for Linkura"
+    args:
+      skip:
+        about:
+          zh: "跳过登录流程"
+          ja: "ログインプロセスをスキップ"
+          en: "Skip login process"
+      config:
+        about:
+          zh: "指定配置文件路径"
+          ja: "設定ファイルのパスを指定"
+          en: "Specify config file path"
+      quiet:
+        about:
+          zh: "不输出任何日志"
+          ja: "ログを出力しない"
+          en: "Do not output any logs"
+      loglevel:
+        about:
+          zh: "设置日志级别（off, error, warn, info, debug` trace）"
+          ja: "ログレベルを設定する（off, error, warn, info, debug` trace）"
+          en: "Set log level (off, error, warn, info, debug` trace)"
+      player_id:
+        about:
+          zh: "指定玩家ID（app登陆界面左上角）"
+          ja: "プレイヤーIDを指定してください（アプリのログイン画面の左上）"
+          en: "Specify player ID (top left of the app login screen)"
+      password:
+        about:
+          zh: "指定账户密码"
+          ja: "アカウントのパスワードを指定してください"
+          en: "Specify account password"
+  main:
+    version.fetch.failed:
+      zh: "获取版本信息失败"
+      ja: "バージョン情報の取得に失敗しました"
+      en: "Failed to fetch version info"
+    command.api.run.failed:
+      zh: "执行 API 命令失败: %{error}"
+      ja: "API コマンドの実行に失敗しました: %{error}"
+      en: "Failed to run API command: %{error}"
+    command.mcp.run.failed:
+      zh: "启动 MCP 服务器失败: %{error}"
+      ja: "MCP サーバーの起動に失敗しました: %{error}"
+      en: "Failed to start MCP server: %{error}"
+    command.unknown:
+      zh: "未知命令"
+      ja: "不明なコマンドです"
+      en: "Unknown command"
   interactive:
     prompt.account:
       zh: "请输入你的账号id（app登陆界面左上角）"
@@ -26,6 +74,10 @@ linkura:
       zh: "获取登录信息成功！"
       ja: "ログイン情報の取得に成功しました！"
       en: "Successfully fetched login information!"
+    app.version:
+      zh: "资源版本: %{res_version}, 客户端版本: %{client_version}"
+      ja: "リソースバージョン: %{res_version}, クライアントバージョン: %{client_version}"
+      en: "Res version: %{res_version}, client version: %{client_version}"
   config:
     logging.in:
       zh: "登陆中..."
@@ -63,7 +115,180 @@ linkura:
       zh: "版本检查完成！"
       ja: "バージョンチェック完了！"
       en: "Version check complete!"
-
+    load.failed:
+      zh: "加载配置失败: %{error}"
+      ja: "設定の読み込みに失敗しました: %{error}"
+      en: "Failed to load config: %{error}"
+    no_config.create:
+      zh: "未找到配置文件，将在 %{path} 创建新配置"
+      ja: "設定ファイルが見つかりません。%{path} に新しい設定を作成します"
+      en: "No config found, creating a new one at %{path}"
+    credential.fetch.failed:
+      zh: "获取登录凭证失败"
+      ja: "ログイン認証情報の取得に失敗しました"
+      en: "Failed to get login credential"
+    initialize.start:
+      zh: "正在初始化配置..."
+      ja: "設定を初期化中..."
+      en: "Initializing config..."
+    initialize.complete:
+      zh: "配置初始化完成！"
+      ja: "設定の初期化が完了しました！"
+      en: "Config initialized!"
+    initialize.mcp.start:
+      zh: "正在为 MCP 模式初始化配置..."
+      ja: "MCP モード用の設定を初期化中..."
+      en: "Initializing config for MCP mode..."
+    mcp.no_config:
+      zh: "未找到配置文件。请先初始化凭证后再启动 MCP 模式。"
+      ja: "設定ファイルが見つかりません。先に認証情報を初期化してから MCP モードを起動してください。"
+      en: "No config found. Initialize credentials before starting MCP mode."
+    file.read.failed:
+      zh: "读取配置文件失败: %{path}"
+      ja: "設定ファイルの読み込みに失敗しました: %{path}"
+      en: "Failed to read config file at %{path}"
+    dir.create.failed:
+      zh: "创建配置目录失败: %{path}"
+      ja: "設定ディレクトリの作成に失敗しました: %{path}"
+      en: "Failed to create config directory at %{path}"
+    serialize.failed:
+      zh: "序列化配置失败"
+      ja: "設定のシリアライズに失敗しました"
+      en: "Failed to serialize config"
+    file.write.failed:
+      zh: "写入配置文件失败: %{path}"
+      ja: "設定ファイルの書き込みに失敗しました: %{path}"
+      en: "Failed to write config file at %{path}"
+    save.failed:
+      zh: "保存配置失败"
+      ja: "設定の保存に失敗しました"
+      en: "Failed to save config"
+  command:
+    api:
+      about:
+        zh: "访问 Linkura API 的相关功能"
+        ja: "Linkura APIにアクセスするための関連機能"
+        en: "Related functionalities for accessing Linkura API"
+      archive.saved:
+        zh: "回放列表已保存到 %{path}"
+        ja: "アーカイブ一覧を %{path} に保存しました"
+        en: "Archive list saved to %{path}"
+      archives.output:
+        zh: "回放列表: %{json}"
+        ja: "アーカイブ一覧: %{json}"
+        en: "Archives: %{json}"
+      archive_details.saved:
+        zh: "回放详情已保存到 %{path}"
+        ja: "アーカイブ詳細を %{path} に保存しました"
+        en: "Archive details saved to %{path}"
+      archive_details.output:
+        zh: "回放详情: %{json}"
+        ja: "アーカイブ詳細: %{json}"
+        en: "Archive details: %{json}"
+      args:
+        output:
+          about:
+            zh: "指定输出文件路径，如果没有指定，则输出至标准输出中"
+            ja: "出力ファイルのパスを指定してください。指定しない場合は標準出力に出力されます"
+            en: "Specify output file path, if not specified, output to standard output"
+      subcommand:
+        archive:
+          about:
+            zh: "获取回放列表"
+            ja: "アーカイブリストを取得する"
+            en: "Get archive list"
+          args:
+            limit:
+              about:
+                zh: "限制获取的回放数量"
+                ja: "取得するアーカイブの数を制限する"
+                en: "Limit the number of archives to fetch"
+        archive_details:
+          about:
+            zh: "获取回放详情"
+            ja: "アーカイブの詳細を取得する"
+            en: "Get archive details"
+          args:
+            id:
+              about:
+                zh: "回放ID"
+                ja: "アーカイブID"
+                en: "Archive ID"
+            type:
+              about:
+                zh: "回放类型（1是FesxLive, 2是WithxMeets）"
+                ja: "アーカイブのタイプ（1はFesxLive、2はWithxMeets）"
+                en: "Archive type (1 is FesxLive, 2 is WithxMeets)"
+    mcp:
+      about:
+        zh: "启用MCP服务器"
+        ja: "MCPサーバーを起動する"
+        en: "Start MCP server"
+      server.http.listening:
+        zh: "Linkura MCP HTTP 服务器已监听 http://%{bind_addr}%{endpoint_path}"
+        ja: "Linkura MCP HTTP サーバーは http://%{bind_addr}%{endpoint_path} で待ち受けています"
+        en: "Linkura MCP HTTP server listening on http://%{bind_addr}%{endpoint_path}"
+      args:
+        http:
+          about:
+            zh: "设置 --http 后，将以HTTP服务器的形式启动MCP，默认以标准输出的形式启动"
+            ja: "--httpを設定すると、MCPはHTTPサーバーの形式で起動します。デフォルトでは標準出力の形式で起動します"
+            en: "With --http, MCP will be started in the form of an HTTP server, by default it will be started in the form of standard output"
+        port:
+          about:
+            zh: "设置HTTP服务器的端口，默认为31023"
+            ja: "HTTPサーバーのポートを設定します。デフォルトは31023です"
+            en: "Set the port for the HTTP server, default is 31023"
+    version:
+      about:
+        zh: "获取游戏版本信息"
+        ja: "ゲームのバージョン情報を取得する"
+        en: "Get game version info"
+    default:
+      trailer.info:
+        zh: "%{live_kind} 信息:\n%{name}\n\n%{description}\nstart_time: %{start_time}\nopen_time: %{open_time}"
+        ja: "%{live_kind} 情報:\n%{name}\n\n%{description}\nstart_time: %{start_time}\nopen_time: %{open_time}"
+        en: "%{live_kind} info:\n%{name}\n\n%{description}\nstart_time: %{start_time}\nopen_time: %{open_time}"
+      trailer.kind.with_meets:
+        zh: "With Meets"
+        ja: "With Meets"
+        en: "with meets"
+      trailer.kind.fes_live:
+        zh: "Fes Live"
+        ja: "Fes Live"
+        en: "fes live"
+      trailer.not_open:
+        zh: "直播尚未开放: %{name} %{open_time}"
+        ja: "ライブはまだ開放されていません: %{name} %{open_time}"
+        en: "The live has not opened yet: %{name} %{open_time}"
+      with_meets.info:
+        zh: "With Meets 信息:\ntitle: %{title}\ndescription: %{description}\nroom: %{room}\nthumbnail: %{thumbnail}\nhls_url: %{hls_url}\ncharacters: %{characters}\ncostume_ids: %{costume_ids}\nlive_location_id: %{live_location_id}"
+        ja: "With Meets 情報:\ntitle: %{title}\ndescription: %{description}\nroom: %{room}\nthumbnail: %{thumbnail}\nhls_url: %{hls_url}\ncharacters: %{characters}\ncostume_ids: %{costume_ids}\nlive_location_id: %{live_location_id}"
+        en: "With meets info:\ntitle: %{title}\ndescription: %{description}\nroom: %{room}\nthumbnail: %{thumbnail}\nhls_url: %{hls_url}\ncharacters: %{characters}\ncostume_ids: %{costume_ids}\nlive_location_id: %{live_location_id}"
+      with_meets.unavailable:
+        zh: "暂时无法获取 With Meets 信息: %{name} %{id}"
+        ja: "現在 With Meets 情報を取得できません: %{name} %{id}"
+        en: "Can't get with meets info for now: %{name} %{id}"
+      fes_live.info:
+        zh: "Fes Live 信息:\ntitle: %{title}\ndescription: %{description}\nroom: %{room}\ncharacters: %{characters}\nhls: %{hls}\ncostume_ids: %{costume_ids}\nlive_location_id: %{live_location_id}"
+        ja: "Fes Live 情報:\ntitle: %{title}\ndescription: %{description}\nroom: %{room}\ncharacters: %{characters}\nhls: %{hls}\ncostume_ids: %{costume_ids}\nlive_location_id: %{live_location_id}"
+        en: "Fes live info:\ntitle: %{title}\ndescription: %{description}\nroom: %{room}\ncharacters: %{characters}\nhls: %{hls}\ncostume_ids: %{costume_ids}\nlive_location_id: %{live_location_id}"
+      fes_live.unavailable:
+        zh: "暂时无法获取 Fes Live 信息: %{name} %{id}"
+        ja: "現在 Fes Live 情報を取得できません: %{name} %{id}"
+        en: "Can't get fes live info for now: %{name} %{id}"
+      enterable.none:
+        zh: "未找到可进入的预告"
+        ja: "参加可能なトレーラーは見つかりませんでした"
+        en: "No enterable trailers found."
+      enterable.count:
+        zh: "可进入的预告数量: %{count}"
+        ja: "参加可能なトレーラー数: %{count}"
+        en: "Enterable trailers found: %{count}"
+      latest_archive.info:
+        zh: "最新回放:\n title: %{title}\n description: %{description}\n thumbnail: %{thumbnail}\n link: %{link}\n url: %{url}\n video_url: %{video_url}"
+        ja: "最新アーカイブ:\n title: %{title}\n description: %{description}\n thumbnail: %{thumbnail}\n link: %{link}\n url: %{url}\n video_url: %{video_url}"
+        en: "Latest archive:\n title: %{title}\n description: %{description}\n thumbnail: %{thumbnail}\n link: %{link}\n url: %{url}\n video_url: %{video_url}"
 common:
   config.initialize.failed:
     zh: "初始化配置失败"

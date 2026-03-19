@@ -25,7 +25,7 @@ async fn main() {
                 .high_level()
                 .get_app_version()
                 .await
-                .expect("Fail to get versions");
+                .expect(&t!("linkura.main.version.fetch.failed"));
             // we believe that all versions exist
             println!("{}", app_version.unwrap());
             println!("{}", res_version.unwrap());
@@ -40,27 +40,37 @@ async fn main() {
 
     match args.command.clone() {
         Some(Commands::API(api_args)) => {
-            let global = init(args).await.expect(&t!("config.initialize.failed"));
+            let global = init(args)
+                .await
+                .expect(&t!("common.config.initialize.failed"));
             let _ = command::api::run(&global, &api_args).await.map_err(|e| {
-                tracing::error!("Error running API command: {}", e);
+                tracing::error!(
+                    "{}",
+                    t!("linkura.main.command.api.run.failed", error = e.to_string())
+                );
                 std::process::exit(1);
             });
         }
         Some(Commands::Mcp(mcp_args)) => {
             let global = config::init_non_interactive(args)
                 .await
-                .expect(&t!("config.initialize.failed"));
+                .expect(&t!("common.config.initialize.failed"));
             let _ = command::mcp::run(&global, &mcp_args).await.map_err(|e| {
-                tracing::error!("Error running MCP server: {}", e);
+                tracing::error!(
+                    "{}",
+                    t!("linkura.main.command.mcp.run.failed", error = e.to_string())
+                );
                 std::process::exit(1);
             });
         }
         None => {
-            let global = init(args).await.expect(&t!("config.initialize.failed"));
+            let global = init(args)
+                .await
+                .expect(&t!("common.config.initialize.failed"));
             command::default::run(&global).await;
         }
         _ => {
-            unimplemented!("Unknown command");
+            unimplemented!("{}", t!("linkura.main.command.unknown"));
         }
     }
 

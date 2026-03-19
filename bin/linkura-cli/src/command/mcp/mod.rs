@@ -9,13 +9,15 @@ use clap::Args as ClapArgs;
 
 use crate::config::Global;
 
+use linkura_i18n::t;
+
 pub use server::LinkuraMcpServer;
 
 #[derive(Debug, Clone, ClapArgs)]
 pub struct ArgsMcp {
-    #[clap(long = "http", default_value_t = false)]
+    #[arg(long = "http", default_value_t = false, help = t!("linkura.command.mcp.args.http.about").to_string())]
     pub http: bool,
-    #[clap(long = "port", default_value_t = 31023)]
+    #[arg(long = "port", default_value_t = 31023, help = t!("linkura.command.mcp.args.port.about").to_string())]
     pub port: u16,
 }
 

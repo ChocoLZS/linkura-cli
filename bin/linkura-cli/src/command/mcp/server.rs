@@ -3,6 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use axum::Router;
 use linkura_api::ApiClient;
+use linkura_i18n::t;
 use rmcp::{
     ServerHandler, ServiceExt, tool_handler, transport::stdio,
     handler::server::router::tool::ToolRouter,
@@ -59,9 +60,12 @@ impl LinkuraMcpServer {
         let listener = tokio::net::TcpListener::bind(&bind_addr).await?;
 
         tracing::info!(
-            "Linkura MCP HTTP server listening on http://{}{}",
-            bind_addr,
-            endpoint_path
+            "{}",
+            t!(
+                "linkura.command.mcp.server.http.listening",
+                bind_addr = bind_addr,
+                endpoint_path = endpoint_path
+            )
         );
 
         axum::serve(listener, router).await?;

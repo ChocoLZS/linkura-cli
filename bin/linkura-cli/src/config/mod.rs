@@ -21,27 +21,18 @@ use linkura_i18n::t;
     bin_name = "linkura-cli",
 )]
 pub struct Args {
-    #[clap(short('k'), long)]
+    #[arg(short('k'), long, help = t!("linkura.cli.args.skip.about").to_string())]
     pub skip: bool,
-    #[clap(short('i'), long = "id", value_name = "ID")]
-    pub id: Option<String>,
-    #[clap(short('c'), long = "config", value_name = "CONFIG_PATH")]
+    #[arg(short('c'), long = "config", value_name = "CONFIG_PATH", help = t!("linkura.cli.args.config.about").to_string())]
     pub config_path: Option<String>,
-    #[clap(short('Q'), long = "quiet", action = clap::ArgAction::SetTrue)]
+    #[arg(short('Q'), long = "quiet", action = clap::ArgAction::SetTrue, help = t!("linkura.cli.args.quiet.about").to_string())]
     pub quiet: bool,
-    #[clap(short('l'), long = "loglevel", value_name = "LOG_LEVEL")]
-    /// Sets the log level for the application.
-    ///
-    /// Valid values are, in order of verbosity:
-    ///
-    /// `off`, `error`, `warn`, `info`, `debug`, `trace`
-    ///
-    /// Default is "info".
+    #[arg(short('l'), long = "loglevel", value_name = "LOG_LEVEL", help = t!("linkura.cli.args.loglevel.about").to_string())]
     pub log_level: Option<String>,
 
-    #[clap(long = "player-id", value_name = "PLAYER_ID")]
+    #[clap(long = "player-id", value_name = "PLAYER_ID", help = t!("linkura.cli.args.player_id.about").to_string())]
     pub player_id: Option<String>,
-    #[clap(long = "password", value_name = "PASSWORD")]
+    #[clap(long = "password", value_name = "PASSWORD", help = t!("linkura.cli.args.password.about").to_string())]
     pub password: Option<String>,
 
     #[command(subcommand)]
@@ -50,11 +41,11 @@ pub struct Args {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
-    /// Get api response data
+    #[command(about = t!("linkura.command.api.about").to_string())]
     API(ArgsAPI),
-    /// Start MCP server over stdio
+    #[command(about = t!("linkura.command.mcp.about").to_string())]
     Mcp(ArgsMcp),
-    /// Get app version & res version
+    #[command(about = t!("linkura.command.version.about").to_string())]
     Version,
 }
 
@@ -136,9 +127,9 @@ impl ConfigManager {
     }
 
     fn read_config(&self, path: &Path) -> Result<Config> {
-        let content = fs::read_to_string(path).context(format!(
-            "Failed to read config file at {:?}",
-            path.display()
+        let content = fs::read_to_string(path).context(t!(
+            "linkura.config.file.read.failed",
+            path = path.display().to_string()
         ))?;
         Ok(serde_json::from_str(&content)?)
     }
@@ -150,15 +141,23 @@ impl ConfigManager {
         if let Some(parent) = path.parent() {
             if !parent.exists() {
                 fs::create_dir_all(parent).with_context(|| {
-                    format!("Failed to create config directory at {}", parent.display())
+                    t!(
+                        "linkura.config.dir.create.failed",
+                        path = parent.display().to_string()
+                    )
                 })?;
             }
         }
 
-        let content = serde_json::to_string_pretty(config).context("Failed to serialize config")?;
+        let content =
+            serde_json::to_string_pretty(config).context(t!("linkura.config.serialize.failed"))?;
 
-        fs::write(&path, content)
-            .with_context(|| format!("Failed to write config file at {}", path.display()))?;
+        fs::write(&path, content).with_context(|| {
+            t!(
+                "linkura.config.file.write.failed",
+                path = path.display().to_string()
+            )
+        })?;
 
         Ok(())
     }
@@ -182,7 +181,13 @@ impl Global {
         let config_res = config_manager.load_config();
 
         let config = if config_res.is_err() {
-            tracing::error!("Failed to load config: {:?}", config_res.err());
+            tracing::error!(
+                "{}",
+                t!(
+                    "linkura.config.load.failed",
+                    error = format!("{:?}", config_res.err())
+                )
+            );
             Self::initialize_config(&args, &config_manager, &mut api_client, &spinner_manager)
                 .await
         } else {
@@ -249,8 +254,11 @@ impl Global {
         spinner_manager: &SpinnerManager,
     ) -> Config {
         tracing::warn!(
-            "No config found, creating a new one to path: {}",
-            config_manager.get_config_path().display()
+            "{}",
+            t!(
+                "linkura.config.no_config.create",
+                path = config_manager.get_config_path().display().to_string()
+            )
         );
         // first time to init interactive
         let credential = interactive::get_credential_with_simple_prompt(
@@ -260,7 +268,7 @@ impl Global {
             args.password.clone(),
         )
         .await
-        .expect("Failed to get credential");
+        .expect(&t!("linkura.config.credential.fetch.failed"));
         Config { credential }
     }
 }
@@ -268,9 +276,9 @@ impl Global {
 /*  CONFIG END **/
 
 pub async fn init(args: Args) -> Result<Global> {
-    tracing::info!("Initializing config...");
+    tracing::info!("{}", t!("linkura.config.initialize.start"));
     let mut global = Global::new(args).await;
-    tracing::info!("Config initialized!");
+    tracing::info!("{}", t!("linkura.config.initialize.complete"));
 
     let sp = global
         .spinner_manager
@@ -314,7 +322,7 @@ pub async fn init(args: Args) -> Result<Global> {
     global
         .config_manager
         .save_config(&global.config)
-        .context("Failed to save config")?;
+        .context(t!("linkura.config.save.failed"))?;
     sp.finish_with_message(t!(
         "linkura.config.login.success",
         path = global
@@ -328,7 +336,7 @@ pub async fn init(args: Args) -> Result<Global> {
 }
 
 pub async fn init_non_interactive(args: Args) -> Result<Global> {
-    tracing::info!("Initializing config for MCP mode...");
+    tracing::info!("{}", t!("linkura.config.initialize.mcp.start"));
 
     let spinner_manager = SpinnerManager::new(true);
     let mut api_client = linkura_api::ApiClient::new();
@@ -336,7 +344,7 @@ pub async fn init_non_interactive(args: Args) -> Result<Global> {
 
     let mut config = config_manager
         .load_config()?
-        .ok_or_else(|| anyhow::anyhow!("No config found. Initialize credentials before starting MCP mode."))?;
+        .ok_or_else(|| anyhow::anyhow!(t!("linkura.config.mcp.no_config")))?;
 
     api_client.update_with_credential(&config.credential);
 
