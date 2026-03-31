@@ -124,6 +124,7 @@ impl<'a> HighLevelApi<'a> {
         }
         let res_version = headers.get("x-res-version").map(|v| {
             let version = v.to_str().unwrap_or_default();
+            tracing::debug!("x-res-version: {}", version);
             version.split('@').next().unwrap_or_default().to_string()
         });
 

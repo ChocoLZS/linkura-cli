@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use linkura_api::{self, ApiClient, Credential};
+use linkura_api::{self, ApiClient, Credential, LoginType};
 use linkura_i18n::t;
 
 /** ARG PARSER **/
@@ -27,13 +27,15 @@ pub struct Args {
     pub config_path: Option<String>,
     #[arg(short('Q'), long = "quiet", action = clap::ArgAction::SetTrue, help = t!("linkura.cli.args.quiet.about").to_string())]
     pub quiet: bool,
-    #[arg(short('l'), long = "loglevel", value_name = "LOG_LEVEL", help = t!("linkura.cli.args.loglevel.about").to_string())]
+    #[arg(short('l'), long = "log-level", value_name = "LOG_LEVEL", help = t!("linkura.cli.args.log_level.about").to_string())]
     pub log_level: Option<String>,
 
     #[clap(long = "player-id", value_name = "PLAYER_ID", help = t!("linkura.cli.args.player_id.about").to_string())]
     pub player_id: Option<String>,
     #[clap(long = "password", value_name = "PASSWORD", help = t!("linkura.cli.args.password.about").to_string())]
     pub password: Option<String>,
+    #[clap(long = "login-type", value_name = "LOGIN_TYPE", help = t!("linkura.cli.args.login_type.about").to_string())]
+    pub login_type: Option<LoginType>,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -54,6 +56,8 @@ pub enum Commands {
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Config {
     pub credential: Credential,
+    #[serde(default)]
+    pub login_type: LoginType,
 }
 
 #[derive(Debug)]
@@ -175,12 +179,24 @@ pub struct Global {
 impl Global {
     pub async fn new(args: Args) -> Self {
         let spinner_manager = SpinnerManager::new(args.quiet);
-        let mut api_client = linkura_api::ApiClient::new();
         let mut config_manager = ConfigManager::new(args.config_path.clone());
 
         let config_res = config_manager.load_config();
 
-        let config = if config_res.is_err() {
+        // Resolve login_type: CLI arg > config file > default (android)
+        // We need to peek at the file value first (if available) to determine the baseline,
+        // then CLI arg overrides it. We do the override unconditionally after loading.
+        let cli_login_type = args.login_type.clone();
+
+        // Temporary client for version checking / initial login.
+        // Use CLI login_type if specified; otherwise use default (android) until config is loaded.
+        let effective_login_type_for_temp = cli_login_type
+            .clone()
+            .unwrap_or_default();
+        let mut temp_api_client =
+            linkura_api::ApiClient::new_with_login_type(effective_login_type_for_temp.clone());
+
+        let mut config = if config_res.is_err() {
             tracing::error!(
                 "{}",
                 t!(
@@ -188,8 +204,14 @@ impl Global {
                     error = format!("{:?}", config_res.err())
                 )
             );
-            Self::initialize_config(&args, &config_manager, &mut api_client, &spinner_manager)
-                .await
+            Self::initialize_config(
+                &args,
+                &config_manager,
+                &mut temp_api_client,
+                &spinner_manager,
+                cli_login_type.unwrap_or_default(),
+            )
+            .await
         } else {
             match config_res.unwrap() {
                 Some(mut config) => {
@@ -198,7 +220,7 @@ impl Global {
                             spinner_manager.create_spinner(&t!("linkura.config.checking.version"));
                         // check if latest res_version and client_version
                         let (res_version, client_version) =
-                            api_client.high_level().get_app_version().await.unwrap();
+                            temp_api_client.high_level().get_app_version().await.unwrap();
                         if let Some(res_version) = res_version {
                             if res_version != config.credential.res_version {
                                 sp.set_message(t!(
@@ -225,18 +247,28 @@ impl Global {
                         sp.finish_with_message(t!("linkura.config.version.check.complete"));
                     }
 
+                    // CLI arg wins over file value
+                    if let Some(login_type) = cli_login_type {
+                        config.login_type = login_type;
+                    }
                     config
                 }
-                None => Self::initialize_config(
-                    &args,
-                    &config_manager,
-                    &mut api_client,
-                    &spinner_manager,
-                )
-                .await,
+                None => {
+                    Self::initialize_config(
+                        &args,
+                        &config_manager,
+                        &mut temp_api_client,
+                        &spinner_manager,
+                        effective_login_type_for_temp,
+                    )
+                    .await
+                }
             }
         };
 
+        // Build the final client with the definitively resolved login type
+        let mut api_client =
+            linkura_api::ApiClient::new_with_login_type(config.login_type.clone());
         api_client.update_with_credential(&config.credential);
         Self {
             config,
@@ -252,6 +284,7 @@ impl Global {
         config_manager: &ConfigManager,
         api_client: &mut ApiClient,
         spinner_manager: &SpinnerManager,
+        login_type: LoginType,
     ) -> Config {
         tracing::warn!(
             "{}",
@@ -269,7 +302,10 @@ impl Global {
         )
         .await
         .expect(&t!("linkura.config.credential.fetch.failed"));
-        Config { credential }
+        Config {
+            credential,
+            login_type,
+        }
     }
 }
 
@@ -339,23 +375,31 @@ pub async fn init_non_interactive(args: Args) -> Result<Global> {
     tracing::info!("{}", t!("linkura.config.initialize.mcp.start"));
 
     let spinner_manager = SpinnerManager::new(true);
-    let mut api_client = linkura_api::ApiClient::new();
     let mut config_manager = ConfigManager::new(args.config_path.clone());
 
     let mut config = config_manager
         .load_config()?
         .ok_or_else(|| anyhow::anyhow!(t!("linkura.config.mcp.no_config")))?;
 
+    // Allow CLI --login-type to override saved value
+    if let Some(login_type) = &args.login_type {
+        config.login_type = login_type.clone();
+    }
+
+    let mut api_client =
+        linkura_api::ApiClient::new_with_login_type(config.login_type.clone());
     api_client.update_with_credential(&config.credential);
 
     let session_token = if let Some(token) = config.credential.session_token.clone() {
         token
     } else {
-        let token = api_client.high_level().device_id_login(
-            &config.credential.player_id,
-            &config.credential.device_specific_id,
-        )
-        .await?;
+        let token = api_client
+            .high_level()
+            .device_id_login(
+                &config.credential.player_id,
+                &config.credential.device_specific_id,
+            )
+            .await?;
         config.credential.session_token = Some(token.clone());
         token
     };
@@ -364,11 +408,13 @@ pub async fn init_non_interactive(args: Args) -> Result<Global> {
 
     if api_client.high_level().get_plan_list().await.is_err() {
         api_client.del_session_token();
-        let token = api_client.high_level().device_id_login(
-            &config.credential.player_id,
-            &config.credential.device_specific_id,
-        )
-        .await?;
+        let token = api_client
+            .high_level()
+            .device_id_login(
+                &config.credential.player_id,
+                &config.credential.device_specific_id,
+            )
+            .await?;
         config.credential.session_token = Some(token.clone());
         api_client.set_session_token(&token);
     }

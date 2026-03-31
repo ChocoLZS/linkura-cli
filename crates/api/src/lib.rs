@@ -3,6 +3,7 @@ use rand::Rng;
 use rand::distr::Alphanumeric;
 use reqwest::header;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 mod high_level;
 mod l4;
@@ -10,6 +11,34 @@ mod macros;
 
 pub mod model;
 pub use high_level::ArchiveListOptions;
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LoginType {
+    #[default]
+    Android,
+    Ios,
+}
+
+impl fmt::Display for LoginType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LoginType::Android => write!(f, "android"),
+            LoginType::Ios => write!(f, "ios"),
+        }
+    }
+}
+
+impl std::str::FromStr for LoginType {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self> {
+        match s.to_lowercase().as_str() {
+            "android" => Ok(LoginType::Android),
+            "ios" => Ok(LoginType::Ios),
+            other => Err(anyhow::anyhow!("Unknown login type: {}", other)),
+        }
+    }
+}
+
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Credential {
     /// x-res-version
@@ -31,12 +60,14 @@ const LINKURA_GOOGLE_PLAY_URL: &str =
 const WEB_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
 /* CONFIG **/
 pub const UA_PREFIX: &str = "inspix-android";
+pub const UA_PREFIX_IOS: &str = "inspix-ios";
 pub const BASE_RES_VERSION: &str = "R2504300";
 pub const BASE_CLIENT_VERSION: &str = "3.1.0";
 
 mod api_header {
     /// x-device-type
     pub const DEVICE_TYPE: &str = "android";
+    pub const DEVICE_TYPE_IOS: &str = "ios";
     /// inspix-user-api-version
     pub const API_VERSION: &str = "1.0.0";
     pub const ACCEPT: &str = "application/json";
@@ -56,17 +87,26 @@ pub struct ApiClient {
     pub(crate) client: reqwest::Client,
     pub(crate) assets_client: reqwest::Client,
     pub(crate) runtime_header: header::HeaderMap,
+    pub login_type: LoginType,
 }
 
 impl ApiClient {
     pub fn new() -> Self {
+        Self::new_with_login_type(LoginType::Android)
+    }
+
+    pub fn new_with_login_type(login_type: LoginType) -> Self {
+        let (ua_prefix, device_type) = match &login_type {
+            LoginType::Android => (UA_PREFIX, api_header::DEVICE_TYPE),
+            LoginType::Ios => (UA_PREFIX_IOS, api_header::DEVICE_TYPE_IOS),
+        };
         Self {
             client: reqwest::Client::builder()
                 .default_headers({
                     let mut headers = header::HeaderMap::new();
                     headers.insert("x-res-version", BASE_RES_VERSION.parse().unwrap());
                     headers.insert("x-client-version", BASE_CLIENT_VERSION.parse().unwrap());
-                    headers.insert("x-device-type", api_header::DEVICE_TYPE.parse().unwrap());
+                    headers.insert("x-device-type", device_type.parse().unwrap());
                     headers.insert(
                         "inspix-user-api-version",
                         api_header::API_VERSION.parse().unwrap(),
@@ -75,7 +115,7 @@ impl ApiClient {
                     headers.insert("x-api-key", api_header::X_API_KEY.parse().unwrap());
                     headers.insert(
                         header::USER_AGENT,
-                        format!("{UA_PREFIX}/{BASE_RES_VERSION}").parse().unwrap(),
+                        format!("{ua_prefix}/{BASE_RES_VERSION}").parse().unwrap(),
                     );
                     headers.insert(header::HOST, api_header::HOST.parse().unwrap());
                     headers.insert(
@@ -107,6 +147,7 @@ impl ApiClient {
                 })
                 .build()
                 .unwrap(),
+            login_type,
         }
     }
 
@@ -126,13 +167,17 @@ impl ApiClient {
 // setter
 impl ApiClient {
     pub fn update_version(&mut self, res_version: &str, client_version: &str) {
+        let ua_prefix = match &self.login_type {
+            LoginType::Android => UA_PREFIX,
+            LoginType::Ios => UA_PREFIX_IOS,
+        };
         self.runtime_header
             .insert("x-res-version", res_version.parse().unwrap());
         self.runtime_header
             .insert("x-client-version", client_version.parse().unwrap());
         self.runtime_header.insert(
             header::USER_AGENT,
-            format!("{UA_PREFIX}/{0}", client_version).parse().unwrap(),
+            format!("{ua_prefix}/{client_version}").parse().unwrap(),
         );
     }
 
