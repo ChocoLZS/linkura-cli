@@ -7,17 +7,17 @@ use crate::config::Global;
 
 use super::{ArgsALS, api_runtime::fetch_token, model::parse_plan_items};
 
-pub fn run(ctx: &mut Global, args: &ArgsALS) -> Result<()> {
+pub async fn run(ctx: &mut Global, args: &ArgsALS) -> Result<()> {
     let mut test_results: Vec<serde_json::Value> = Vec::new();
     let api_client = &ctx.api_client;
-    let plan_list = api_client.high_level().get_plan_list()?;
+    let plan_list = api_client.high_level().get_plan_list().await?;
     let plans = parse_plan_items(plan_list)?;
 
     if let (Some(live_id), Some(live_type)) = (args.live_id.clone(), args.live_type) {
         let hit = plans
             .iter()
             .find(|p| p.live_id == live_id && p.live_type == live_type);
-        let token = fetch_token(api_client, &live_id, live_type)?;
+        let token = fetch_token(api_client, &live_id, live_type).await?;
         let payload_json = extract_jwt_payload(token.as_str())?;
         test_results.push(serde_json::json!({
             "name": hit.map(|h| h.name.clone()).unwrap_or_default(),
@@ -29,7 +29,7 @@ pub fn run(ctx: &mut Global, args: &ArgsALS) -> Result<()> {
         }));
     } else {
         for p in plans {
-            match fetch_token(api_client, &p.live_id, p.live_type) {
+            match fetch_token(api_client, &p.live_id, p.live_type).await {
                 Ok(token) => {
                     let payload_json = extract_jwt_payload(token.as_str())?;
                     test_results.push(serde_json::json!({

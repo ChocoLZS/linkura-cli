@@ -17,9 +17,9 @@ linkura_i18n::init!();
 
 #[tokio::main]
 async fn main() {
-    let args = config::Args::parse();
+    let cli_args = config::Args::parse();
     // Commands that will not need to initialize
-    match &args.command {
+    match &cli_args.command {
         Some(Commands::Version) => {
             let (res_version, app_version) = ApiClient::new()
                 .high_level()
@@ -34,22 +34,31 @@ async fn main() {
         _ => {}
     }
 
-    if !args.quiet {
-        log::init(args.log_level.clone());
+    if !cli_args.quiet {
+        log::init(cli_args.log_level.clone());
     }
 
-    match args.command.clone() {
-        Some(Commands::MRS(args)) => {
-            let _ = command::mrs::run(&global, &args);
+    match cli_args.command.clone() {
+        Some(Commands::MRS(mrs_args)) => {
+            let global = init(cli_args.clone())
+                .await
+                .expect(&t!("common.config.initialize.failed"));
+            let _ = command::mrs::run(&global, &mrs_args).map_err(|e| {
+                tracing::error!("Error running MRS command: {}", e);
+                std::process::exit(1);
+            });
         }
-        Some(Commands::ALS(args)) => {
-            let _ = command::als::run(&mut global, &args).map_err(|e| {
+        Some(Commands::ALS(als_args)) => {
+            let mut global = init(cli_args.clone())
+                .await
+                .expect(&t!("common.config.initialize.failed"));
+            let _ = command::als::run(&mut global, &als_args).await.map_err(|e| {
                 tracing::error!("Error running ALS command: {}", e);
                 std::process::exit(1);
             });
         }
         Some(Commands::API(api_args)) => {
-            let global = init(args)
+            let global = init(cli_args.clone())
                 .await
                 .expect(&t!("common.config.initialize.failed"));
             let _ = command::api::run(&global, &api_args).await.map_err(|e| {
@@ -61,7 +70,7 @@ async fn main() {
             });
         }
         Some(Commands::Mcp(mcp_args)) => {
-            let global = config::init_non_interactive(args)
+            let global = config::init_non_interactive(cli_args.clone())
                 .await
                 .expect(&t!("common.config.initialize.failed"));
             let _ = command::mcp::run(&global, &mcp_args).await.map_err(|e| {
@@ -73,7 +82,7 @@ async fn main() {
             });
         }
         None => {
-            let global = init(args)
+            let global = init(cli_args.clone())
                 .await
                 .expect(&t!("common.config.initialize.failed"));
             command::default::run(&global).await;

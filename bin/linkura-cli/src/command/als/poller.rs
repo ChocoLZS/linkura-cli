@@ -24,20 +24,13 @@ pub async fn plan_poller_task(
                 }
             }
             _ = ticker.tick() => {
-                let api_clone = api.clone();
-                let plans = tokio::task::spawn_blocking(move || api_clone.get_plan_items_with_auto_refresh()).await;
-                match plans {
-                    Ok(Ok(plans)) => {
+                match api.get_plan_items_with_auto_refresh().await {
+                    Ok(plans) => {
                         if tx.send(plans).await.is_err() {
                             break;
                         }
                     }
-                    Ok(Err(e)) => {
-                        tracing::warn!("Plan polling failed: {}", e);
-                    }
-                    Err(e) => {
-                        tracing::warn!("Plan polling task join error: {}", e);
-                    }
+                    Err(e) => tracing::warn!("Plan polling failed: {}", e),
                 }
             }
         }

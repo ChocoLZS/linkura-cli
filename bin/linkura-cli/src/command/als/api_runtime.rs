@@ -1,9 +1,9 @@
-use std::sync::Mutex;
-
 use anyhow::{Context, Result};
 use linkura_api::{ApiClient, Credential};
+use linkura_api::model::FesliveLobbyRequest;
 use linkura_common::jwt::extract_jwt_payload;
 use linkura_packet::als::client::ConnectionInfo;
+use tokio::sync::Mutex;
 
 use crate::config::Global;
 
@@ -25,7 +25,7 @@ struct RuntimeVersions {
 
 impl ApiRuntime {
     pub fn from_global(ctx: &Global) -> Self {
-        let mut client = ApiClient::new();
+        let mut client = ApiClient::new_with_login_type(ctx.config.login_type.clone());
         let credential = Credential {
             res_version: ctx.config.credential.res_version.clone(),
             client_version: ctx.config.credential.client_version.clone(),
@@ -49,51 +49,42 @@ impl ApiRuntime {
         }
     }
 
-    fn with_client<T>(&self, f: impl FnOnce(&mut ApiClient) -> Result<T>) -> Result<T> {
-        let mut guard = self
-            .client
-            .lock()
-            .map_err(|_| anyhow::anyhow!("api client mutex poisoned"))?;
-        f(&mut guard)
-    }
+    pub async fn refresh_token(&self) -> Result<()> {
+        let mut client = self.client.lock().await;
 
-    pub fn refresh_token(&self) -> Result<()> {
-        self.with_client(|client| {
-            // Force-refresh session state:
-            // 1) refresh app/resource version
-            // 2) clear local session token
-            // 3) login again with device id (take over login)
-            // 4) verify session by get_plan_list, retry force-login once if needed
-            tracing::info!(
-                "ALS refresh_token start: player_id={}, device_specific_id={}",
-                self.player_id,
-                self.device_specific_id
+        // Force-refresh session state:
+        // 1) refresh app/resource version
+        // 2) clear local session token
+        // 3) login again with device id (take over login)
+        // 4) verify session by get_plan_list, retry force-login once if needed
+        tracing::info!(
+            "ALS refresh_token start: player_id={}, device_specific_id={}",
+            self.player_id,
+            self.device_specific_id
+        );
+        self.refresh_runtime_versions(&mut client).await?;
+        force_device_login(&mut client, &self.player_id, &self.device_specific_id).await?;
+        if let Err(e) = client.high_level().get_plan_list().await {
+            tracing::warn!(
+                "refresh_token verification failed, force login retry once: {}",
+                e
             );
-            self.refresh_runtime_versions(client)?;
-            force_device_login(client, &self.player_id, &self.device_specific_id)?;
-            if let Err(e) = client.high_level().get_plan_list() {
-                tracing::warn!(
-                    "refresh_token verification failed, force login retry once: {}",
-                    e
-                );
-                force_device_login(client, &self.player_id, &self.device_specific_id)?;
-                // second failure should bubble up
-                client
-                    .high_level()
-                    .get_plan_list()
-                    .context("refresh_token verification failed after force-login retry")?;
-            }
-            tracing::info!("ALS refresh_token done: player_id={}", self.player_id);
-            Ok(())
-        })
+            force_device_login(&mut client, &self.player_id, &self.device_specific_id).await?;
+            // second failure should bubble up
+            client
+                .high_level()
+                .get_plan_list()
+                .await
+                .context("refresh_token verification failed after force-login retry")?;
+        }
+        tracing::info!("ALS refresh_token done: player_id={}", self.player_id);
+        Ok(())
     }
 
-    fn refresh_runtime_versions(&self, client: &mut ApiClient) -> Result<()> {
-        let (latest_res_version, latest_client_version) = client.high_level().get_app_version()?;
-        let mut versions = self
-            .versions
-            .lock()
-            .map_err(|_| anyhow::anyhow!("api runtime versions mutex poisoned"))?;
+    async fn refresh_runtime_versions(&self, client: &mut ApiClient) -> Result<()> {
+        let (latest_res_version, latest_client_version) =
+            client.high_level().get_app_version().await?;
+        let mut versions = self.versions.lock().await;
 
         let mut changed = false;
         if let Some(res_version) = latest_res_version {
@@ -132,69 +123,74 @@ impl ApiRuntime {
         Ok(())
     }
 
-    pub fn get_plan_items(&self) -> Result<Vec<PlanItem>> {
-        self.with_client(|client| {
-            let value = client.high_level().get_plan_list()?;
-            parse_plan_items(value)
-        })
+    pub async fn get_plan_items(&self) -> Result<Vec<PlanItem>> {
+        let client = self.client.lock().await;
+        let value = client.high_level().get_plan_list().await?;
+        parse_plan_items(value)
     }
 
-    pub fn get_plan_items_with_auto_refresh(&self) -> Result<Vec<PlanItem>> {
-        match self.get_plan_items() {
+    pub async fn get_plan_items_with_auto_refresh(&self) -> Result<Vec<PlanItem>> {
+        match self.get_plan_items().await {
             Ok(v) => Ok(v),
             Err(e) => {
                 tracing::warn!("get_plan_list failed, refreshing token and retrying: {}", e);
-                self.refresh_token()?;
-                self.get_plan_items()
+                self.refresh_token().await?;
+                self.get_plan_items().await
             }
         }
     }
 
-    pub fn contains_live(&self, live_id: &str, live_type: u64) -> Result<bool> {
-        let plans = self.get_plan_items()?;
+    pub async fn contains_live(&self, live_id: &str, live_type: u64) -> Result<bool> {
+        let plans = self.get_plan_items().await?;
         Ok(plans
             .iter()
             .any(|p| p.live_id == live_id && p.live_type == live_type))
     }
 
-    pub fn fetch_live_connection_info(
+    pub async fn fetch_live_connection_info(
         &self,
         live_id: &str,
         live_type: u64,
     ) -> Result<ConnectionInfo> {
-        self.with_client(|client| {
-            let token = fetch_token(client, live_id, live_type)?;
-            get_connect_info(token)
-        })
+        let client = self.client.lock().await;
+        let token = fetch_token(&client, live_id, live_type).await?;
+        get_connect_info(token)
     }
 }
 
-fn force_device_login(client: &mut ApiClient, player_id: &str, device_specific_id: &str) -> Result<()> {
+async fn force_device_login(
+    client: &mut ApiClient,
+    player_id: &str,
+    device_specific_id: &str,
+) -> Result<()> {
     tracing::info!("ALS force_device_login start: player_id={}", player_id);
     client.del_session_token();
     let token = client
         .high_level()
-        .device_id_login(player_id, device_specific_id)?;
+        .device_id_login(player_id, device_specific_id)
+        .await?;
     client.set_session_token(&token);
     tracing::info!("ALS force_device_login done: player_id={}", player_id);
     Ok(())
 }
 
-pub fn fetch_token(api_client: &ApiClient, live_id: &str, live_type: u64) -> Result<String> {
+pub async fn fetch_token(api_client: &ApiClient, live_id: &str, live_type: u64) -> Result<String> {
     if live_type == 2 {
         return api_client
             .high_level()
-            .get_with_meets_connect_token(live_id);
+            .get_with_meets_connect_token(live_id)
+            .await;
     }
     if live_type == 1 {
-        let res = api_client.raw().fes_live().lobby(live_id)?;
-        if !res.status().is_success() {
-            return Err(anyhow::anyhow!(
-                "failed to enter FES lobby: status={}",
-                res.status()
-            ));
-        }
-        return api_client.high_level().get_fes_live_connect_token(live_id);
+        let request = FesliveLobbyRequest {
+            live_id: Some(live_id.to_string()),
+            ..Default::default()
+        };
+        let _ = api_client.raw().fes_live().lobby(&request).await?;
+        return api_client
+            .high_level()
+            .get_fes_live_connect_token(live_id)
+            .await;
     }
     Err(anyhow::anyhow!(
         "unsupported live_type={}, expected 1(fes) or 2(meets)",

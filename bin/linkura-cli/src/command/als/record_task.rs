@@ -102,32 +102,22 @@ impl RecordTask {
     }
 
     async fn still_in_plan(&self) -> Result<bool> {
-        let api = self.api.clone();
-        let live_id = self.item.live_id.clone();
-        let live_type = self.item.live_type;
-        tokio::task::spawn_blocking(move || {
-            // RecordTask requirement: always refresh token before API call.
-            api.refresh_token()?;
-            api.contains_live(&live_id, live_type)
-        })
-        .await
-        .context("join failed when checking plan existence")?
+        // RecordTask requirement: always refresh token before API call.
+        self.api.refresh_token().await?;
+        self.api
+            .contains_live(&self.item.live_id, self.item.live_type)
+            .await
     }
 
     async fn fetch_connection_info(&self) -> Result<ConnectionInfo> {
         if !self.running_signal.load(Ordering::Relaxed) {
             return Err(anyhow::anyhow!("shutdown requested before connect"));
         }
-        let api = self.api.clone();
-        let live_id = self.item.live_id.clone();
-        let live_type = self.item.live_type;
-        tokio::task::spawn_blocking(move || {
-            // RecordTask requirement: always refresh token before API call.
-            api.refresh_token()?;
-            api.fetch_live_connection_info(&live_id, live_type)
-        })
-        .await
-        .context("join failed while fetching connection info")?
+        // RecordTask requirement: always refresh token before API call.
+        self.api.refresh_token().await?;
+        self.api
+            .fetch_live_connection_info(&self.item.live_id, self.item.live_type)
+            .await
     }
 
     async fn run_client(&self, connection_info: ConnectionInfo, raw_dir: PathBuf) -> Result<()> {

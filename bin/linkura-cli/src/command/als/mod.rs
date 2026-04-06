@@ -10,7 +10,6 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Local, Utc};
 use clap::Args as ClapArgs;
 use tokio::{
-    runtime::Builder,
     sync::{mpsc, watch},
     task::JoinSet,
 };
@@ -84,21 +83,16 @@ pub struct ArgsALS {
     pub live_type: Option<u64>,
 }
 
-pub fn run(ctx: &mut Global, args: &ArgsALS) -> Result<()> {
+pub async fn run(ctx: &mut Global, args: &ArgsALS) -> Result<()> {
     if args.test {
-        return test_mode::run(ctx, args);
+        return test_mode::run(ctx, args).await;
     }
-
-    let runtime = Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .context("failed to create tokio runtime")?;
 
     let api = Arc::new(ApiRuntime::from_global(ctx));
     if args.immediate {
-        runtime.block_on(run_immediate_once(api, args.clone()))
+        run_immediate_once(api, args.clone()).await
     } else {
-        runtime.block_on(run_supervisor(api, args.clone()))
+        run_supervisor(api, args.clone()).await
     }
 }
 
@@ -268,9 +262,10 @@ fn log_status(scheduled: &HashMap<JobKey, ScheduledTimer>, running: &HashSet<Job
 async fn select_immediate_item(api: Arc<ApiRuntime>, args: &ArgsALS) -> Result<Option<PlanItem>> {
     let designated_live_id = args.live_id.clone();
     let designated_live_type = args.live_type;
-    let plans = tokio::task::spawn_blocking(move || api.get_plan_items())
+    let plans = api
+        .get_plan_items_with_auto_refresh()
         .await
-        .context("join failed while loading plans for immediate mode")??;
+        .context("failed while loading plans for immediate mode")?;
 
     if let (Some(live_id), Some(live_type)) = (designated_live_id, designated_live_type) {
         return Ok(plans
