@@ -1,3 +1,7 @@
+**⚠️⚠️Announcement⚠️⚠️**
+
+**Due to recent news about the discontinuation of this game, this repository may be archived in the future.**
+
 # linkura-cli
 
 [简体中文](docs/zh-CN/README.md) | [日本語](docs/ja/README.md)
