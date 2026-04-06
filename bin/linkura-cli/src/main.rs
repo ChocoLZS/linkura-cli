@@ -39,6 +39,15 @@ async fn main() {
     }
 
     match args.command.clone() {
+        Some(Commands::MRS(args)) => {
+            let _ = command::mrs::run(&global, &args);
+        }
+        Some(Commands::ALS(args)) => {
+            let _ = command::als::run(&mut global, &args).map_err(|e| {
+                tracing::error!("Error running ALS command: {}", e);
+                std::process::exit(1);
+            });
+        }
         Some(Commands::API(api_args)) => {
             let global = init(args)
                 .await

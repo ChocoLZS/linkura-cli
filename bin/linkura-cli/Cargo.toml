@@ -25,6 +25,8 @@ axum.workspace = true
 indicatif.workspace = true
 inquire = "0.7.5"
 colored = "3.0.0"
+flate2 = "1.0.35"
+tar = "0.4.44"
 
 [build-dependencies]
 anyhow.workspace = true
