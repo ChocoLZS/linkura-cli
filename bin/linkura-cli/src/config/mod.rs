@@ -1,4 +1,4 @@
-use crate::{cli::spinner::SpinnerManager, command::api::ArgsAPI, command::mcp::ArgsMcp};
+use crate::{cli::spinner::SpinnerManager, command::{als::ArgsALS, api::ArgsAPI, mcp::ArgsMcp, mrs::ArgsMRS}};
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
@@ -43,6 +43,10 @@ pub struct Args {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
+    /// (Not implemented) Get mrs data
+    MRS(ArgsMRS),
+    /// Get als data
+    ALS(ArgsALS),
     #[command(about = t!("linkura.command.api.about").to_string())]
     API(ArgsAPI),
     #[command(about = t!("linkura.command.mcp.about").to_string())]
