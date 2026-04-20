@@ -130,6 +130,22 @@ impl<'a> ArchiveApi<'a> {
         crate::model::ArchiveWithliveStarsPostRequest,
         serde_json::Value
     );
+
+    // POST /v1/archive/get_with_station_list
+    post!(
+        get_with_station_list,
+        "/archive/get_with_station_list",
+        Option<crate::model::GetWithStationListRequest>,
+        crate::model::GetWithStationListResponse
+    );
+
+    // POST /v1/archive/get_with_station_data
+    post!(
+        get_with_station_data,
+        "/archive/get_with_station_data",
+        crate::model::GetWithStationDataRequest,
+        crate::model::GetWithStationDataResponse
+    );
 }
 
 

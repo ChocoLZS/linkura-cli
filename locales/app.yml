@@ -21,7 +21,7 @@ linkura:
           zh: "不输出任何日志"
           ja: "ログを出力しない"
           en: "Do not output any logs"
-      loglevel:
+      log_level:
         about:
           zh: "设置日志级别（off, error, warn, info, debug` trace）"
           ja: "ログレベルを設定する（off, error, warn, info, debug` trace）"
@@ -36,6 +36,11 @@ linkura:
           zh: "指定账户密码"
           ja: "アカウントのパスワードを指定してください"
           en: "Specify account password"
+      login_type:
+        about:
+          zh: "指定登录类型（android | ios），默认为 android"
+          ja: "ログインタイプを指定します（android | ios）。デフォルトは android"
+          en: "Specify login type (android | ios), default is android"
   main:
     version.fetch.failed:
       zh: "获取版本信息失败"
@@ -185,6 +190,22 @@ linkura:
         zh: "回放详情: %{json}"
         ja: "アーカイブ詳細: %{json}"
         en: "Archive details: %{json}"
+      archive_with_station.saved:
+        zh: "连线回放列表已保存到 %{path}"
+        ja: "With Station アーカイブ一覧を %{path} に保存しました"
+        en: "With Station archive list saved to %{path}"
+      archive_with_station.output:
+        zh: "连线回放列表: %{json}"
+        ja: "With Station アーカイブ一覧: %{json}"
+        en: "With Station archives: %{json}"
+      archive_with_station_details.saved:
+        zh: "连线回放详情已保存到 %{path}"
+        ja: "With Station アーカイブ詳細を %{path} に保存しました"
+        en: "With Station archive details saved to %{path}"
+      archive_with_station_details.output:
+        zh: "连线回放详情: %{json}"
+        ja: "With Station アーカイブ詳細: %{json}"
+        en: "With Station archive details: %{json}"
       args:
         output:
           about:
@@ -219,6 +240,16 @@ linkura:
                 zh: "回放类型（1是FesxLive, 2是WithxMeets）"
                 ja: "アーカイブのタイプ（1はFesxLive、2はWithxMeets）"
                 en: "Archive type (1 is FesxLive, 2 is WithxMeets)"
+        archive_with_station:
+          about:
+            zh: "获取连线回放列表"
+            ja: "With Station アーカイブ一覧を取得する"
+            en: "Get With Station archive list"
+        archive_with_station_details:
+          about:
+            zh: "获取连线回放详情"
+            ja: "With Station アーカイブ詳細を取得する"
+            en: "Get With Station archive details"
     mcp:
       about:
         zh: "启用MCP服务器"

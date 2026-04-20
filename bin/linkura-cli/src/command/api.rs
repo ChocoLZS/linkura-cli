@@ -19,6 +19,10 @@ pub enum Commands {
     Archive(ArgsArchive),
     #[command(about = t!("linkura.command.api.subcommand.archive_details.about").to_string())]
     ArchiveDetails(ArgsArchiveDetails),
+    #[command(about = t!("linkura.command.api.subcommand.archive_with_station.about").to_string())]
+    ArchiveWithStation(ArgsArchiveWithStation),
+    #[command(about = t!("linkura.command.api.subcommand.archive_with_station_details.about").to_string())]
+    ArchiveWithStationDetails(ArgsArchiveWithStationDetails),
 }
 
 #[derive(Debug, Clone, ClapArgs)]
@@ -33,6 +37,18 @@ pub struct ArgsArchiveDetails {
     pub id: String,
     #[clap(short('t'), long = "type", value_name = "LIVE TYPE", help = t!("linkura.command.api.subcommand.archive_details.args.type.about").to_string())]
     pub live_type: u8,
+}
+
+#[derive(Debug, Clone, ClapArgs)]
+pub struct ArgsArchiveWithStation {
+    #[clap(short('l'), long = "limit", value_name = "LIMIT", help = t!("linkura.command.api.subcommand.archive.args.limit.about").to_string())]
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Clone, ClapArgs)]
+pub struct ArgsArchiveWithStationDetails {
+    #[clap(short('i'), long = "id", value_name = "ID", help = t!("linkura.command.api.subcommand.archive_details.args.id.about").to_string())]
+    pub id: String,
 }
 
 pub async fn run(ctx: &Global, args: &ArgsAPI) -> Result<()> {
@@ -84,6 +100,43 @@ pub async fn run(ctx: &Global, args: &ArgsAPI) -> Result<()> {
             }
             //     tracing::info!("Archive details: {}", serde_json::to_string_pretty(&archive_details)?);
             // }
+        }
+        Commands::ArchiveWithStation(archive_with_station_args) => {
+            let archives = api_client.raw().archive().get_with_station_list(&None).await?;
+            if !save_json.is_empty() {
+                std::fs::write(save_json, serde_json::to_string_pretty(&archives)?)?;
+                tracing::info!("{}", t!("linkura.command.api.archive_with_station.saved", path = save_json));
+            } else {
+                tracing::info!(
+                    "{}",
+                    t!(
+                        "linkura.command.api.archive_with_station.output",
+                        json = serde_json::to_string_pretty(&archives)?
+                    )
+                );
+            }
+        }
+        Commands::ArchiveWithStationDetails(details_args) => {
+            let withstation_id = &details_args.id;
+            let details = api_client.raw().archive().get_with_station_data(&linkura_api::model::GetWithStationDataRequest {
+                withstation_id: Some(withstation_id.to_string()),
+                extra: Default::default(),
+            }).await?;
+            if !save_json.is_empty() {
+                std::fs::write(save_json, serde_json::to_string_pretty(&details)?)?;
+                tracing::info!(
+                    "{}",
+                    t!("linkura.command.api.archive_with_station_details.saved", path = save_json)
+                );
+            } else {
+                tracing::info!(
+                    "{}",
+                    t!(
+                        "linkura.command.api.archive_with_station_details.output",
+                        json = serde_json::to_string_pretty(&details)?
+                    )
+                );
+            }
         }
     }
     Ok(())

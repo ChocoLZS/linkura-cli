@@ -337,6 +337,8 @@ pub struct ArchiveGetHomeResponse {
     pub live_archive_list: Option<Vec<LiveInfo>>,
     pub trailer_archive_list: Option<Vec<LiveInfo>>,
     pub recommend_archive_list: Option<Vec<LiveInfo>>,
+    pub with_station_list: Option<Vec<LiveInfoWithstation>>,
+    pub music_video_list: Option<Vec<LiveInfoMusicvideo>>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -1411,6 +1413,75 @@ pub struct LiveInfo {
     pub end_time: Option<String>,
     pub open_time: Option<String>,
     pub close_time: Option<String>,
+    pub external_link: Option<String>,
+    pub thumbnail_image_url: Option<String>,
+    /// dnSpy enum: Org.OpenAPITools.Model.LiveTicketRank
+    pub ticket_rank: Option<i32>,
+    pub character_list: Option<Vec<LiveInfoCharacterListInner>>,
+    pub total_playing_time_second: Option<i32>,
+    pub is_publish_video_url: Option<bool>,
+    pub is_extra_started: Option<bool>,
+    pub has_extra: Option<bool>,
+    pub has_extra_admission: Option<bool>,
+    pub earned_star_count: Option<i32>,
+    pub gift_stars_threshold_for_extra_admission: Option<i32>,
+    pub video_url: Option<String>,
+    pub archive_video_size_in_byte: Option<i64>,
+    pub is_scheduled_start_time_visible: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct LiveInfoWithstation {
+    pub live_type: Option<i32>,
+    pub live_id: Option<String>,
+    pub status: i32,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub ticket_list: Option<Vec<TicketInfo>>,
+    pub trailer_start_time: Option<String>,
+    pub trailer_end_time: Option<String>,
+    pub start_time: Option<String>,
+    pub end_time: Option<String>,
+    pub interaction_start_time: Option<String>,
+    pub interaction_end_time: Option<String>,
+    pub external_link: Option<String>,
+    pub thumbnail_image_url: Option<String>,
+    /// dnSpy enum: Org.OpenAPITools.Model.LiveTicketRank
+    pub ticket_rank: Option<i32>,
+    pub character_list: Option<Vec<LiveInfoCharacterListInner>>,
+    pub total_playing_time_second: Option<i32>,
+    pub is_publish_video_url: Option<bool>,
+    pub is_extra_started: Option<bool>,
+    pub has_extra: Option<bool>,
+    pub has_extra_admission: Option<bool>,
+    pub earned_star_count: Option<i32>,
+    pub gift_stars_threshold_for_extra_admission: Option<i32>,
+    pub video_url: Option<String>,
+    pub archive_video_size_in_byte: Option<i64>,
+    pub is_scheduled_start_time_visible: Option<bool>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct LiveInfoMusicvideo {
+    /// dnSpy enum: Org.OpenAPITools.Model.LiveType
+    pub live_type: Option<i32>,
+    pub live_id: Option<String>,
+    pub status: i32,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub ticket_list: Option<Vec<TicketInfo>>,
+    pub trailer_start_time: Option<String>,
+    pub trailer_end_time: Option<String>,
+    pub start_time: Option<String>,
+    pub end_time: Option<String>,
+    pub interaction_start_time: Option<String>,
+    pub interaction_end_time: Option<String>,
     pub external_link: Option<String>,
     pub thumbnail_image_url: Option<String>,
     /// dnSpy enum: Org.OpenAPITools.Model.LiveTicketRank
@@ -7111,6 +7182,58 @@ pub struct UserTrainingItem {
 pub struct WallpaperSetting {
     pub d_home_wall_paper_settings_id: Option<String>,
     pub wallpaper_setting_info: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetWithStationListResponse {
+    pub with_station_list: Option<Vec<LiveInfoWithstation>>,
+    pub filterable_characters: Option<Vec<FilterableCharacter>>,
+    pub sortable_fields: Option<Vec<SortableField>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetWithStationDataResponse {
+    pub timelines: Option<Vec<LiveTimeline>>,
+    pub gift_pt_rankings: Option<Vec<LiveGiftPtRanking>>,
+    pub live_location_id: Option<i32>,
+    pub costume_ids: Option<Vec<i32>>,
+    pub timeline_ids: Option<Vec<i64>>,
+    // pub status: i32,
+    pub video_url: Option<String>,
+    pub chapters: Option<Vec<ArchiveWithliveChapter>>,
+    pub has_extra: Option<bool>,
+    pub gift_star_reward_segments: Option<Vec<i32>>,
+    pub gift_stars_threshold_for_extra_admission: Option<i32>,
+    pub has_extra_admission: Option<bool>,
+    pub current_play_time_second: Option<i32>,
+    pub total_play_time_second_without_extra: Option<i32>,
+    pub total_play_time_second_including_extra: Option<i32>,
+    pub start_time: Option<String>,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub content_code: Option<i32>,
+    pub viewer_count: Option<i32>,
+    pub user_icon_parts_info: Option<String>,
+    pub user_gift_pt: Option<i32>,
+    pub user_gift_pt_ranking: Option<i32>,
+    pub total_gift_pt: Option<String>,
+    pub characters: Option<Vec<LiveArchiveCharacter>>,
+    pub is_archive_published: Option<bool>,
+    pub is_horizontal: Option<bool>,
+    pub cover_image_url: Option<String>,
+    pub bgm_acb_path: Option<String>,
+    pub emoji_list: Option<Vec<i32>>,
+    pub membership_list: Option<Vec<i32>>,
+    pub user_profile: Option<LiveUserProfile>,
+    pub max_season_fan_level: i32,
+    pub has_admission: bool,
+    pub enquetes: Option<Vec<WithliveEnquete>>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }

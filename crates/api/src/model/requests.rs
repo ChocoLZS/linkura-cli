@@ -3244,3 +3244,29 @@ impl From<Value> for WebviewSchoolIdolConnectPostGetThemeListRequest {
 
 pub type ProfileUseFanLevelPointStocksRequest = ProfileUseFanlevelPointStocksRequest;
 
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetWithStationListRequest {
+    pub season_id: Option<i32>,
+    /// dnSpy: Org.OpenAPITools.Model.FilterLiveType
+    pub live_type: Option<i32>,
+    /// dnSpy: Org.OpenAPITools.Model.FilterHasWithliveExtra
+    pub has_withlive_extra: Option<i32>,
+    /// dnSpy: Org.OpenAPITools.Model.FilterHasWithliveExtraAdmission
+    pub has_withlive_extra_admission: Option<i32>,
+    pub characters: Option<Vec<Value>>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub order: Option<String>,
+    pub sort: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GetWithStationDataRequest {
+    pub withstation_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
