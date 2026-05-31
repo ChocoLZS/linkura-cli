@@ -23,6 +23,8 @@ pub enum Commands {
     ArchiveWithStation(ArgsArchiveWithStation),
     #[command(about = t!("linkura.command.api.subcommand.archive_with_station_details.about").to_string())]
     ArchiveWithStationDetails(ArgsArchiveWithStationDetails),
+    #[command(about = t!("linkura.command.api.subcommand.live_comments.about").to_string())]
+    LiveComments(ArgsLiveComments),
 }
 
 #[derive(Debug, Clone, ClapArgs)]
@@ -49,6 +51,43 @@ pub struct ArgsArchiveWithStation {
 pub struct ArgsArchiveWithStationDetails {
     #[clap(short('i'), long = "id", value_name = "ID", help = t!("linkura.command.api.subcommand.archive_details.args.id.about").to_string())]
     pub id: String,
+}
+
+#[derive(Debug, Clone, ClapArgs)]
+pub struct ArgsLiveComments {
+    #[clap(short('i'), long = "id", value_name = "ID", help = t!("linkura.command.api.subcommand.archive_details.args.id.about").to_string())]
+    pub id: String,
+    #[clap(short('t'), long = "type", value_name = "LIVE TYPE", help = t!("linkura.command.api.subcommand.live_comments.args.type.about").to_string())]
+    pub live_type: u8,
+}
+
+/// Extract a `YYYYMMDD` date prefix from a raw start time string such as
+/// `2024-12-25T19:00:00+09:00`. Falls back to `unknown` when no date is found.
+fn format_comment_date(start_time: &str) -> String {
+    let digits: String = start_time
+        .chars()
+        .take(10)
+        .filter(|c| c.is_ascii_digit())
+        .collect();
+    if digits.len() == 8 {
+        digits
+    } else {
+        "unknown".to_string()
+    }
+}
+
+/// Replace characters that are invalid in file names so the title can be used
+/// safely as part of the output path.
+fn sanitize_file_name(name: &str) -> String {
+    name.chars()
+        .map(|c| match c {
+            '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            c if c.is_control() => '_',
+            c => c,
+        })
+        .collect::<String>()
+        .trim()
+        .to_string()
 }
 
 pub async fn run(ctx: &Global, args: &ArgsAPI) -> Result<()> {
@@ -134,6 +173,45 @@ pub async fn run(ctx: &Global, args: &ArgsAPI) -> Result<()> {
                     t!(
                         "linkura.command.api.archive_with_station_details.output",
                         json = serde_json::to_string_pretty(&details)?
+                    )
+                );
+            }
+        }
+        Commands::LiveComments(comments_args) => {
+            let live_id = &comments_args.id;
+            let live_type = comments_args.live_type;
+            let comments = api_client
+                .high_level()
+                .get_live_comments(live_id, live_type)
+                .await?;
+
+            let date = format_comment_date(&comments.start_time);
+            let title = sanitize_file_name(&comments.title);
+            // When `-o` is provided it is treated as the output directory the
+            // generated files are placed into; otherwise the current directory.
+            let out_dir = if save_json.is_empty() {
+                std::path::PathBuf::from(".")
+            } else {
+                std::path::PathBuf::from(save_json)
+            };
+            if !save_json.is_empty() {
+                std::fs::create_dir_all(&out_dir)?;
+            }
+
+            for section in &comments.sections {
+                let tag_markers: String =
+                    section.tags.iter().map(|tag| format!("[{tag}]")).collect();
+                let file_name = format!(
+                    "[{date}][{kind}]{tag_markers}[{title}]_comments.json",
+                    kind = comments.kind
+                );
+                let path = out_dir.join(&file_name);
+                std::fs::write(&path, serde_json::to_string_pretty(&section.timelines)?)?;
+                tracing::info!(
+                    "{}",
+                    t!(
+                        "linkura.command.api.live_comments.saved",
+                        path = path.display().to_string()
                     )
                 );
             }

@@ -1,4 +1,4 @@
-use crate::macros::{define_api_struct, post, post_params, use_common_crate};
+use crate::macros::{define_api_struct, get_params, post, post_params, use_common_crate};
 
 use_common_crate!();
 define_api_struct!(FesliveApi);
@@ -99,14 +99,12 @@ impl<'a> FesliveApi<'a> {
         live_id: String,
     );
 
-    // POST /v1/feslive/live_info
-    post_params!(
+    // GET /v1/feslive/live_info
+    get_params!(
         live_info,
         "/feslive/live_info",
         crate::model::FesliveLiveInfoResponse,
         live_id: String,
-        offset_timeline_id: String,
-        offset_circle_chat_id: String,
     );
 
     // POST /v1/feslive/live_subinfo
@@ -149,14 +147,12 @@ impl<'a> FesliveApi<'a> {
         crate::model::FesliveGiftResponse
     );
 
-    // POST /v1/feslive/lobby_info
-    post_params!(
+    // GET /v1/feslive/lobby_info
+    get_params!(
         lobby_info,
         "/feslive/lobby_info",
         crate::model::FesliveLobbyInfoResponse,
         live_id: String,
-        offset_timeline_id: String,
-        offset_circle_chat_id: String,
     );
 
     // POST /v1/feslive/lobby_message_card

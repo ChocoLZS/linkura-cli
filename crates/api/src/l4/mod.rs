@@ -46,6 +46,7 @@ pub mod user;
 pub mod webview;
 pub mod webview_live;
 pub mod withlive;
+pub mod withstation;
 
 use_common_crate!();
 define_api_struct!(LinkuraApi);
@@ -241,6 +242,10 @@ impl<'a> LinkuraApi<'a> {
 
     pub fn with_live(&self) -> withlive::WithliveApi {
         self.withlive()
+    }
+
+    pub fn withstation(&self) -> withstation::WithstationApi {
+        withstation::WithstationApi { api: self }
     }
 
     pub fn fes_live(&self) -> feslive::FesliveApi {
