@@ -206,6 +206,10 @@ linkura:
         zh: "连线回放详情: %{json}"
         ja: "With Station アーカイブ詳細: %{json}"
         en: "With Station archive details: %{json}"
+      live_comments.saved:
+        zh: "直播评论已保存到 %{path}"
+        ja: "ライブコメントを %{path} に保存しました"
+        en: "Live comments saved to %{path}"
       args:
         output:
           about:
@@ -250,6 +254,17 @@ linkura:
             zh: "获取连线回放详情"
             ja: "With Station アーカイブ詳細を取得する"
             en: "Get With Station archive details"
+        live_comments:
+          about:
+            zh: "获取直播回放的评论时间线并保存为 JSON 文件"
+            ja: "ライブアーカイブのコメントタイムラインを取得し JSON ファイルとして保存する"
+            en: "Get live archive comment timelines and save them as JSON files"
+          args:
+            type:
+              about:
+                zh: "回放类型（1是FesLive, 2是WithLive, 3是WithStation）"
+                ja: "アーカイブのタイプ（1はFesLive、2はWithLive、3はWithStation）"
+                en: "Live type (1 is FesLive, 2 is WithLive, 3 is WithStation)"
     mcp:
       about:
         zh: "启用MCP服务器"

@@ -482,6 +482,7 @@ pub struct ArchiveLiveTimeline {
     pub asset_icon_parts_info: Option<String>,
     pub image_size: Option<i32>,
     pub play_time_second: Option<i32>,
+    pub play_time_ms: Option<i64>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -744,6 +745,7 @@ pub struct LiveTimeline {
     pub asset_icon_parts_info: Option<String>,
     pub image_size: Option<i32>,
     pub play_time_second: Option<i32>,
+    pub play_time_ms: Option<i64>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -1264,7 +1266,7 @@ pub struct ArchiveGetChannelMovieListResponse {
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub struct ArchiveGetFesTimelineDataResponse {
-    pub timelines: Option<Vec<ArchiveLiveTimeline>>,
+    pub timelines: Option<Vec<LiveTimeline>>,
     pub polling_interval: Option<i32>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
@@ -7234,6 +7236,15 @@ pub struct GetWithStationDataResponse {
     pub max_season_fan_level: i32,
     pub has_admission: bool,
     pub enquetes: Option<Vec<WithliveEnquete>>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct WithstationInfoResponse {
+    pub timelines: Option<Vec<LiveTimeline>>,
+    pub polling_interval: Option<i32>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }

@@ -1,4 +1,4 @@
-use crate::macros::{define_api_struct, post, post_params, use_common_crate};
+use crate::macros::{define_api_struct, get_params, post, post_params, use_common_crate};
 
 use_common_crate!();
 define_api_struct!(WithliveApi);
@@ -67,13 +67,12 @@ impl<'a> WithliveApi<'a> {
         live_id: String,
     );
 
-    // POST /v1/withlive/live_info
-    post_params!(
+    // GET /v1/withlive/live_info
+    get_params!(
         live_info,
         "/withlive/live_info",
         crate::model::WithliveLiveInfoResponse,
         live_id: String,
-        offset_timeline_id: String,
     );
 
     // POST /v1/withlive/live_subinfo

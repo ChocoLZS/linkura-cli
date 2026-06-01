@@ -105,7 +105,48 @@ macro_rules! post_params {
     };
 }
 
+/// Converts a value into an optional query-string value. `Option<T>` yields
+/// `None` when absent so the parameter is omitted from the URL entirely; plain
+/// values are always included.
+pub(crate) trait ToQueryParam {
+    fn to_query_value(&self) -> Option<String>;
+}
+
+impl ToQueryParam for String {
+    fn to_query_value(&self) -> Option<String> {
+        Some(self.clone())
+    }
+}
+
+impl<T: ToString> ToQueryParam for Option<T> {
+    fn to_query_value(&self) -> Option<String> {
+        self.as_ref().map(|v| v.to_string())
+    }
+}
+
+macro_rules! get_params {
+    ($name:ident, $path:expr, $response_ty:ty, $( $param:ident : $param_ty:ty ),+ $(,)?) => {
+        pub async fn $name(&self, $( $param: $param_ty ),+ ) -> Result<$response_ty> {
+            let url = format!("{API_BASE}{}", $path);
+            let mut query: Vec<(&str, String)> = Vec::new();
+            $(
+                if let Some(value) = crate::macros::ToQueryParam::to_query_value(&$param) {
+                    query.push((stringify!($param), value));
+                }
+            )+
+            let req = self
+                .client
+                .get(url)
+                .headers(self.runtime_header.clone())
+                .query(&query);
+            let res = req.send().await?;
+            crate::macros::parse_response(res, $path).await
+        }
+    };
+}
+
 pub(crate) use define_api_struct;
+pub(crate) use get_params;
 pub(crate) use post;
 pub(crate) use post_params;
 pub(crate) use use_common_crate;

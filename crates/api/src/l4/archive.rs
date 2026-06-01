@@ -1,4 +1,4 @@
-use crate::macros::{define_api_struct, post, post_params, use_common_crate};
+use crate::macros::{define_api_struct, get_params, post, post_params, use_common_crate};
 
 use_common_crate!();
 define_api_struct!(ArchiveApi);
@@ -105,8 +105,8 @@ impl<'a> ArchiveApi<'a> {
         crate::model::ArchiveWithliveGiftResponse
     );
 
-    // POST /v1/archive/withlive_info
-    post_params!(
+    // GET /v1/archive/withlive_info
+    get_params!(
         withlive_info,
         "/archive/withlive_info",
         crate::model::ArchiveWithliveInfoResponse,
